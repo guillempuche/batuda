@@ -50,6 +50,9 @@ export type ThreadRow = {
 	readonly id: string
 	readonly subject: string | null
 	readonly status: 'open' | 'closed' | 'archived'
+	// When the last message was actually sent. Null on a conversation whose
+	// messages are all too malformed to date, which is what `updatedAt` is for.
+	readonly lastMessageAt: string | null
 	readonly updatedAt: string
 	readonly messageCount: number
 }
@@ -161,7 +164,11 @@ export function ConversationsTab({
 			out.push({ kind: 'interaction', date: row.occurredAt, row })
 		}
 		for (const row of threads) {
-			out.push({ kind: 'email', date: row.updatedAt, row })
+			// Dated by its last message, not by when the row was last written:
+			// `updatedAt` moves when a status is changed or a message is stored,
+			// so mail that arrived in March sat at the top of the feed under
+			// today's date, above a call that really did happen today.
+			out.push({ kind: 'email', date: row.lastMessageAt ?? row.updatedAt, row })
 		}
 		for (const row of calendar) {
 			out.push({ kind: 'calendar', date: row.startAt, row })

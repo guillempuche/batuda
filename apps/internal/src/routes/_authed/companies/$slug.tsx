@@ -785,6 +785,7 @@ function DetailBody({
 		readonly externalThreadId: string
 		readonly subject: string | null
 		readonly status: 'open' | 'closed' | 'archived'
+		readonly lastMessageAt: string | null
 		readonly updatedAt: string
 		readonly messageCount: number
 	}
@@ -809,6 +810,7 @@ function DetailBody({
 				externalThreadId: r['externalThreadId'],
 				subject: typeof r['subject'] === 'string' ? r['subject'] : null,
 				status,
+				lastMessageAt: dateToIsoOrNull(r['lastMessageAt']),
 				updatedAt: dateToIsoOrNull(r['updatedAt']) ?? new Date(0).toISOString(),
 				messageCount:
 					typeof r['messageCount'] === 'number' ? r['messageCount'] : 0,

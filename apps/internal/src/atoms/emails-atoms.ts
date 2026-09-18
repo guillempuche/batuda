@@ -1,16 +1,39 @@
+import type { ThreadSort, ThreadStatus, ThreadWaitingOn } from '@batuda/domain'
+
 import { BatudaApiAtom } from '#/lib/batuda-api-atom'
 
 /**
- * Canonical shape for the `/emails` search params. Mirrors the envelope
- * query schema in `packages/controllers/src/routes/email.ts` — every
- * field is optional and only present when set. Keeping this shape strict
- * (no `undefined` literals, no empty strings) makes the cache-key helper
- * stable across equivalent searches.
+ * Canonical shape for the `/emails` search params. Mirrors the thread-list
+ * query in `packages/controllers/src/routes/email.ts` — every field is optional
+ * and only present when set.
+ *
+ * Keeping this shape strict (no `undefined` literals, no empty strings, no
+ * empty lists) is what makes the cache key below stable: two searches that
+ * narrow the list the same way have to answer to one entry, or the same rows
+ * are fetched twice under two names.
+ *
+ * A field added here needs nothing added beside it — the key and the request
+ * both read whatever the search holds rather than a list of names kept in step
+ * by hand.
  */
 export type EmailsSearch = {
 	readonly inboxId?: string
 	readonly companyId?: string
-	readonly status?: 'open' | 'closed' | 'archived'
+	readonly contactId?: string
+	// Several stages at once: a conversation matching any of them is on the
+	// list, which is how "open or closed but not archived" is asked for.
+	readonly status?: ReadonlyArray<ThreadStatus>
+	readonly waitingOn?: ThreadWaitingOn
+	// The words the server reads, not a yes/no: a query string carries text, and
+	// the endpoint holds these two to 'true' or 'false' rather than guessing at
+	// whatever else a link might spell.
+	readonly unread?: 'true' | 'false'
+	readonly hasAttachments?: 'true' | 'false'
+	readonly quietDays?: number
+	// User ids, and/or the word 'none' for the conversations whose company
+	// nobody has taken.
+	readonly companyOwner?: ReadonlyArray<string>
+	readonly sort?: ThreadSort
 	readonly query?: string
 	readonly limit?: number
 	readonly offset?: number
@@ -22,22 +45,11 @@ export const EMAILS_PAGE_SIZE = 100
 const cache = new Map<string, ReturnType<typeof makeListAtom>>()
 
 function makeListAtom(search: EmailsSearch) {
-	const query: Record<string, string | number> = {}
-	if (search.inboxId !== undefined && search.inboxId !== '') {
-		query['inboxId'] = search.inboxId
-	}
-	if (search.companyId !== undefined && search.companyId !== '') {
-		query['companyId'] = search.companyId
-	}
-	if (search.status !== undefined) query['status'] = search.status
-	if (search.query !== undefined && search.query !== '') {
-		query['query'] = search.query
-	}
-	if (search.limit !== undefined) query['limit'] = search.limit
-	if (search.offset !== undefined) query['offset'] = search.offset
-	if (search.count !== undefined) query['count'] = search.count
 	return BatudaApiAtom.query('email', 'listThreads', {
-		query,
+		// Handed over whole rather than copied field by field: a field missed in
+		// the copying is a filter the server never hears about, so the list comes
+		// back unfiltered under a cache key that says it was filtered.
+		query: search,
 		serializationKey: `email:threads:${canonicalKey(search)}`,
 	})
 }
@@ -51,23 +63,33 @@ export function emailsSearchAtom(search: EmailsSearch) {
 	return atom
 }
 
+/**
+ * A stable cache key for a search. Normalises away key order, the order of the
+ * values inside one filter and any blanks among them, and treats an empty
+ * string or an empty list as absent.
+ *
+ * Sorting the values inside a filter is what makes `?status=open,closed` and
+ * `?status=closed,open` one list rather than two atoms fetching the same rows
+ * twice.
+ *
+ * Two requests that differ only in whether they asked to be counted come back
+ * with different answers, so `count` is part of the key like everything else.
+ */
 export function canonicalKey(search: EmailsSearch): string {
 	const entries: Array<[string, string | number]> = []
-	if (search.inboxId !== undefined && search.inboxId !== '') {
-		entries.push(['inboxId', search.inboxId])
+	for (const [key, raw] of Object.entries(search)) {
+		if (raw === undefined || raw === null || raw === '') continue
+		if (Array.isArray(raw)) {
+			const values = (raw as ReadonlyArray<string>)
+				.filter(value => value !== '')
+				.slice()
+				.sort()
+			if (values.length === 0) continue
+			entries.push([key, values.join(',')])
+			continue
+		}
+		entries.push([key, raw as string | number])
 	}
-	if (search.companyId !== undefined && search.companyId !== '') {
-		entries.push(['companyId', search.companyId])
-	}
-	if (search.status !== undefined) entries.push(['status', search.status])
-	if (search.query !== undefined && search.query !== '') {
-		entries.push(['query', search.query])
-	}
-	if (search.limit !== undefined) entries.push(['limit', search.limit])
-	if (search.offset !== undefined) entries.push(['offset', search.offset])
-	// Two requests that differ only in whether they asked to be counted come
-	// back with different answers, so they cannot share a cache slot.
-	if (search.count !== undefined) entries.push(['count', search.count])
 	entries.sort(([a], [b]) => a.localeCompare(b))
 	return JSON.stringify(Object.fromEntries(entries))
 }

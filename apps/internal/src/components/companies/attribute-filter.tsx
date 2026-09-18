@@ -11,6 +11,7 @@ import {
 import { PriButton, PriInput } from '@batuda/ui/pri'
 
 import type { AttributeDeclaration } from '#/components/instructions/attribute-shapes'
+import { ALL, FilterSelect } from '#/components/shared/filter-select'
 import { MultiSelectFilter } from '#/components/shared/multi-select-filter'
 import { attributeEditText } from '#/lib/attribute-kinds'
 import type { AttributeFilterSearch } from '#/lib/companies-search-params'
@@ -22,7 +23,6 @@ import {
 } from './attribute-filter-logic'
 import { readLocaleNumber } from './attribute-input'
 import { resolveDeclarations } from './attribute-rows'
-import { ALL, FilterSelect } from './filter-select'
 
 // The three params, set together or dropped together.
 type AttributeFilterPatch = {

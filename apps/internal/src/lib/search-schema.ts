@@ -1,5 +1,7 @@
 import { Option, Schema } from 'effect'
 
+import { CommaList } from '@batuda/controllers'
+
 /**
  * Build a TanStack Router `validateSearch` that reads each address param on its
  * own — one malformed param never invalidates its neighbours.
@@ -72,4 +74,28 @@ function tryDecode(
 	} catch {
 		return Option.none()
 	}
+}
+
+/**
+ * A filter that holds several values, each of them one of a fixed set of words.
+ *
+ * It has to read two shapes. A link somebody wrote, or one this app built,
+ * carries the values comma-separated in a single param; the router's own
+ * round-trip of what it last put in the address hands them back as a list. Both
+ * mean the same filter, so both decode to the same list of words.
+ *
+ * `CommaList` does the splitting, rather than a second copy of the rule here:
+ * one splitting rule means a value trimmed one way everywhere, on the link the
+ * server reads and on the one the browser builds.
+ *
+ * A word outside the set fails the whole list, which `validateSearchWith` turns
+ * into a filter holding nothing. `?status=open,xyzzy` therefore shows every
+ * conversation rather than only the open ones — the filter is refused as a
+ * whole, so nothing is silently dropped from what was asked for.
+ */
+export function valueListOf<M extends Schema.Top>(member: M) {
+	return Schema.Union([
+		Schema.Array(member),
+		CommaList.pipe(Schema.decodeTo(Schema.Array(member))),
+	])
 }

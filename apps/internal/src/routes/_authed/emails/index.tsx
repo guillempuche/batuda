@@ -10,13 +10,11 @@ import {
 	type ColumnDef,
 	flexRender,
 	getCoreRowModel,
-	getSortedRowModel,
-	type SortingState,
 	type Table as TanstackTable,
 	useReactTable,
 	type VisibilityState,
 } from '@tanstack/react-table'
-import { Cause, DateTime, Effect, Option, Schema } from 'effect'
+import { Cause, DateTime, Effect, Option } from 'effect'
 import { AsyncResult } from 'effect/unstable/reactivity'
 import {
 	AlertTriangle,
@@ -29,6 +27,7 @@ import {
 	ChevronDown,
 	ChevronLeft,
 	ChevronRight,
+	ChevronsUpDown,
 	Columns,
 	Eye,
 	EyeOff,
@@ -40,7 +39,7 @@ import {
 	Search,
 	X,
 } from 'lucide-react'
-import { css, styled } from 'next-yak'
+import { styled } from 'next-yak'
 import {
 	useCallback,
 	useContext,
@@ -50,6 +49,14 @@ import {
 	useState,
 } from 'react'
 
+import {
+	THREAD_SORTS,
+	THREAD_STATUSES,
+	THREAD_WAITING_ON,
+	type ThreadSort,
+	type ThreadStatus,
+	type ThreadWaitingOn,
+} from '@batuda/domain'
 import {
 	PriButton,
 	PriCheckbox,
@@ -74,20 +81,33 @@ import { companiesListAtom } from '#/atoms/pipeline-atoms'
 import { PriTable } from '#/components/primitives/pri-table'
 import { EmptyState } from '#/components/shared/empty-state'
 import { ErrorState } from '#/components/shared/error-state'
+import { FilterChip } from '#/components/shared/filter-chip'
+import { ALL, FilterSelect } from '#/components/shared/filter-select'
+import { MultiSelectFilter } from '#/components/shared/multi-select-filter'
 import { RelativeDate } from '#/components/shared/relative-date'
 import { SkeletonRows } from '#/components/shared/skeleton-row'
+import { SrOnly } from '#/components/shared/sr-only'
 import { useComposeEmail } from '#/context/compose-email-context'
 import { dehydrateAtom, handOverFromServer } from '#/lib/atom-hydration'
 import type { BatudaApiServerClient } from '#/lib/batuda-api-server'
+import {
+	DEFAULT_THREAD_SORT,
+	type EmailsSearchPatch,
+	hasActiveFilters,
+	mergeSearch,
+	QUIET_DAY_CHOICES,
+	toggleValue,
+	toWireSearch,
+	validateEmailsSearch,
+} from '#/lib/emails-search-params'
+import { useOrgMembers } from '#/lib/org-members'
 import type { PaginatedList } from '#/lib/paginated-list'
-import { validateSearchWith } from '#/lib/search-schema'
 import {
 	brushedMetalPlate,
 	rulerUnderRule,
 	stenciledTitle,
 } from '#/lib/workshop-mixins'
 
-type ThreadStatus = 'open' | 'closed' | 'archived'
 type Direction = 'inbound' | 'outbound'
 type InboundClassification = 'normal' | 'spam' | 'blocked'
 
@@ -128,48 +148,6 @@ type CompanyLookup = {
 /** Debounce window for the search input before we push to the URL. */
 const SEARCH_DEBOUNCE_MS = 300
 
-/**
- * TanStack Router `validateSearch` — runs on every search-param change
- * and produces a canonical `EmailsSearch` plus the `page` URL param.
- * Empty strings and invalid values are dropped entirely so the URL stays
- * clean. `page` accepts either a number or a numeric string (raw URL)
- * and is filtered to positive finite values.
- */
-const validateSearch = validateSearchWith({
-	inboxId: Schema.NonEmptyString,
-	companyId: Schema.NonEmptyString,
-	status: Schema.Literals(['open', 'closed', 'archived'] as const),
-	query: Schema.NonEmptyString,
-	page: Schema.Union([Schema.Number, Schema.NumberFromString]).pipe(
-		Schema.refine((n): n is number => Number.isFinite(n) && n >= 1),
-	),
-})
-
-/** Convert URL search (with `page`) to the wire-level `EmailsSearch`. */
-function toWireSearch(
-	search: EmailsSearch & { readonly page?: number },
-): EmailsSearch {
-	const page = search.page ?? 1
-	const offset = (page - 1) * EMAILS_PAGE_SIZE
-	const wire: {
-		inboxId?: string
-		companyId?: string
-		status?: 'open' | 'closed' | 'archived'
-		query?: string
-		limit?: number
-		offset?: number
-		count?: 'exact' | 'none'
-		// This screen numbers its pages and prints "601–700 of 3400", so it needs
-		// the running count on every page, not only the first.
-	} = { limit: EMAILS_PAGE_SIZE, count: 'exact' }
-	if (offset > 0) wire.offset = offset
-	if (search.inboxId !== undefined) wire.inboxId = search.inboxId
-	if (search.companyId !== undefined) wire.companyId = search.companyId
-	if (search.status !== undefined) wire.status = search.status
-	if (search.query !== undefined) wire.query = search.query
-	return wire
-}
-
 // Return type is inferred from the typed API client so the dehydrated atom
 // values line up with the atoms' success schemas. The runtime `narrow*`
 // guards below still treat the payload as unknown.
@@ -177,18 +155,15 @@ function loadThreadsOnServer(
 	client: BatudaApiServerClient,
 	wire: EmailsSearch,
 ) {
-	const queryForServer: Record<string, string | number> = {}
-	if (wire.inboxId !== undefined) queryForServer['inboxId'] = wire.inboxId
-	if (wire.companyId !== undefined) queryForServer['companyId'] = wire.companyId
-	if (wire.status !== undefined) queryForServer['status'] = wire.status
-	if (wire.query !== undefined) queryForServer['query'] = wire.query
-	if (wire.limit !== undefined) queryForServer['limit'] = wire.limit
-	if (wire.offset !== undefined) queryForServer['offset'] = wire.offset
-	if (wire.count !== undefined) queryForServer['count'] = wire.count
 	return Effect.gen(function* () {
 		const [envelope, inboxes] = yield* Effect.all(
 			[
-				client.email.listThreads({ query: queryForServer }),
+				// Asked in exactly the words the browser will use, filters and
+				// counting included — the browser picks this answer up by the shape
+				// of the question. A filter copied out field by field here is a
+				// filter that can be missed, and a missed one renders the whole list
+				// under a cache key that says it was narrowed.
+				client.email.listThreads({ query: wire }),
 				// Must match the list atom this hydrates, or the filter chip would
 				// offer mailboxes that are gone until the first client fetch.
 				client.email.listInboxes({ query: { active: 'true' } }),
@@ -200,7 +175,7 @@ function loadThreadsOnServer(
 }
 
 export const Route = createFileRoute('/_authed/emails/')({
-	validateSearch,
+	validateSearch: validateEmailsSearch,
 	loaderDeps: ({ search }) => ({ search }),
 	loader: ({ deps: { search } }) => {
 		const wire = toWireSearch(search)
@@ -220,25 +195,12 @@ export const Route = createFileRoute('/_authed/emails/')({
 	component: EmailsIndexPage,
 })
 
-const STATUS_OPTIONS: ReadonlyArray<{
-	readonly value: ThreadStatus | 'all'
-	readonly labelKey:
-		| 'filterAll'
-		| 'filterOpen'
-		| 'filterClosed'
-		| 'filterArchived'
-}> = [
-	{ value: 'all', labelKey: 'filterAll' },
-	{ value: 'open', labelKey: 'filterOpen' },
-	{ value: 'closed', labelKey: 'filterClosed' },
-	{ value: 'archived', labelKey: 'filterArchived' },
-]
-
 function EmailsIndexPage() {
 	const { t } = useLingui()
 	const search = Route.useSearch()
 	const navigate = useNavigate({ from: Route.fullPath })
 	const { openCompose, drafts } = useComposeEmail()
+	const { members, meUserId } = useOrgMembers()
 	const listTopRef = useRef<HTMLDivElement>(null)
 	const wire = useMemo(() => toWireSearch(search), [search])
 
@@ -246,6 +208,7 @@ function EmailsIndexPage() {
 	// raw URL search object — so we memo on the key to avoid re-subscribing
 	// just because TanStack Router re-created the search on every render.
 	const wireKey = canonicalKey(wire)
+	// biome-ignore lint/correctness/useExhaustiveDependencies: wireKey stands for wire; listing wire itself would rebuild the atom on every render
 	const atom = useMemo(() => emailsSearchAtom(wire), [wireKey])
 	const result = useAtomValue(atom)
 	const refreshList = useAtomRefresh(atom)
@@ -297,9 +260,13 @@ function EmailsIndexPage() {
 			}
 		})
 	}, [envelope, overlays, threadIdsWithDraft])
-	const total = envelope?.total ?? 0
+	// How many conversations match in total, not how many this page holds.
+	// Unknown until the list actually loads: a still-loading or failed fetch
+	// must not read as "0 threads", which is an empty mailbox.
+	const total = envelope?.total ?? undefined
 	const isLoading = AsyncResult.isInitial(result)
 	const isFailure = AsyncResult.isFailure(result)
+	const hasResult = !isLoading && !isFailure
 	// Treat a tagged `Forbidden` whose message names the org-context gap
 	// as a distinct UI state so we can prompt for a sign-in/org-switch
 	// instead of showing the generic "Could not load threads" empty.
@@ -356,6 +323,7 @@ function EmailsIndexPage() {
 	}, [companiesResult])
 
 	// ── Search input (debounced URL write) ─────────────────────
+	const searchInputRef = useRef<HTMLInputElement>(null)
 	const [searchInput, setSearchInput] = useState(search.query ?? '')
 	useEffect(() => {
 		setSearchInput(search.query ?? '')
@@ -374,7 +342,6 @@ function EmailsIndexPage() {
 				search: prev =>
 					mergeSearch(prev, {
 						query: searchInput === '' ? undefined : searchInput,
-						page: undefined,
 					}),
 				replace: true,
 			})
@@ -385,23 +352,53 @@ function EmailsIndexPage() {
 	}, [searchInput, search.query, navigate])
 
 	// ── Filter handlers ────────────────────────────────────────
-	const handleStatusFilter = useCallback(
-		(status: ThreadStatus | undefined) => {
+	const applyPatch = useCallback(
+		(patch: EmailsSearchPatch) => {
 			void navigate({
 				to: '/emails',
-				search: prev => mergeSearch(prev, { status, page: undefined }),
+				search: prev => mergeSearch(prev, patch),
+			})
+		},
+		[navigate],
+	)
+	// Ticking a status works off the search the router is about to hand back,
+	// not the one this render captured: two presses land inside one navigation
+	// window often enough, and building both on the same captured list would let
+	// the second quietly undo the first.
+	const toggleStatus = useCallback(
+		(status: ThreadStatus) => {
+			void navigate({
+				to: '/emails',
+				search: prev => {
+					const next = toggleValue(prev, 'status', status)
+					// Waiting on somebody is something only an open conversation does,
+					// and the server holds a "waiting on" to exactly that. So naming
+					// any other status alongside one lights a chip that cannot add a
+					// single row — and naming none of the open ones empties the list
+					// outright, with nothing on screen to say why.
+					const chosen = next.status
+					return chosen === undefined || chosen.every(one => one === 'open')
+						? next
+						: mergeSearch(next, { waitingOn: undefined })
+				},
+			})
+		},
+		[navigate],
+	)
+	const toggleCompanyOwner = useCallback(
+		(userId: string) => {
+			void navigate({
+				to: '/emails',
+				search: prev => toggleValue(prev, 'companyOwner', userId),
 			})
 		},
 		[navigate],
 	)
 	const handleInboxFilter = useCallback(
 		(inboxId: string | undefined) => {
-			void navigate({
-				to: '/emails',
-				search: prev => mergeSearch(prev, { inboxId, page: undefined }),
-			})
+			applyPatch({ inboxId })
 		},
-		[navigate],
+		[applyPatch],
 	)
 	const handlePage = useCallback(
 		(page: number) => {
@@ -419,9 +416,15 @@ function EmailsIndexPage() {
 		},
 		[navigate],
 	)
+	// Sort goes too, not just the filters: it is set from this same bar, and a
+	// list left in an order nobody remembers choosing reads as broken.
 	const handleClearFilters = useCallback(() => {
 		setSearchInput('')
 		void navigate({ to: '/emails', search: {} })
+		// The button disappears with the filters it just cleared, so the keyboard
+		// would be left standing on nothing. The search box is where the next
+		// thing anyone does on this bar starts.
+		searchInputRef.current?.focus()
 	}, [navigate])
 
 	// ── Selection state ────────────────────────────────────────
@@ -547,20 +550,88 @@ function EmailsIndexPage() {
 
 	// ── Pagination math ────────────────────────────────────────
 	const page = search.page ?? 1
-	const firstRow = total === 0 ? 0 : (page - 1) * EMAILS_PAGE_SIZE + 1
-	const lastRow = Math.min(page * EMAILS_PAGE_SIZE, total)
-	const totalPages = Math.max(1, Math.ceil(total / EMAILS_PAGE_SIZE))
+	const counted = total ?? 0
+	const firstRow = counted === 0 ? 0 : (page - 1) * EMAILS_PAGE_SIZE + 1
+	const lastRow = Math.min(page * EMAILS_PAGE_SIZE, counted)
+	const totalPages = Math.max(1, Math.ceil(counted / EMAILS_PAGE_SIZE))
 	const activeFilters = hasActiveFilters(search)
 
 	const selectedCount = selected.size
 	const allSelected = threads.length > 0 && selectedCount === threads.length
+
+	// ── Filter vocabulary ──────────────────────────────────────
+	const chosenStatuses = search.status ?? []
+	// Both counts have a singular form: narrowing down to one conversation is
+	// ordinary, and "1 threads" reads as a bug.
+	const countLabel = activeFilters
+		? total === 1
+			? t`1 thread with filters applied`
+			: t`${total} threads with filters applied`
+		: total === 1
+			? t`1 thread`
+			: t`${total} threads`
+	// Read off the words the server actually holds, so a stage added there and
+	// missed here fails to compile rather than quietly going unoffered.
+	const statusLabels: Record<ThreadStatus, string> = {
+		open: t`Open`,
+		closed: t`Closed`,
+		archived: t`Archived`,
+	}
+	// Named for the reader's own next move rather than for the column it reads:
+	// "us" is a conversation somebody here still owes an answer to.
+	const waitingLabels: Record<ThreadWaitingOn, string> = {
+		us: t`Needs a reply`,
+		them: t`Waiting on them`,
+	}
+	const waitingOptions = [
+		{ value: ALL, label: t`Any thread` },
+		...THREAD_WAITING_ON.map(value => ({
+			value,
+			label: waitingLabels[value],
+		})),
+	]
+	// A hand-written link may ask for any number of days the server accepts, and
+	// a control that could not show it would leave the reader unable to put it
+	// down again, so it joins the offered ones in its place.
+	const quietChoices =
+		search.quietDays !== undefined &&
+		!QUIET_DAY_CHOICES.includes(search.quietDays)
+			? [...QUIET_DAY_CHOICES, search.quietDays].sort((a, b) => a - b)
+			: QUIET_DAY_CHOICES
+	const quietOptions = [
+		{ value: ALL, label: t`Any time` },
+		...quietChoices.map(days => ({
+			value: String(days),
+			label: t`Gone quiet · ${days}+ days`,
+		})),
+	]
+	// No counts: the colleagues come from the organisation's own list, not from
+	// a tally of the conversations, so there is no number to put beside a name.
+	const ownerOptions = [
+		...(meUserId ? [{ value: meUserId, label: t`My leads` }] : []),
+		{ value: 'none', label: t`Company without owner` },
+		...members
+			.filter(member => member.userId !== meUserId)
+			.map(member => ({ value: member.userId, label: member.name })),
+	]
+	// Each names the order rather than the field, because the trigger shows only
+	// the value it is set to: a bare "Activity" would say nothing about whether
+	// the newest is at the top.
+	const sortLabels: Record<ThreadSort, string> = {
+		recent_activity: t`By recent activity`,
+		latest_message: t`By latest message`,
+	}
+	const sortOptions = THREAD_SORTS.map(value => ({
+		value,
+		label: sortLabels[value],
+	}))
 
 	return (
 		<Page>
 			<Intro>
 				<IntroText>
 					<Title>{t`Emails`}</Title>
-					{!showOnboarding && (
+					{!showOnboarding && hasResult && total !== undefined && (
 						<Subtitle data-testid='emails-thread-total'>
 							{total === 1 ? t`1 thread` : t`${total} threads`}
 						</Subtitle>
@@ -617,15 +688,31 @@ function EmailsIndexPage() {
 				/>
 			) : (
 				<>
+					{/* Every control in the bar below changes the list without the
+					 * keyboard moving anywhere, so anyone not looking at the screen
+					 * gets no sign of it — including when one control quietly lifts
+					 * another, as the status chips and "waiting on" do to each other.
+					 * This line sits outside the block that swaps for the skeleton,
+					 * because a spoken message that disappears with the list it
+					 * describes is often never read out. */}
+					<SrOnly
+						role='status'
+						aria-live='polite'
+						data-testid='emails-count-announcement'
+					>
+						{hasResult && total !== undefined ? countLabel : ''}
+					</SrOnly>
+
 					<Filters role='group' aria-label={t`Filter emails`}>
 						<SearchWrap>
 							<SearchIcon>
 								<Search size={16} aria-hidden />
 							</SearchIcon>
 							<PriInput
+								ref={searchInputRef}
 								type='search'
 								data-testid='emails-search'
-								placeholder={t`Search by subject…`}
+								placeholder={t`Search subject, message text, or address…`}
 								value={searchInput}
 								onChange={event => setSearchInput(event.target.value)}
 								aria-label={t`Search threads`}
@@ -633,106 +720,210 @@ function EmailsIndexPage() {
 							/>
 						</SearchWrap>
 
-						<FilterControls>
-							<StatusFilters role='group' aria-label={t`Filter by status`}>
-								{STATUS_OPTIONS.map(opt => {
-									const current = search.status ?? 'all'
-									const active = current === opt.value
-									const label =
-										opt.labelKey === 'filterAll'
-											? t`All`
-											: opt.labelKey === 'filterOpen'
-												? t`Open`
-												: opt.labelKey === 'filterClosed'
-													? t`Closed`
-													: t`Archived`
-									return (
-										<StatusFilterButton
-											key={opt.value}
-											type='button'
-											$active={active}
-											aria-pressed={active}
-											data-testid={`emails-status-${opt.value}`}
-											onClick={() =>
-												handleStatusFilter(
-													opt.value === 'all' ? undefined : opt.value,
-												)
-											}
-										>
-											{label}
-										</StatusFilterButton>
-									)
-								})}
-							</StatusFilters>
+						<StatusFilters role='group' aria-label={t`Filter by status`}>
+							<FilterChip
+								type='button'
+								onClick={() => applyPatch({ status: undefined })}
+								// It is the one chip that lights up while carrying no state
+								// a listener can hear, so the strip would read as five
+								// toggles and one plain button with no way to tell which is
+								// on. And "All" alone says nothing about what it is all of.
+								aria-pressed={chosenStatuses.length === 0}
+								aria-label={t`All statuses`}
+								data-testid='emails-status-all'
+							>
+								{t`All`}
+							</FilterChip>
+							{THREAD_STATUSES.map(status => (
+								<FilterChip
+									key={status}
+									type='button'
+									onClick={() => toggleStatus(status)}
+									aria-pressed={chosenStatuses.includes(status)}
+									data-testid={`emails-status-${status}`}
+								>
+									{statusLabels[status]}
+								</FilterChip>
+							))}
+							{/* Separate from the statuses on purpose: a conversation has a
+							    status as well as being read or not, so these ask a
+							    different question about the same list. */}
+							<FilterChip
+								type='button'
+								onClick={() =>
+									applyPatch({
+										unread: search.unread === 'true' ? undefined : 'true',
+									})
+								}
+								aria-pressed={search.unread === 'true'}
+								data-testid='emails-filter-unread'
+							>
+								{t`Unread`}
+							</FilterChip>
+							<FilterChip
+								type='button'
+								onClick={() =>
+									applyPatch({
+										hasAttachments:
+											search.hasAttachments === 'true' ? undefined : 'true',
+									})
+								}
+								aria-pressed={search.hasAttachments === 'true'}
+								data-testid='emails-filter-has-attachments'
+							>
+								{t`Has attachments`}
+							</FilterChip>
+						</StatusFilters>
 
+						<DropdownRow>
 							{inboxOptions.length > 0 && (
-								<InboxSelectWrap>
-									<PriSelect.Root
-										value={search.inboxId ?? '__all__'}
-										onValueChange={value =>
-											handleInboxFilter(
-												value === '__all__' ? undefined : String(value),
-											)
-										}
+								// Written out rather than handed to `FilterSelect`: the
+								// mailboxes come from the organisation and the tests reach
+								// each option by the address on it, which a generic control
+								// has nowhere to put.
+								<PriSelect.Root
+									value={search.inboxId ?? ALL}
+									onValueChange={value =>
+										handleInboxFilter(value === ALL ? undefined : String(value))
+									}
+								>
+									<PriSelect.Trigger
+										data-testid='inbox-filter-trigger'
+										aria-label={t`Filter by inbox`}
 									>
-										<PriSelect.Trigger
-											data-testid='inbox-filter-trigger'
-											aria-label={t`Filter by inbox`}
-										>
-											<PriSelect.Value placeholder={t`All inboxes`} />
-											<PriSelect.Icon>
-												<ChevronRight size={14} aria-hidden />
-											</PriSelect.Icon>
-										</PriSelect.Trigger>
-										<PriSelect.Portal>
-											<PriSelect.Positioner>
-												<PriSelect.Popup>
+										<PriSelect.Value placeholder={t`All inboxes`} />
+										<PriSelect.Icon>
+											<ChevronsUpDown size={14} aria-hidden />
+										</PriSelect.Icon>
+									</PriSelect.Trigger>
+									<PriSelect.Portal>
+										<PriSelect.Positioner>
+											<PriSelect.Popup>
+												<PriSelect.Item
+													value={ALL}
+													data-testid='inbox-filter-option'
+													data-inbox-email='__all__'
+												>
+													<PriSelect.ItemIndicator>
+														<Check size={12} aria-hidden />
+													</PriSelect.ItemIndicator>
+													<PriSelect.ItemText>{t`All inboxes`}</PriSelect.ItemText>
+												</PriSelect.Item>
+												{inboxOptions.map(inbox => (
 													<PriSelect.Item
-														value='__all__'
+														key={inbox.id}
+														value={inbox.id}
 														data-testid='inbox-filter-option'
-														data-inbox-email='__all__'
+														data-inbox-email={inbox.email}
 													>
 														<PriSelect.ItemIndicator>
 															<Check size={12} aria-hidden />
 														</PriSelect.ItemIndicator>
-														<PriSelect.ItemText>{t`All inboxes`}</PriSelect.ItemText>
+														<PriSelect.ItemText>
+															{inbox.displayName
+																? `${inbox.displayName} <${inbox.email}>`
+																: inbox.email}
+														</PriSelect.ItemText>
 													</PriSelect.Item>
-													{inboxOptions.map(inbox => (
-														<PriSelect.Item
-															key={inbox.id}
-															value={inbox.id}
-															data-testid='inbox-filter-option'
-															data-inbox-email={inbox.email}
-														>
-															<PriSelect.ItemIndicator>
-																<Check size={12} aria-hidden />
-															</PriSelect.ItemIndicator>
-															<PriSelect.ItemText>
-																{inbox.displayName
-																	? `${inbox.displayName} <${inbox.email}>`
-																	: inbox.email}
-															</PriSelect.ItemText>
-														</PriSelect.Item>
-													))}
-												</PriSelect.Popup>
-											</PriSelect.Positioner>
-										</PriSelect.Portal>
-									</PriSelect.Root>
-								</InboxSelectWrap>
+												))}
+											</PriSelect.Popup>
+										</PriSelect.Positioner>
+									</PriSelect.Portal>
+								</PriSelect.Root>
 							)}
-
+							<FilterSelect
+								label={t`Waiting on`}
+								value={search.waitingOn ?? ALL}
+								options={waitingOptions}
+								onChange={value => {
+									const waitingOn =
+										value === ALL ? undefined : (value as ThreadWaitingOn)
+									void navigate({
+										to: '/emails',
+										// Worked out from the search the router is about to hand
+										// back, not from the one this render captured: a status
+										// chip pressed a moment earlier may not have come back
+										// yet, and this would otherwise throw it away.
+										search: prev => {
+											// Nothing settled is waiting for anyone, so a closed
+											// or archived conversation and a "waiting on"
+											// together can only ever show an empty list.
+											const stillOpen = (prev.status ?? []).filter(
+												status => status === 'open',
+											)
+											return mergeSearch(prev, {
+												waitingOn,
+												...(waitingOn === undefined
+													? {}
+													: {
+															status:
+																stillOpen.length === 0 ? undefined : stillOpen,
+														}),
+											})
+										},
+									})
+								}}
+								testId='emails-filter-waiting-on'
+							/>
+							<FilterSelect
+								label={t`Quiet for`}
+								value={
+									search.quietDays !== undefined
+										? String(search.quietDays)
+										: ALL
+								}
+								options={quietOptions}
+								onChange={value =>
+									applyPatch({
+										quietDays: value === ALL ? undefined : Number(value),
+									})
+								}
+								testId='emails-filter-quiet'
+							/>
+							<MultiSelectFilter
+								label={t`Company owner`}
+								options={ownerOptions}
+								selected={search.companyOwner ?? []}
+								onToggle={toggleCompanyOwner}
+								onClear={() => applyPatch({ companyOwner: undefined })}
+								describeCount={count => t`${count} threads`}
+								testId='emails-filter-company-owner'
+							/>
+							<FilterSelect
+								label={t`Sort`}
+								value={search.sort ?? DEFAULT_THREAD_SORT}
+								options={sortOptions}
+								onChange={value =>
+									applyPatch({
+										// The usual order is what the list does anyway, so
+										// writing it would add a param that changes nothing.
+										sort:
+											value === DEFAULT_THREAD_SORT
+												? undefined
+												: (value as ThreadSort),
+									})
+								}
+								testId='emails-filter-sort'
+							/>
 							{activeFilters && (
 								<PriButton
 									type='button'
 									$variant='outlined'
 									onClick={handleClearFilters}
+									data-testid='emails-clear-filters'
 								>
 									<X size={14} aria-hidden />
 									<span>{t`Clear filters`}</span>
 								</PriButton>
 							)}
-						</FilterControls>
+						</DropdownRow>
 					</Filters>
+
+					{/* Where paging sends the keyboard and the screen, so a new page
+					    opens at its first conversation. It sits above the block that
+					    swaps below, because focus cannot be moved onto an element
+					    that the same navigation takes off the page. */}
+					<ListTop ref={listTopRef} tabIndex={-1} />
 
 					{isLoading ? (
 						<SkeletonRows count={8} height='3.5rem' />
@@ -779,9 +970,6 @@ function EmailsIndexPage() {
 						/>
 					) : (
 						<>
-							{/* Where paging sends the keyboard and the screen, so a new
-							    page opens at its first thread. */}
-							<ListTop ref={listTopRef} tabIndex={-1} />
 							{drafts.length > 0 && <DraftsResumeStrip drafts={drafts} />}
 							<ThreadsGrid
 								threads={threads}
@@ -797,9 +985,12 @@ function EmailsIndexPage() {
 						</>
 					)}
 
-					{total > EMAILS_PAGE_SIZE && (
+					{total !== undefined && total > EMAILS_PAGE_SIZE && (
 						<Pagination aria-label={t`Thread pages`}>
-							<PageLabel role='status'>{t`Showing ${firstRow}–${lastRow} of ${total}`}</PageLabel>
+							{/* Not a spoken status of its own: the count above already
+							    announces the list, and two live regions firing on one
+							    navigation read out over each other. */}
+							<PageLabel>{t`Showing ${firstRow}–${lastRow} of ${total}`}</PageLabel>
 							<PageNav>
 								<PriButton
 									type='button'
@@ -893,7 +1084,6 @@ function ThreadsGrid({
 	const [columnVisibility, setColumnVisibility] = useState<VisibilityState>(
 		() => readLocal<VisibilityState>(COLUMN_VISIBILITY_KEY, {}),
 	)
-	const [sorting, setSorting] = useState<SortingState>([])
 
 	useEffect(() => {
 		writeLocal(COLUMN_VISIBILITY_KEY, columnVisibility)
@@ -946,10 +1136,15 @@ function ThreadsGrid({
 				enableSorting: false,
 				cell: ({ row }) => <StatusCell thread={row.original} />,
 			},
+			// None of the three reading columns sorts. The order comes from the
+			// server, over every conversation that matches; a header could only
+			// reorder the hundred on this page, so it would quietly disagree with
+			// the Sort control and with the page numbers beneath it.
 			{
 				id: 'who',
 				header: () => t`Who`,
 				size: 260,
+				enableSorting: false,
 				accessorFn: r => resolveCompany(r, companiesById)?.name ?? '',
 				cell: ({ row }) => (
 					<WhoCell
@@ -962,6 +1157,7 @@ function ThreadsGrid({
 				id: 'what',
 				header: () => t`What`,
 				size: 420,
+				enableSorting: false,
 				accessorFn: r => r.subject ?? '',
 				cell: ({ row }) => <WhatCell thread={row.original} />,
 			},
@@ -969,6 +1165,7 @@ function ThreadsGrid({
 				id: 'when',
 				header: () => t`When`,
 				size: 120,
+				enableSorting: false,
 				accessorFn: r => r.lastMessageAt ?? r.updatedAt,
 				cell: ({ row }) => (
 					<RelativeDate
@@ -1007,13 +1204,11 @@ function ThreadsGrid({
 	const table = useReactTable({
 		data: threads as ThreadRow[],
 		columns,
-		state: { columnVisibility, sorting, rowSelection },
+		state: { columnVisibility, rowSelection },
 		getRowId: r => r.id,
 		enableRowSelection: true,
 		onColumnVisibilityChange: setColumnVisibility,
-		onSortingChange: setSorting,
 		getCoreRowModel: getCoreRowModel(),
-		getSortedRowModel: getSortedRowModel(),
 		defaultColumn: { minSize: 48 },
 	})
 
@@ -1117,11 +1312,6 @@ function ThreadsGrid({
 											data-col={header.column.id}
 											$flex={COLUMN_FLEX[header.column.id] ?? 'fixed'}
 											style={{ width: header.getSize() }}
-											onClick={
-												header.column.getCanSort()
-													? header.column.getToggleSortingHandler()
-													: undefined
-											}
 										>
 											{header.isPlaceholder
 												? null
@@ -1129,8 +1319,6 @@ function ThreadsGrid({
 														header.column.columnDef.header,
 														header.getContext(),
 													)}
-											{header.column.getIsSorted() === 'asc' && ' ↑'}
-											{header.column.getIsSorted() === 'desc' && ' ↓'}
 										</PriTable.ColumnHeader>
 									))}
 								</PriTable.Row>
@@ -1210,14 +1398,15 @@ function resolveCompany(
 }
 
 function StatusCell({ thread }: { thread: ThreadRow }) {
+	const { t } = useLingui()
 	if (thread.hasDraft) {
-		return <PencilLine size={14} aria-label='Has draft' />
+		return <PencilLine size={14} aria-label={t`Has draft`} />
 	}
 	if (thread.status === 'closed') {
-		return <Check size={14} aria-label='Closed' />
+		return <Check size={14} aria-label={t`Closed`} />
 	}
 	if (thread.status === 'archived') {
-		return <Archive size={14} aria-label='Archived' />
+		return <Archive size={14} aria-label={t`Archived`} />
 	}
 	return null
 }
@@ -1492,45 +1681,6 @@ function DraftsResumeStrip({ drafts }: { drafts: ReadonlyArray<StripDraft> }) {
 
 // ── Helpers ──────────────────────────────────────────────────────
 
-function mergeSearch(
-	prev: EmailsSearch & { page?: number },
-	next: Partial<{
-		inboxId: string | undefined
-		companyId: string | undefined
-		status: ThreadStatus | undefined
-		query: string | undefined
-		page: number | undefined
-	}>,
-): EmailsSearch & { page?: number } {
-	const result: {
-		inboxId?: string
-		companyId?: string
-		status?: ThreadStatus
-		query?: string
-		page?: number
-	} = {}
-	const inboxId = 'inboxId' in next ? next.inboxId : prev.inboxId
-	if (inboxId !== undefined && inboxId !== '') result.inboxId = inboxId
-	const companyId = 'companyId' in next ? next.companyId : prev.companyId
-	if (companyId !== undefined && companyId !== '') result.companyId = companyId
-	const status = 'status' in next ? next.status : prev.status
-	if (status !== undefined) result.status = status
-	const query = 'query' in next ? next.query : prev.query
-	if (query !== undefined && query !== '') result.query = query
-	const page = 'page' in next ? next.page : prev.page
-	if (page !== undefined && page > 1) result.page = page
-	return result
-}
-
-function hasActiveFilters(search: EmailsSearch & { page?: number }): boolean {
-	return (
-		search.inboxId !== undefined ||
-		search.companyId !== undefined ||
-		search.status !== undefined ||
-		search.query !== undefined
-	)
-}
-
 function narrowEnvelope(value: unknown): PaginatedList<unknown> | null {
 	if (!value || typeof value !== 'object') return null
 	const v = value as Record<string, unknown>
@@ -1689,16 +1839,12 @@ const Filters = styled.div`
 	${brushedMetalPlate}
 	display: flex;
 	flex-direction: column;
-	gap: var(--space-sm);
-	padding: var(--space-md);
+	/* Padding and gaps shrink with the sheet rather than at a width picked in
+	 * advance: on a phone this block used to stand between the reader and the
+	 * first conversation for most of a screen. */
+	gap: clamp(var(--space-2xs), 1.5vw, var(--space-sm));
+	padding: clamp(var(--space-2xs), 2vw, var(--space-md));
 	border-radius: var(--shape-2xs);
-`
-
-const FilterControls = styled.div`
-	display: flex;
-	flex-wrap: wrap;
-	align-items: center;
-	gap: var(--space-sm);
 `
 
 const SearchWrap = styled.div`
@@ -1717,59 +1863,56 @@ const SearchIcon = styled.span`
 `
 
 const StatusFilters = styled.div`
+	/* Six chips on one line that slides, rather than wrapping onto three rows.
+	 * Wrapped, they were most of what stood between a phone and the first
+	 * conversation; sliding, they cost one row at every width. The faded ends
+	 * say there is more either side, the same as the tab strip. */
+	display: flex;
+	flex-wrap: nowrap;
+	overflow-x: auto;
+	overflow-y: hidden;
+	gap: var(--space-2xs);
+	padding-bottom: var(--space-3xs);
+	scrollbar-width: none;
+	scroll-snap-type: x proximity;
+	mask-image: linear-gradient(
+		to right,
+		transparent 0,
+		black 1rem,
+		black calc(100% - 1rem),
+		transparent 100%
+	);
+
+	&::-webkit-scrollbar {
+		display: none;
+	}
+
+	> * {
+		flex: 0 0 auto;
+		scroll-snap-align: start;
+	}
+`
+
+const DropdownRow = styled.div`
 	display: flex;
 	flex-wrap: wrap;
+	/* Stretch, not centre: one control carries a longer label than the rest —
+	 * "Gone quiet · 30+ days" — and on a narrow row it takes two lines. Centred,
+	 * it would stand taller than its neighbours and the row would read as
+	 * broken; stretched, every control on a line is the same height whatever
+	 * its label does. */
+	align-items: stretch;
 	gap: var(--space-2xs);
-`
 
-const StatusFilterButton = styled.button<{ $active: boolean }>`
-	display: inline-flex;
-	align-items: center;
-	gap: var(--space-2xs);
-	padding: var(--space-2xs) var(--space-sm);
-	background: ${p => (p.$active ? 'var(--color-primary)' : 'transparent')};
-	color: ${p =>
-		p.$active ? 'var(--color-on-primary)' : 'var(--color-on-surface)'};
-	border: 2px
-		${p => (p.$active ? 'solid' : 'dashed')}
-		${p =>
-			p.$active
-				? 'color-mix(in oklab, var(--color-primary) 70%, black)'
-				: 'var(--color-outline)'};
-	border-radius: var(--shape-2xs);
-	font-family: var(--font-display);
-	font-size: var(--typescale-label-small-size);
-	line-height: var(--typescale-label-small-line);
-	font-weight: var(--font-weight-bold);
-	letter-spacing: 0.06em;
-	text-transform: uppercase;
-	cursor: pointer;
-	transition:
-		background 160ms ease,
-		color 160ms ease,
-		border-color 160ms ease;
-
-	${p =>
-		p.$active &&
-		css`
-			text-shadow: var(--text-shadow-engrave);
-			box-shadow:
-				inset 0 1px 3px var(--shadow-color-deep),
-				0 1px 0 var(--highlight-inset-soft);
-		`}
-
-	&:hover:not(:disabled) {
-		border-color: var(--color-primary);
+	/* Each dropdown takes a share of the line and stops shrinking once it is
+	 * still readable, so several sit on one line on a monitor and two or three
+	 * per line on a phone — continuously, with no width to cross. Aimed at the
+	 * buttons rather than at every child: each dropdown also plants a hidden
+	 * input beside its trigger, and a grid would have given those a column. */
+	> button {
+		flex: 1 1 8rem;
+		min-width: 0;
 	}
-
-	&:focus-visible {
-		outline: none;
-		box-shadow: var(--glow-active);
-	}
-`
-
-const InboxSelectWrap = styled.div`
-	display: flex;
 `
 
 // While rows are selected the bulk-action bar takes the header's slot, so it

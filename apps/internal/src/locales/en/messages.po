@@ -220,6 +220,10 @@ msgstr "{count} companies"
 msgid "{count} people went with it"
 msgstr "{count} people went with it"
 
+#: src/routes/_authed/emails/index.tsx
+msgid "{count} threads"
+msgstr "{count} threads"
+
 #: src/components/research/inbox/research-inbox.tsx
 msgid "{entered} changes entered the records."
 msgstr "{entered} changes entered the records."
@@ -265,8 +269,13 @@ msgid "{total} documents"
 msgstr "{total} documents"
 
 #: src/routes/_authed/emails/index.tsx
+#: src/routes/_authed/emails/index.tsx
 msgid "{total} threads"
 msgstr "{total} threads"
+
+#: src/routes/_authed/emails/index.tsx
+msgid "{total} threads with filters applied"
+msgstr "{total} threads with filters applied"
 
 #: src/routes/_authed/settings/organization/members.tsx
 msgid "{trimmed} is already in this organization."
@@ -322,12 +331,17 @@ msgid "1 person went with it"
 msgstr "1 person went with it"
 
 #: src/routes/_authed/emails/index.tsx
+#: src/routes/_authed/emails/index.tsx
 msgid "1 thread"
 msgstr "1 thread"
 
 #: src/routes/_authed/emails/index.tsx
 msgid "1 thread selected"
 msgstr "1 thread selected"
+
+#: src/routes/_authed/emails/index.tsx
+msgid "1 thread with filters applied"
+msgstr "1 thread with filters applied"
 
 #: src/components/research/inbox/research-inbox.tsx
 msgid "50%+"
@@ -627,6 +641,7 @@ msgstr "All runs"
 msgid "All stages"
 msgstr "All stages"
 
+#: src/routes/_authed/emails/index.tsx
 #: src/routes/_authed/pages/index.tsx
 msgid "All statuses"
 msgstr "All statuses"
@@ -734,6 +749,14 @@ msgstr "Any confidence"
 msgid "Any priority"
 msgstr "Any priority"
 
+#: src/routes/_authed/emails/index.tsx
+msgid "Any thread"
+msgstr "Any thread"
+
+#: src/routes/_authed/emails/index.tsx
+msgid "Any time"
+msgstr "Any time"
+
 #: src/components/companies/attribute-filter.tsx
 msgid "Any value"
 msgstr "Any value"
@@ -831,6 +854,7 @@ msgstr "Archive thread"
 
 #: src/components/companies/conversations-tab.tsx
 #: src/routes/_authed/emails/$threadId.tsx
+#: src/routes/_authed/emails/index.tsx
 #: src/routes/_authed/emails/index.tsx
 msgid "Archived"
 msgstr "Archived"
@@ -1092,6 +1116,10 @@ msgstr "By last contact"
 msgid "By last update"
 msgstr "By last update"
 
+#: src/routes/_authed/emails/index.tsx
+msgid "By latest message"
+msgstr "By latest message"
+
 #: src/routes/_authed/companies/index.tsx
 msgid "By name"
 msgstr "By name"
@@ -1103,6 +1131,10 @@ msgstr "By priority"
 #: src/routes/_authed/settings/organization/spend.tsx
 msgid "By provider"
 msgstr "By provider"
+
+#: src/routes/_authed/emails/index.tsx
+msgid "By recent activity"
+msgstr "By recent activity"
 
 #: src/routes/_authed/settings/organization/spend.tsx
 msgid "By tool"
@@ -1343,6 +1375,7 @@ msgstr "Close thread"
 #: src/components/shared/status-badge.tsx
 #: src/routes/_authed/emails/$threadId.tsx
 #: src/routes/_authed/emails/index.tsx
+#: src/routes/_authed/emails/index.tsx
 msgid "Closed"
 msgstr "Closed"
 
@@ -1410,9 +1443,17 @@ msgstr "Company deleted"
 msgid "Company enrichment"
 msgstr "Company enrichment"
 
+#: src/routes/_authed/emails/index.tsx
+msgid "Company owner"
+msgstr "Company owner"
+
 #: src/routes/_authed/companies/$slug.tsx
 msgid "Company restored"
 msgstr "Company restored"
+
+#: src/routes/_authed/emails/index.tsx
+msgid "Company without owner"
+msgstr "Company without owner"
 
 #: src/components/research/research-dialog.tsx
 msgid "Competitor scan"
@@ -2936,6 +2977,10 @@ msgstr "Gone quiet"
 msgid "Gone quiet · {0}+ days"
 msgstr "Gone quiet · {0}+ days"
 
+#: src/routes/_authed/emails/index.tsx
+msgid "Gone quiet · {days}+ days"
+msgstr "Gone quiet · {days}+ days"
+
 #: src/components/instructions/template-transfer-dialog.tsx
 msgid "Hand it over"
 msgstr "Hand it over"
@@ -2952,6 +2997,14 @@ msgstr "Hand to a colleague"
 #: src/components/instructions/template-transfer-dialog.tsx
 msgid "Handing over…"
 msgstr "Handing over…"
+
+#: src/routes/_authed/emails/index.tsx
+msgid "Has attachments"
+msgstr "Has attachments"
+
+#: src/routes/_authed/emails/index.tsx
+msgid "Has draft"
+msgstr "Has draft"
 
 #: src/components/primitives/pri-rich-text.tsx
 msgid "Heading 1"
@@ -3769,6 +3822,7 @@ msgid "My default"
 msgstr "My default"
 
 #: src/routes/_authed/companies/index.tsx
+#: src/routes/_authed/emails/index.tsx
 msgid "My leads"
 msgstr "My leads"
 
@@ -3806,6 +3860,10 @@ msgstr "Narrow this list"
 #: src/components/shared/multi-select-filter.tsx
 msgid "Narrow this list…"
 msgstr "Narrow this list…"
+
+#: src/routes/_authed/emails/index.tsx
+msgid "Needs a reply"
+msgstr "Needs a reply"
 
 #: src/routes/_authed/index.tsx
 #: src/routes/_authed/index.tsx
@@ -5058,6 +5116,10 @@ msgstr "Quick add task"
 msgid "Quick add: \"Call Acme tomorrow #high\""
 msgstr "Quick add: \"Call Acme tomorrow #high\""
 
+#: src/routes/_authed/emails/index.tsx
+msgid "Quiet for"
+msgstr "Quiet for"
+
 #: src/components/primitives/pri-rich-text.tsx
 msgid "Quote"
 msgstr "Quote"
@@ -5511,10 +5573,6 @@ msgstr "Schedule a call via Cal.com"
 msgid "Search by name, industry, or location…"
 msgstr "Search by name, industry, or location…"
 
-#: src/routes/_authed/emails/index.tsx
-msgid "Search by subject…"
-msgstr "Search by subject…"
-
 #: src/routes/_authed/companies/index.tsx
 msgid "Search companies"
 msgstr "Search companies"
@@ -5522,6 +5580,10 @@ msgstr "Search companies"
 #: src/components/research/inbox/research-inbox.tsx
 msgid "Search name or query"
 msgstr "Search name or query"
+
+#: src/routes/_authed/emails/index.tsx
+msgid "Search subject, message text, or address…"
+msgstr "Search subject, message text, or address…"
 
 #: src/components/research/inbox/research-inbox.tsx
 msgid "Search the review queue"
@@ -5854,6 +5916,7 @@ msgid "Something went wrong. Try again."
 msgstr "Something went wrong. Try again."
 
 #: src/routes/_authed/companies/index.tsx
+#: src/routes/_authed/emails/index.tsx
 msgid "Sort"
 msgstr "Sort"
 
@@ -6751,6 +6814,7 @@ msgid "Unnamed client"
 msgstr "Unnamed client"
 
 #: src/routes/_authed/emails/index.tsx
+#: src/routes/_authed/emails/index.tsx
 msgid "Unread"
 msgstr "Unread"
 
@@ -6898,6 +6962,14 @@ msgstr "Visit"
 #: src/components/documents/document-kinds.ts
 msgid "Visit notes"
 msgstr "Visit notes"
+
+#: src/routes/_authed/emails/index.tsx
+msgid "Waiting on"
+msgstr "Waiting on"
+
+#: src/routes/_authed/emails/index.tsx
+msgid "Waiting on them"
+msgstr "Waiting on them"
 
 #: src/components/companies/company-channels-section.tsx
 msgid "Ways to reach"

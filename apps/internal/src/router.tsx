@@ -16,8 +16,8 @@ function NotFound() {
  * link people share, hand-edit and paste into a terminal working everywhere.
  *
  * Only the array case is ours; everything else is handed to the router's own
- * encoder unchanged, and the companies list and its board are the only routes
- * with a list-valued filter today.
+ * encoder unchanged. The companies list and its board have list-valued filters,
+ * and so does the emails list.
  */
 const stringifySearch = stringifySearchWith(
 	value =>
