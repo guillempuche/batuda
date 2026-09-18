@@ -190,7 +190,7 @@ The combination I couldn't find anywhere else: **MIT + your provider keys + per-
 | CLI             | `apps/cli` — Effect CLI + @clack/prompts TUI        |
 | Backend         | `apps/server` — Effect HTTP + MCP server            |
 | Web app         | `apps/internal` — TanStack Start                    |
-| Shared UI       | `packages/ui` — MD3 design tokens + BaseUI + Tiptap |
+| Shared UI       | `packages/ui` — MD3 design tokens + Base UI + Tiptap |
 | Database        | Postgres (NeonDB)                                   |
 | Deploy          | Unikraft via kraft CLI                              |
 | Code quality    | Biome (lint + format) + dprint (markdown)           |
