@@ -5,7 +5,18 @@ import {
 	HttpApiSchema,
 } from 'effect/unstable/httpapi'
 
-import { EmailDraft, Inbox, InboxFooter } from '@batuda/domain'
+import {
+	EmailBounceType,
+	EmailDirection,
+	EmailDraft,
+	EmailMessageStatus,
+	InboundClassification,
+	Inbox,
+	InboxFooter,
+	ThreadSort,
+	ThreadStatus,
+	ThreadWaitingOn,
+} from '@batuda/domain'
 import { EmailBlocks } from '@batuda/email/schema'
 
 import {
@@ -22,12 +33,15 @@ import {
 import { OrgMiddleware } from '../middleware/org'
 import { SessionMiddleware } from '../middleware/session'
 import { PaginatedList, pageQuery } from '../pagination'
+import { CommaList, commaListOf } from '../query-list'
+import { StaleDays } from './pipeline'
+
+// A yes/no filter on a link, where everything is text. Only these two words
+// are read, so `?unread=1` is answered with a refusal rather than quietly
+// meaning something.
+const YesOrNo = Schema.Literals(['true', 'false'])
 
 const Recipients = Schema.Union([Schema.String, Schema.Array(Schema.String)])
-
-const ThreadStatus = Schema.Literals(['open', 'closed', 'archived'])
-const InboundClassification = Schema.Literals(['normal', 'spam', 'blocked'])
-const MessageDirection = Schema.Literals(['inbound', 'outbound'])
 
 // A line about what a mailbox is for, not a place to paste a document. The
 // same limit the database holds, so an over-long one is turned away here
@@ -65,7 +79,7 @@ export const EmailThreadListItem = Schema.Struct({
 	updatedAt: Schema.DateTimeUtcFromString,
 	messageCount: Schema.Number,
 	lastMessageAt: Schema.NullOr(Schema.DateTimeUtcFromString),
-	lastMessageDirection: Schema.NullOr(MessageDirection),
+	lastMessageDirection: Schema.NullOr(EmailDirection),
 	lastInboundAt: Schema.NullOr(Schema.DateTimeUtcFromString),
 	lastInboundClassification: Schema.NullOr(InboundClassification),
 	isUnread: Schema.Boolean,
@@ -107,7 +121,7 @@ export const EmailMessageRecord = Schema.Struct({
 	messageId: Schema.String,
 	inReplyTo: Schema.NullOr(Schema.String),
 	references: Schema.NullOr(Schema.Array(Schema.String)),
-	direction: MessageDirection,
+	direction: EmailDirection,
 	folder: Schema.String,
 	subject: Schema.NullOr(Schema.String),
 	receivedAt: Schema.NullOr(Schema.DateTimeUtcFromString),
@@ -118,7 +132,7 @@ export const EmailMessageRecord = Schema.Struct({
 	companyId: Schema.NullOr(Schema.String),
 	contactId: Schema.NullOr(Schema.String),
 	recipients: Schema.Unknown,
-	status: Schema.Literals(['normal', 'spam', 'blocked', 'bounced']),
+	status: EmailMessageStatus,
 	statusReason: Schema.NullOr(Schema.String),
 	bounceType: Schema.NullOr(Schema.String),
 	bounceSubType: Schema.NullOr(Schema.String),
@@ -215,11 +229,25 @@ export const EmailGroup = HttpApiGroup.make('email')
 			query: {
 				inboxId: Schema.optional(Schema.String),
 				companyId: Schema.optional(Schema.String),
-				status: Schema.optional(ThreadStatus),
+				contactId: Schema.optional(Schema.String),
+				// Several stages travel as one comma-separated value, checked
+				// against the stages that exist: `?status=open,bogus` is answered
+				// with a refusal rather than an empty list, which reads as "you
+				// have none of those".
+				status: Schema.optional(commaListOf(ThreadStatus)),
+				waitingOn: Schema.optional(ThreadWaitingOn),
+				unread: Schema.optional(YesOrNo),
+				quietDays: Schema.optional(StaleDays),
+				lastMessageAfter: Schema.optional(Schema.String),
+				lastMessageBefore: Schema.optional(Schema.String),
+				hasAttachments: Schema.optional(YesOrNo),
+				companyOwner: Schema.optional(CommaList),
+				sort: Schema.optional(ThreadSort),
 				query: Schema.optional(Schema.String),
 				...pageQuery,
 			},
 			success: EmailThreadList,
+			error: BadRequest.pipe(HttpApiSchema.status(400)),
 		}),
 	)
 	.add(
@@ -262,10 +290,17 @@ export const EmailGroup = HttpApiGroup.make('email')
 			query: {
 				contactId: Schema.optional(Schema.String),
 				companyId: Schema.optional(Schema.String),
-				status: Schema.optional(Schema.String),
+				inboxId: Schema.optional(Schema.String),
+				status: Schema.optional(commaListOf(EmailMessageStatus)),
+				direction: Schema.optional(EmailDirection),
+				bounceType: Schema.optional(EmailBounceType),
+				receivedAfter: Schema.optional(Schema.String),
+				receivedBefore: Schema.optional(Schema.String),
+				query: Schema.optional(Schema.String),
 				...pageQuery,
 			},
 			success: PaginatedList(EmailMessageRecord),
+			error: BadRequest.pipe(HttpApiSchema.status(400)),
 		}),
 	)
 	.add(

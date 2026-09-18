@@ -57,11 +57,12 @@ const apply = (bounce: ParsedBounce) =>
 /** An outbound message we can bounce, returning its RFC-5322 Message-ID. */
 const seedOutbound = async (): Promise<string> => {
 	const messageId = `<sent-${randomUUID()}@${DOMAIN}>`
+	// No thread link is created for it, so thread_key is its own id.
 	await pool.query(
 		`INSERT INTO email_messages (
-			organization_id, inbox_id, folder, message_id, subject, received_at,
+			organization_id, inbox_id, folder, message_id, thread_key, subject, received_at,
 			raw_rfc822_ref, status, status_updated_at, direction, company_id, contact_id
-		) VALUES ($1, $2, 'SENT', $3, 'Quote', now(), 'sentinel', 'normal', now(), 'outbound', $4, $5)`,
+		) VALUES ($1, $2, 'SENT', $3, $3, 'Quote', now(), 'sentinel', 'normal', now(), 'outbound', $4, $5)`,
 		[ORG_ID, inboxId, messageId, companyId, contactId],
 	)
 	return messageId

@@ -680,13 +680,14 @@ describe('EmailService.listThreads unread flag', () => {
 			VALUES (${TEST_ORG}, ${externalThreadId}, ${id}, 'Proposal sent')
 		`
 		// One OUTBOUND message, no inbound reply — the case where the unread
-		// computation's inner MAX over inbound messages is SQL NULL.
+		// computation's inner MAX over inbound messages is SQL NULL. It starts
+		// the thread, so thread_key is its own id.
 		yield* sql`
 			INSERT INTO email_messages
-				(organization_id, inbox_id, message_id, direction, folder,
+				(organization_id, inbox_id, message_id, thread_key, direction, folder,
 				 raw_rfc822_ref, subject, status, imap_uid, imap_uidvalidity)
 			VALUES
-				(${TEST_ORG}, ${id}, ${externalThreadId}, 'outbound', 'Sent',
+				(${TEST_ORG}, ${id}, ${externalThreadId}, ${externalThreadId}, 'outbound', 'Sent',
 				 'sentinel', 'Proposal sent', 'normal',
 				 ${Math.floor(Math.random() * 1_000_000_000)}, 100)
 		`

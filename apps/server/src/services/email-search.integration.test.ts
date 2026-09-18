@@ -74,11 +74,13 @@ const insertThreadWithMessage = async (args: {
 	const linkRow = link.rows[0]
 	if (!linkRow) throw new Error('failed to insert thread link')
 
+	// This message starts the thread, so its own id is the thread_key —
+	// the same value the thread link above carries as external_thread_id.
 	const msg = await pool.query<{ id: string }>(
 		`INSERT INTO email_messages
-		 (organization_id, inbox_id, message_id, direction, folder, raw_rfc822_ref,
+		 (organization_id, inbox_id, message_id, thread_key, direction, folder, raw_rfc822_ref,
 		  subject, text_preview, text_body, status, imap_uid, imap_uidvalidity)
-		 VALUES ($1, $2, $3, 'inbound', 'INBOX', 'sentinel',
+		 VALUES ($1, $2, $3, $3, 'inbound', 'INBOX', 'sentinel',
 		         $4, $5, $6, 'normal', $7, 100)
 		 RETURNING id`,
 		[

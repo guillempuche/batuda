@@ -221,7 +221,7 @@ const fetchInteractionFor = async (emailMessageId: string) => {
 		contact_id: string | null
 	}>(
 		`SELECT channel, direction, company_id, contact_id FROM interactions
-		 WHERE metadata->>'emailMessageId' = $1`,
+		 WHERE email_message_id = $1`,
 		[emailMessageId],
 	)
 	return rows.rows[0]
@@ -582,11 +582,13 @@ describe('persistMessage — the conversation keeps a subject', () => {
 				 VALUES ($1, $2, $3, 'your pallet pools', 'open')`,
 				[ORG_ID, inboxId, rootMessageId],
 			)
+			// This message starts the thread, so thread_key is its own id —
+			// the same value the thread link above carries as external_thread_id.
 			await pool.query(
-				`INSERT INTO email_messages (organization_id, inbox_id, folder, message_id,
+				`INSERT INTO email_messages (organization_id, inbox_id, folder, message_id, thread_key,
 				   "references", subject, received_at, recipients, attachments,
 				   status, status_updated_at, direction, raw_rfc822_ref)
-				 VALUES ($1, $2, 'Sent', $3, ARRAY[]::text[], 'your pallet pools', now(),
+				 VALUES ($1, $2, 'Sent', $3, $3, ARRAY[]::text[], 'your pallet pools', now(),
 				   '{}'::jsonb, '[]'::jsonb, 'normal', now(), 'outbound', 'sentinel')`,
 				[ORG_ID, inboxId, rootMessageId],
 			)
@@ -899,11 +901,12 @@ describe('persistMessage — a message we already hold', () => {
 			// GIVEN a message already recorded because we sent it — no folder
 			// position yet, because it had not been read back from the server
 			const messageId = `<ours-${randomUUID()}@example>`
+			// No thread link is created here, so thread_key is its own id.
 			await pool.query(
 				`INSERT INTO email_messages
-				 (organization_id, inbox_id, message_id, direction, folder, raw_rfc822_ref,
+				 (organization_id, inbox_id, message_id, thread_key, direction, folder, raw_rfc822_ref,
 				  status, text_body, imap_uid, imap_uidvalidity)
-				 VALUES ($1, $2, $3, 'outbound', 'Sent', 'sent-ref', 'normal', $4, NULL, NULL)`,
+				 VALUES ($1, $2, $3, $3, 'outbound', 'Sent', 'sent-ref', 'normal', $4, NULL, NULL)`,
 				[ORG_ID, inboxId, messageId, 'What we actually sent.'],
 			)
 

@@ -188,20 +188,32 @@ const draftThreadLinkOf = (draftId: string) =>
 		}),
 	)
 
-// A conversation already under way, for a draft to be attached to.
+// A conversation already under way, for a draft to be attached to. It is
+// given the message it opened with, the way an arriving one is: a conversation
+// holding nothing is not one anybody can see.
 let threadSeq = 0
 const insertThreadLink = () =>
 	sqlOnly(
 		Effect.gen(function* () {
 			const sql = yield* SqlClient.SqlClient
 			threadSeq += 1
+			const rootId = `<thread-${threadSeq}@taller.test>`
 			const rows = yield* sql<{ id: string }>`
 				INSERT INTO email_thread_links (
 					organization_id, external_thread_id, subject
 				) VALUES (
-					${ORG}, ${`<thread-${threadSeq}@taller.test>`}, 'your quote'
+					${ORG}, ${rootId}, 'your quote'
 				)
 				RETURNING id
+			`
+			yield* sql`
+				INSERT INTO email_messages (
+					organization_id, inbox_id, message_id, thread_key,
+					direction, folder, raw_rfc822_ref, subject, received_at, status
+				) VALUES (
+					${ORG}, ${teamInboxId}, ${rootId}, ${rootId},
+					'inbound', 'INBOX', 'draft-inbox-test', 'your quote', now(), 'normal'
+				)
 			`
 			return rows[0]!.id
 		}),

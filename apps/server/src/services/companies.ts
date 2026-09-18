@@ -19,6 +19,7 @@ import {
 } from '@batuda/domain'
 import type { AttributeFilter } from '@batuda/instructions'
 
+import { ownerCondition } from '../lib/owner-filter'
 import { textAnywhere } from '../lib/search-text'
 import {
 	type CountMode,
@@ -264,17 +265,9 @@ const companyConditions = (
 		}
 		if (filters.priority !== undefined)
 			conditions.push(sql`priority = ${filters.priority}`)
-		// 'none' is the companies nobody has taken, and it sits beside the ids
-		// rather than replacing them: "mine or going spare" is one question, and
-		// an owner column has no value standing for nobody to match against.
 		const owners = asked(filters.owner)
 		if (owners !== undefined) {
-			const unassigned = owners.includes('none')
-			const ids = owners.filter(id => id !== 'none')
-			if (ids.length === 0) conditions.push(sql`owner_id IS NULL`)
-			else if (!unassigned) conditions.push(sql`owner_id IN ${sql.in(ids)}`)
-			else
-				conditions.push(sql`(owner_id IS NULL OR owner_id IN ${sql.in(ids)})`)
+			conditions.push(ownerCondition(sql, sql`owner_id`, owners))
 		}
 		const verdicts = asked(filters.fitVerdict)
 		if (verdicts !== undefined && lifted !== 'fitVerdict')

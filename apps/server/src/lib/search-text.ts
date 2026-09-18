@@ -31,7 +31,7 @@
 // write one and they do not match each other: an é can be a single character, or
 // an e with a mark added after it, and a Mac hands over the second where a browser
 // hands over the first. Somebody pasting "Calderería" from a file found nothing.
-const asPlainText = (typed: string): string =>
+export const asPlainText = (typed: string): string =>
 	typed.normalize('NFC').replace(/[\\%_]/g, match => `\\${match}`)
 
 /** Rows whose column holds this text anywhere in it. */

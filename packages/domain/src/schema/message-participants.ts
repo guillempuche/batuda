@@ -1,21 +1,6 @@
 import { Schema } from 'effect'
-import { Model } from 'effect/unstable/schema'
 
-export const MessageParticipantId = Schema.String.pipe(
-	Schema.brand('MessageParticipantId'),
-)
-
-export const ParticipantRole = Schema.Literals(['from', 'to', 'cc', 'bcc'])
+/** Where an address stood on a message. */
+export const PARTICIPANT_ROLES = ['from', 'to', 'cc', 'bcc'] as const
+export const ParticipantRole = Schema.Literals(PARTICIPANT_ROLES)
 export type ParticipantRole = typeof ParticipantRole.Type
-
-export class MessageParticipant extends Model.Class<MessageParticipant>(
-	'MessageParticipant',
-)({
-	id: Model.GeneratedByDb(MessageParticipantId),
-	emailMessageId: Schema.String,
-	emailAddress: Schema.String,
-	displayName: Schema.NullOr(Schema.String),
-	role: ParticipantRole,
-	contactId: Schema.NullOr(Schema.String),
-	createdAt: Model.DateTimeInsertFromDate,
-}) {}

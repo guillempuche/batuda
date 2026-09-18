@@ -125,6 +125,14 @@ export const ingestRawMessage = (args: {
 				// notice twice counts its failures twice — three passes over one
 				// soft bounce is enough to suppress an address that never bounced
 				// three times.
+				//
+				// A notice is recognised before the message is stored, so the
+				// stored row can say what it is. Some mail servers chain a notice
+				// to the message that failed, which would otherwise make it the
+				// conversation's latest message and the conversation read as
+				// waiting for our answer.
+				const bounce = parseBounce(mail)
+
 				const stored = yield* persistMessage({
 					organizationId: args.organizationId,
 					inboxId: args.inboxId,
@@ -135,16 +143,14 @@ export const ingestRawMessage = (args: {
 					rawRfc822Ref: key,
 					parsed: withMessageId,
 					attachments: attachmentsMeta,
+					isDeliveryNotice: bounce !== null,
 				})
 
-				if (stored.messageId !== null) {
-					const bounce = parseBounce(mail)
-					if (bounce) {
-						yield* applyBounce({
-							organizationId: args.organizationId,
-							bounce,
-						})
-					}
+				if (stored.messageId !== null && bounce) {
+					yield* applyBounce({
+						organizationId: args.organizationId,
+						bounce,
+					})
 				}
 			}),
 		)

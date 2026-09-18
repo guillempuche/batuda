@@ -143,10 +143,10 @@ beforeAll(async () => {
 			// The message the notice says did not arrive.
 			yield* sql`
 				INSERT INTO email_messages (
-					organization_id, inbox_id, folder, message_id, direction,
+					organization_id, inbox_id, folder, message_id, thread_key, direction,
 					received_at, status, status_updated_at, raw_rfc822_ref
 				) VALUES (
-					${ORG_ID}, ${inboxId}, 'Sent', ${originalMessageId}, 'outbound',
+					${ORG_ID}, ${inboxId}, 'Sent', ${originalMessageId}, ${originalMessageId}, 'outbound',
 					now(), 'normal', now(), ${`raw/${randomUUID()}`}
 				)`
 		}),

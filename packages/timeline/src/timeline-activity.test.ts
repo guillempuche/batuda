@@ -416,24 +416,28 @@ describe('mapEventToInteraction', () => {
 		// GIVEN an EmailSent event
 		// WHEN mapEventToInteraction runs
 		// THEN it returns channel=email, direction=outbound, type=email
-		// AND metadata carries the email_message id for traceability
+		// AND the row names the message it came from, in a column of its own:
+		// the rule that keeps private mail off a shared history reads it on
+		// every history query, and a name inside JSON has no index to follow
 		const row = mapEventToInteraction(emailSent())
 		expect(row).not.toBeNull()
 		expect(row?.channel).toBe('email')
 		expect(row?.direction).toBe('outbound')
 		expect(row?.type).toBe('email')
 		expect(row?.companyId).toBe('co-1')
-		expect(row?.metadata).toContain('em-1')
+		expect(row?.emailMessageId).toBe('em-1')
 	})
 
 	it('builds an inbound email row for EmailReceived', () => {
 		// GIVEN an EmailReceived event with a resolved companyId
 		// WHEN mapEventToInteraction runs
 		// THEN it returns direction=inbound
-		// AND metadata carries the classification
+		// AND metadata still carries what a check made of the message, while the
+		// message it came from is named in its own column
 		const row = mapEventToInteraction(emailReceived())
 		expect(row?.direction).toBe('inbound')
 		expect(row?.metadata).toContain('normal')
+		expect(row?.emailMessageId).toBe('em-2')
 	})
 
 	it('returns null for EmailReceived without a company match', () => {

@@ -29,25 +29,17 @@ export const resolveThreadId = (args: {
 
 		if (args.inReplyTo) {
 			const rows = yield* sql<{ externalThreadId: string }>`
-				SELECT external_thread_id AS "externalThreadId"
+				SELECT etl.external_thread_id AS "externalThreadId"
 				FROM email_messages em
 				JOIN email_thread_links etl
 				  ON etl.organization_id = em.organization_id
-				 AND (
-				   etl.external_thread_id = em.message_id
-				   OR etl.external_thread_id = ANY(em."references")
-				 )
+				 AND etl.external_thread_id = em.thread_key
 				WHERE em.organization_id = ${args.organizationId}
 				  AND em.message_id = ${args.inReplyTo}
-				-- A conversation can hold more than one of these rows when its
-				-- first message was taken in after a reply that named it, so pick
-				-- deterministically rather than whichever comes back first. A
-				-- references chain runs oldest first, so the earliest entry that
-				-- has a conversation is the conversation — the message's own id
-				-- would name the later split instead, which holds only the tail.
-				ORDER BY array_position(em."references", etl.external_thread_id)
-				           ASC NULLS LAST,
-				         etl.created_at ASC, etl.id ASC
+				-- Each message says which conversation it is in, so this is one
+				-- answer rather than a chain to weigh up — and it stays the right
+				-- answer after a conversation is re-rooted below, which moves its
+				-- messages' keys but leaves what they name as ancestors alone.
 				LIMIT 1
 			`
 			const hit = rows[0]?.externalThreadId
@@ -59,25 +51,13 @@ export const resolveThreadId = (args: {
 		const refs = [...args.references].reverse()
 		for (const ref of refs) {
 			const rows = yield* sql<{ externalThreadId: string }>`
-				SELECT external_thread_id AS "externalThreadId"
+				SELECT etl.external_thread_id AS "externalThreadId"
 				FROM email_messages em
 				JOIN email_thread_links etl
 				  ON etl.organization_id = em.organization_id
-				 AND (
-				   etl.external_thread_id = em.message_id
-				   OR etl.external_thread_id = ANY(em."references")
-				 )
+				 AND etl.external_thread_id = em.thread_key
 				WHERE em.organization_id = ${args.organizationId}
 				  AND em.message_id = ${ref}
-				-- A conversation can hold more than one of these rows when its
-				-- first message was taken in after a reply that named it, so pick
-				-- deterministically rather than whichever comes back first. A
-				-- references chain runs oldest first, so the earliest entry that
-				-- has a conversation is the conversation — the message's own id
-				-- would name the later split instead, which holds only the tail.
-				ORDER BY array_position(em."references", etl.external_thread_id)
-				           ASC NULLS LAST,
-				         etl.created_at ASC, etl.id ASC
 				LIMIT 1
 			`
 			const hit = rows[0]?.externalThreadId
@@ -99,10 +79,7 @@ export const resolveThreadId = (args: {
 			FROM email_messages em
 			JOIN email_thread_links etl
 			  ON etl.organization_id = em.organization_id
-			 AND (
-			   etl.external_thread_id = em.message_id
-			   OR etl.external_thread_id = ANY(em."references")
-			 )
+			 AND etl.external_thread_id = em.thread_key
 			WHERE em.organization_id = ${args.organizationId}
 			  AND (
 			    em."references" @> ARRAY[${args.messageId}]::text[]
@@ -151,5 +128,19 @@ export const resolveThreadId = (args: {
 			RETURNING id
 		`
 
-		return rerooted.length === 1 ? args.messageId : only.externalThreadId
+		if (rerooted.length === 1) {
+			// Each message says which conversation it is in, and the answer just
+			// changed. Left behind, those messages would point at a key no
+			// conversation answers to any more, and the thread would read as
+			// empty.
+			yield* sql`
+				UPDATE email_messages
+				SET thread_key = ${args.messageId}
+				WHERE organization_id = ${args.organizationId}
+				  AND thread_key = ${only.externalThreadId}
+			`
+			return args.messageId
+		}
+
+		return only.externalThreadId
 	})

@@ -149,6 +149,11 @@ export const seedCompanies = (
 			...c,
 			id: seedCompanyId(c.slug),
 			attributes: 'attributes' in c ? c.attributes : {},
+			// One company nobody has taken, so that "going spare" is a state the
+			// demo data actually holds. Both lists that ask about owners — the
+			// companies list and the conversations list — offer it as a filter,
+			// and with every company owned there is nothing behind it to look at.
+			...(c.slug === 'ferros-baix-llobregat' ? { ownerId: null } : {}),
 		}))
 
 		yield* Effect.logInfo(`Seeding companies (${preset})...`)

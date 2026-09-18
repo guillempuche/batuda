@@ -257,16 +257,20 @@ afterAll(async () => {
 // (bypasses RLS, since the table owner skips RLS by default without FORCE).
 // Tests then issue SET LOCAL ROLE app_user inside the same transaction
 // before assertions, and ROLLBACK at the end so no data leaks across tests.
+//
+// The rollback happens whatever the body does. A failed assertion handed the
+// connection back to the pool mid-transaction, and every test that borrowed it
+// afterwards died on "current transaction is aborted" — so one real failure
+// read as a dozen, and none of them said which.
 const withSuper = async <T>(
 	fn: (client: pg.PoolClient) => Promise<T>,
 ): Promise<T> => {
 	const client = await ctx.pool.connect()
 	try {
 		await client.query('BEGIN')
-		const result = await fn(client)
-		await client.query('ROLLBACK')
-		return result
+		return await fn(client)
 	} finally {
+		await client.query('ROLLBACK').catch(() => {})
 		client.release()
 	}
 }
@@ -353,10 +357,12 @@ describe('multi-org isolation', () => {
 				const tallerInboxId = inboxIns.rows[0]?.id
 				const restaurantInboxId = inboxIns.rows[1]?.id
 
+				// No thread link is created for either message, so each stands
+				// as its own conversation: thread_key is its own message id.
 				await client.query(
-					`INSERT INTO email_messages (organization_id, inbox_id, message_id, direction, folder, raw_rfc822_ref, status)
-					 VALUES ($1,$2,'<m1@x>','outbound','Sent','r/1','normal'),
-					        ($3,$4,'<m2@x>','outbound','Sent','r/2','normal')`,
+					`INSERT INTO email_messages (organization_id, inbox_id, message_id, thread_key, direction, folder, raw_rfc822_ref, status)
+					 VALUES ($1,$2,'<m1@x>','<m1@x>','outbound','Sent','r/1','normal'),
+					        ($3,$4,'<m2@x>','<m2@x>','outbound','Sent','r/2','normal')`,
 					[
 						ctx.tallerOrgId,
 						tallerInboxId,
@@ -378,7 +384,8 @@ describe('multi-org isolation', () => {
 		})
 
 		it('email_thread_links is org-scoped under RLS', async () => {
-			// GIVEN one thread per org pinned to a per-org inbox
+			// GIVEN one thread per org pinned to a per-org inbox, each holding
+			// the message it opened with
 			// WHEN selecting from email_thread_links as app_user (taller)
 			// THEN only taller's thread row is visible
 			await withSuper(async client => {
@@ -398,14 +405,29 @@ describe('multi-org isolation', () => {
 						inboxIns.rows[1]?.id,
 					],
 				)
+				// A conversation is only there while it holds a message, so
+				// each gets the one it opened with: the message whose own id
+				// names the conversation.
+				await client.query(
+					`INSERT INTO email_messages (organization_id, inbox_id, message_id, thread_key, direction, folder, raw_rfc822_ref, status)
+					 VALUES ($1,$2,'<t1@x>','<t1@x>','inbound','INBOX','r/1','normal'),
+					        ($3,$4,'<t2@x>','<t2@x>','inbound','INBOX','r/2','normal')`,
+					[
+						ctx.tallerOrgId,
+						inboxIns.rows[0]?.id,
+						ctx.restaurantOrgId,
+						inboxIns.rows[1]?.id,
+					],
+				)
 				await client.query(`SET LOCAL ROLE app_user`)
 				await client.query(
 					`SET LOCAL app.current_org_id = '${ctx.tallerOrgId}'`,
 				)
-				const visible = await client.query(
+				const visible = await client.query<{ organization_id: string }>(
 					'SELECT organization_id FROM email_thread_links',
 				)
 				expect(visible.rows.length).toBe(1)
+				expect(visible.rows[0]?.organization_id).toBe(ctx.tallerOrgId)
 			})
 		})
 
@@ -420,10 +442,11 @@ describe('multi-org isolation', () => {
 					        ($3,$4,'b@b','x',1,'tls','x',1,'tls','u','\\x','\\x','\\x') RETURNING id`,
 					[ctx.tallerOrgId, ctx.aliceId, ctx.restaurantOrgId, ctx.bobId],
 				)
+				// No thread link either, so thread_key is each message's own id.
 				const msgIns = await client.query<{ id: string }>(
-					`INSERT INTO email_messages (organization_id, inbox_id, message_id, direction, folder, raw_rfc822_ref, status)
-					 VALUES ($1,$2,'<m1@x>','outbound','Sent','r/1','normal'),
-					        ($3,$4,'<m2@x>','outbound','Sent','r/2','normal') RETURNING id`,
+					`INSERT INTO email_messages (organization_id, inbox_id, message_id, thread_key, direction, folder, raw_rfc822_ref, status)
+					 VALUES ($1,$2,'<m1@x>','<m1@x>','outbound','Sent','r/1','normal'),
+					        ($3,$4,'<m2@x>','<m2@x>','outbound','Sent','r/2','normal') RETURNING id`,
 					[
 						ctx.tallerOrgId,
 						inboxIns.rows[0]?.id,
@@ -948,11 +971,12 @@ describe('multi-org isolation', () => {
 					        ($3,$4,'b@b','x',1,'tls','x',1,'tls','u','\\x','\\x','\\x') RETURNING id`,
 					[ctx.tallerOrgId, ctx.aliceId, ctx.restaurantOrgId, ctx.bobId],
 				)
-				// Same Message-ID in two different orgs — allowed.
+				// Same Message-ID in two different orgs — allowed. No thread
+				// link is created, so thread_key is each message's own id.
 				await client.query(
-					`INSERT INTO email_messages (organization_id, inbox_id, message_id, direction, folder, raw_rfc822_ref, status)
-					 VALUES ($1,$2,'<shared@x>','outbound','Sent','r/1','normal'),
-					        ($3,$4,'<shared@x>','outbound','Sent','r/2','normal')`,
+					`INSERT INTO email_messages (organization_id, inbox_id, message_id, thread_key, direction, folder, raw_rfc822_ref, status)
+					 VALUES ($1,$2,'<shared@x>','<shared@x>','outbound','Sent','r/1','normal'),
+					        ($3,$4,'<shared@x>','<shared@x>','outbound','Sent','r/2','normal')`,
 					[
 						ctx.tallerOrgId,
 						inboxIns.rows[0]?.id,
@@ -963,8 +987,8 @@ describe('multi-org isolation', () => {
 				// Duplicate inside the same org — rejected.
 				await expect(
 					client.query(
-						`INSERT INTO email_messages (organization_id, inbox_id, message_id, direction, folder, raw_rfc822_ref, status)
-						 VALUES ($1, $2, '<shared@x>', 'outbound', 'Sent', 'r/3', 'normal')`,
+						`INSERT INTO email_messages (organization_id, inbox_id, message_id, thread_key, direction, folder, raw_rfc822_ref, status)
+						 VALUES ($1, $2, '<shared@x>', '<shared@x>', 'outbound', 'Sent', 'r/3', 'normal')`,
 						[ctx.tallerOrgId, inboxIns.rows[0]?.id],
 					),
 				).rejects.toThrow(/duplicate key|unique/i)

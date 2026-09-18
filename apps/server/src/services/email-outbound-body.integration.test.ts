@@ -199,13 +199,15 @@ const seedThreadToReplyTo = () =>
 				)
 				RETURNING id
 			`
+			// This message starts the thread, so thread_key is its own id —
+			// the same value the thread link above carries as external_thread_id.
 			yield* sql`
 				INSERT INTO email_messages (
-					organization_id, inbox_id, folder, message_id, "references",
+					organization_id, inbox_id, folder, message_id, thread_key, "references",
 					subject, received_at, recipients, attachments,
 					status, status_updated_at, direction, raw_rfc822_ref
 				) VALUES (
-					${ORG}, ${inboxId}, 'INBOX', ${PARENT_MESSAGE_ID}, ${[] as string[]},
+					${ORG}, ${inboxId}, 'INBOX', ${PARENT_MESSAGE_ID}, ${PARENT_MESSAGE_ID}, ${[] as string[]},
 					'Quote for the booking module', now(),
 					${JSON.stringify({ to: ['client@example.com'], cc: [], bcc: [] })}::jsonb,
 					'[]'::jsonb, 'normal', now(), 'inbound', 'sentinel'

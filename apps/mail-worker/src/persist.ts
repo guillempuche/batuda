@@ -131,10 +131,20 @@ export const persistMessage = (args: {
 	readonly rawRfc822Ref: string
 	readonly parsed: ParsedInbound
 	readonly attachments: ReadonlyArray<AttachmentMetadata>
+	readonly isDeliveryNotice?: boolean | undefined
 }) =>
 	Effect.gen(function* () {
 		const sql = yield* SqlClient.SqlClient
 		const matcher = yield* ParticipantMatcher
+
+		// Whether this mailbox is private is read here, per message, rather
+		// than carried from the session that claimed the mailbox: a session
+		// stays open for days, and a mailbox made private meanwhile has to
+		// count from the next message on.
+		const mailboxRows = yield* sql<{ isPrivate: boolean }>`
+			SELECT is_private FROM inboxes WHERE id = ${args.inboxId}
+		`
+		const intoPrivate = mailboxRows[0]?.isPrivate === true
 
 		// A message we sent, coming back to us out of the sent folder. It is
 		// already recorded, with no folder position yet, and all that is new is
@@ -247,12 +257,30 @@ export const persistMessage = (args: {
 		// can't rename the conversation — replies to it are sent with this
 		// subject, so it has to stay put. The id comes back so the history
 		// entry can point at the conversation this message belongs to.
+		//
+		// Mail into a private mailbox leaves a conversation the team shares
+		// exactly as it was. Bumping it would move the thread to the top of
+		// everyone's list, and filling in its subject would put words from a
+		// private message on a row the whole team reads — both of which say
+		// something about mail they may not see.
+		const keepsSharedThreadAsItWas = intoPrivate
 		const threadLinks = yield* sql<{ id: string }>`
 			INSERT INTO email_thread_links (organization_id, inbox_id, external_thread_id, company_id, contact_id, subject, updated_at)
 			VALUES (${args.organizationId}, ${args.inboxId}, ${externalThreadId}, ${companyId}, ${contactId}, ${args.parsed.subject}, now())
 			ON CONFLICT (organization_id, external_thread_id)
-			DO UPDATE SET updated_at = now(),
-			              subject = COALESCE(NULLIF(btrim(email_thread_links.subject), ''), NULLIF(btrim(EXCLUDED.subject), ''))
+			DO UPDATE SET
+				updated_at = CASE
+					WHEN ${keepsSharedThreadAsItWas}
+					 AND email_thread_links.inbox_id IS DISTINCT FROM ${args.inboxId}
+					THEN email_thread_links.updated_at
+					ELSE now()
+				END,
+				subject = CASE
+					WHEN ${keepsSharedThreadAsItWas}
+					 AND email_thread_links.inbox_id IS DISTINCT FROM ${args.inboxId}
+					THEN email_thread_links.subject
+					ELSE COALESCE(NULLIF(btrim(email_thread_links.subject), ''), NULLIF(btrim(EXCLUDED.subject), ''))
+				END
 			RETURNING id
 		`
 		const threadLinkId = threadLinks[0]?.id ?? null
@@ -266,7 +294,7 @@ export const persistMessage = (args: {
 		const inserted = yield* sql<{ id: string }>`
 			INSERT INTO email_messages (
 				organization_id, inbox_id, folder, imap_uid, imap_uidvalidity,
-				message_id, in_reply_to, "references",
+				message_id, thread_key, is_delivery_notice, in_reply_to, "references",
 				subject, received_at, text_body, html_body, text_preview,
 				raw_rfc822_ref, recipients, attachments, status, status_updated_at,
 				direction, company_id, contact_id
@@ -274,7 +302,9 @@ export const persistMessage = (args: {
 			VALUES (
 				${args.organizationId}, ${args.inboxId}, ${args.folder},
 				${args.imapUid}, ${args.imapUidvalidity},
-				${args.parsed.messageId}, ${args.parsed.inReplyTo},
+				${args.parsed.messageId}, ${externalThreadId},
+				${args.isDeliveryNotice === true},
+				${args.parsed.inReplyTo},
 				${storedReferences as unknown as string[]},
 				${args.parsed.subject}, ${args.parsed.receivedAt},
 				${args.parsed.textBody}, ${args.parsed.htmlBody}, ${args.parsed.textPreview},
@@ -297,7 +327,36 @@ export const persistMessage = (args: {
 			RETURNING id
 		`
 		const messageDbId = inserted[0]?.id
-		if (!messageDbId) return { messageId: null }
+		if (!messageDbId) {
+			// The same message can reach a private mailbox and a shared one —
+			// somebody copied in alongside the team address. Only one copy is
+			// kept, whichever was read first, and if that was the private one
+			// the team loses sight of mail their own mailbox received. So when
+			// the shared copy turns up, the stored message moves to it, taking
+			// its folder position along; the copy in the private mailbox is the
+			// same message, so nothing is lost by filing it under the mailbox
+			// more people may read.
+			if (!intoPrivate) {
+				yield* sql`
+					UPDATE email_messages m
+					SET inbox_id = ${args.inboxId},
+					    folder = ${args.folder},
+					    imap_uid = ${args.imapUid},
+					    imap_uidvalidity = ${args.imapUidvalidity},
+					    -- The conversation is resolved again above from what this
+					    -- copy names, and it can have moved since the first copy was
+					    -- stored — a conversation is re-rooted when the message it
+					    -- starts with arrives after a reply to it.
+					    thread_key = ${externalThreadId}
+					FROM inboxes i
+					WHERE m.organization_id = ${args.organizationId}
+					  AND m.message_id = ${args.parsed.messageId}
+					  AND i.id = m.inbox_id
+					  AND i.is_private = true
+				`
+			}
+			return { messageId: null }
+		}
 
 		// Participant rows — one per (message × address × role). This
 		// is the queryable index used for "all messages where contact

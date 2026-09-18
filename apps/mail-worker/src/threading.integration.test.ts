@@ -85,13 +85,21 @@ describe('resolveThreadId', () => {
 			 VALUES ($1, $2, 'parent') ON CONFLICT DO NOTHING`,
 			[orgId, opts.externalThreadId],
 		)
+		// This message is the thread link's own root, so thread_key is the
+		// same external_thread_id the link above carries.
 		await pool.query(
 			`INSERT INTO email_messages
-			   (organization_id, message_id, "references", in_reply_to,
+			   (organization_id, message_id, thread_key, "references", in_reply_to,
 			    direction, folder, raw_rfc822_ref, status)
-			 VALUES ($1, $2, $3, $4,
+			 VALUES ($1, $2, $3, $4, $5,
 			         'inbound', 'INBOX', 'sentinel', 'normal')`,
-			[orgId, opts.messageId, opts.references ?? [], opts.inReplyTo ?? null],
+			[
+				orgId,
+				opts.messageId,
+				opts.externalThreadId,
+				opts.references ?? [],
+				opts.inReplyTo ?? null,
+			],
 		)
 	}
 

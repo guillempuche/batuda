@@ -904,6 +904,64 @@ Who is sending is a required `actor` argument rather than an ambient `SessionCon
 
 `SendAttachmentInput` carries an explicit `disposition: 'inline' | 'attachment'`. Without it, the MIME builder defaults to `attachment` and `<img src="cid:…">` in the body fails to resolve against the part. The server sets `disposition: 'inline'` whenever the staging row has `is_inline = true`; inbound parent inline parts are re-emitted the same way on reply.
 
+### Private mailboxes
+
+A mailbox marked private belongs to one person, and mail in it reaches nobody else — not its text, not its subject, not the fact that it arrived.
+
+That rule lives in the database, as four restrictive row-level-security rules on `app_user` (migration 0073), because it has to hold for every way of asking and not only the ones written so far.
+A message is readable when its own mailbox is not private, or the reader owns it; a conversation is readable while it holds a message the reader may read; a history entry about a message is readable when that message is.
+The reader is `current_setting('app.current_user_id')`, which the request middleware sets alongside the organisation (`apps/server/src/middleware/org.ts`), and which is empty for work with nobody signed in, so private mail stays hidden there too.
+The mail worker and cron work run as `app_service`, which is exempt — they file mail for everybody.
+
+One thing the rule does not hold against: an organisation's admin can hand a mailbox to themselves through `transfer_inbox` (migration 0054), privacy flag and all, and then read everything in it.
+That is the same authority that can read any shared mailbox, and it leaves a record on the mailbox, but it is worth knowing that "nobody else" means nobody else *reading*, not nobody able to take ownership.
+
+An earlier version of this check lived in two queries and asked the wrong question: it looked at the mailbox a conversation *started* in.
+A private message inside a conversation the team shares was therefore readable by everyone, while a shared conversation that happened to begin in a private mailbox was hidden from the team.
+
+Three things stay in application code, because a rule about rows cannot express them.
+The conversation row carries the mailbox it began in and a subject taken from that first message, so the list and the thread view show the subject of the earliest *visible* message, and the mailbox of the latest visible one, whenever the mailbox it began in is not the reader's to see.
+Filtering by mailbox asks which mailbox a conversation's visible messages arrived in, rather than where it began.
+And an API key reads as the person who created it, so a key made by the owner of a private mailbox can read that mailbox.
+
+Two consequences are worth knowing.
+`INSERT … RETURNING` has to pass the read rule, so the send path writes the message before the conversation row it belongs to — the other order returns a conversation with no visible message yet and is refused.
+And a conversation with no messages at all is invisible; nothing in the app creates one, since both writers store a message in the same transaction.
+
+Company facts still move on private mail: last-emailed and last-contacted dates, the stage leaving `prospect`, and the sender taking the lead.
+They describe the company rather than the message.
+The one exception is the check that decides between `contacted` and `responded` (`company-lead-assignment.ts`), which reads the company's history and therefore cannot see a reply that arrived privately: a colleague's send then records `contacted` where the mailbox owner's would record `responded`.
+
+### Listing conversations and messages
+
+Both lists are filtered in `apps/server/src/services/email-list-filters.ts`, which the MCP tools, the web API and the `/emails` screen all go through.
+
+Each message says which conversation it is in, in `email_messages.thread_key` — the conversation's first message id, the same value the conversation row carries.
+Before that column, the messages of a conversation were found by asking whether its key was the message's own id or somewhere in its chain of ancestors, an array test whose index Postgres will not use while row security is in force, because it cannot prove the test is safe to run on rows the reader may not see.
+Every per-conversation value then read the whole mailbox: a screenful of conversations took about two thirds of a second on fifteen thousand messages, and the privacy rules would have made it worse.
+Written down as a value, the same question is a comparison an index answers in microseconds.
+Whoever stores a message sets it: the worker, the send path, and the seed.
+Re-rooting a conversation (`apps/mail-worker/src/threading.ts`) moves its messages' keys with it.
+
+What counts as a conversation's latest message is written once, in `email-threading-sql.ts`, and read by the list, the filters, `reply`, `sendDraft` and the check that runs before an agent sends.
+It skips messages deleted from the mailbox and delivery failure notices, and orders by the message's own date, settling ties on when it was stored and then on its id.
+`last_message_at` is therefore the date the sender wrote, not the moment Batuda stored the message — which matters on a mailbox connected with history, where everything was stored at once.
+Unread keeps the other meaning: a message that reached us after the conversation was last read, whatever date it carries.
+
+`waiting_on` reads only conversations still open — a settled one waits for nobody. `us` means their message came last and was not marked as junk; `them` means ours came last and did not bounce.
+A delivery notice is not them writing back, which is what `is_delivery_notice` is for; notices stored before that column existed are not marked.
+
+Date bounds take a day (`2026-09-01`) or a moment that says its timezone.
+A moment without one is refused rather than read against whichever clock the server keeps, and so is a day that is not on the calendar, which the ordinary date reader would silently turn into the next month.
+A range that can only find nothing — the opening bound at or after the closing one — is refused in words, because an empty page reads as "you have none of those".
+
+`participant` matches one address, or a whole domain written as `@acme.com`, anchored so it never matches a domain that merely ends the same way.
+It stays out of the web API on purpose: an address in a query string ends up in logs and history, which is why checking suppressed addresses is a POST.
+Date ranges and `participant` are likewise not on the screen; the search box already matches addresses loosely.
+
+`has_attachments` counts files somebody attached rather than images inside the message.
+A message this system sent gets its list of attachments only when the mailbox's Sent folder is next read, so a very recent send may not count yet.
+
 ### Env vars
 
 ```

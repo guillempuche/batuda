@@ -26,3 +26,13 @@ export const CommaList = Schema.String.pipe(
 		),
 	}),
 )
+
+/**
+ * The same, for a filter whose values come from a fixed list of words.
+ *
+ * `?status=open,bogus` is then refused with a clear answer instead of quietly
+ * matching nothing, which reads to whoever asked — a person or an assistant —
+ * as "you have none of those" rather than "that is not a status".
+ */
+export const commaListOf = <M extends Schema.Top>(member: M) =>
+	CommaList.pipe(Schema.decodeTo(Schema.Array(member)))

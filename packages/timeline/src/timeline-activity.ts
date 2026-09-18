@@ -663,6 +663,11 @@ export interface InteractionInsert {
 	nextActionAt: Date | null
 	durationMin: number | null
 	metadata: string | null
+	// Which message this entry is about, when it is about one. A column
+	// rather than a name inside `metadata`, because the rule that keeps
+	// private mail out of a shared history reads it on every history query
+	// and a name inside JSON has no index to follow.
+	emailMessageId: string | null
 	[key: string]: unknown
 }
 
@@ -684,7 +689,8 @@ export const mapEventToInteraction = (
 				nextAction: null,
 				nextActionAt: null,
 				durationMin: null,
-				metadata: JSON.stringify({ emailMessageId: event.emailMessageId }),
+				metadata: null,
+				emailMessageId: event.emailMessageId,
 			}
 		case 'EmailReceived':
 			if (!event.companyId) return null
@@ -701,10 +707,8 @@ export const mapEventToInteraction = (
 				nextAction: null,
 				nextActionAt: null,
 				durationMin: null,
-				metadata: JSON.stringify({
-					emailMessageId: event.emailMessageId,
-					classification: event.classification,
-				}),
+				metadata: JSON.stringify({ classification: event.classification }),
+				emailMessageId: event.emailMessageId,
 			}
 		case 'InteractionLogged':
 			if (event.attachInteractionId) return null
@@ -722,6 +726,7 @@ export const mapEventToInteraction = (
 				nextActionAt: event.nextActionAt,
 				durationMin: event.durationMin,
 				metadata: null,
+				emailMessageId: null,
 			}
 		case 'CompanyDeleted':
 		case 'CompanyRestored':

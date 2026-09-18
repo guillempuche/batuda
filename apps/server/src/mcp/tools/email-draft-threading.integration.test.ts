@@ -158,17 +158,36 @@ const draftFrom = (outcome: unknown) =>
 let inboxId = ''
 let threadSeq = 0
 
+// The message a conversation opened with, filed under it the way arriving mail
+// is. Without one the conversation holds nothing, and a conversation holding
+// nothing is not one anybody can see.
+const insertRootMessage = (rootId: string, inbox: string) =>
+	Effect.gen(function* () {
+		const sql = yield* SqlClient.SqlClient
+		yield* sql`
+			INSERT INTO email_messages (
+				organization_id, inbox_id, message_id, thread_key,
+				direction, folder, raw_rfc822_ref, subject, received_at, status
+			) VALUES (
+				${ORG}, ${inbox}, ${rootId}, ${rootId},
+				'inbound', 'INBOX', 'draft-threading-test', 'your quote', now(), 'normal'
+			)
+		`
+	})
+
 const insertThreadLink = () =>
 	sqlOnly(
 		Effect.gen(function* () {
 			const sql = yield* SqlClient.SqlClient
 			threadSeq += 1
+			const rootId = `<t-${threadSeq}@taller.test>`
 			const rows = yield* sql<{ id: string }>`
 				INSERT INTO email_thread_links (
 					organization_id, external_thread_id, subject
-				) VALUES (${ORG}, ${`<t-${threadSeq}@taller.test>`}, 'your quote')
+				) VALUES (${ORG}, ${rootId}, 'your quote')
 				RETURNING id
 			`
+			yield* insertRootMessage(rootId, inboxId)
 			return rows[0]!.id
 		}),
 	)
@@ -203,14 +222,19 @@ const insertThreadLinkIn = (inbox: string) =>
 		Effect.gen(function* () {
 			const sql = yield* SqlClient.SqlClient
 			threadSeq += 1
+			const rootId = `<other-${threadSeq}@taller.test>`
 			const rows = yield* sql<{ id: string }>`
 				INSERT INTO email_thread_links (
 					organization_id, external_thread_id, subject, inbox_id
 				) VALUES (
-					${ORG}, ${`<other-${threadSeq}@taller.test>`}, 'elsewhere', ${inbox}
+					${ORG}, ${rootId}, 'elsewhere', ${inbox}
 				)
 				RETURNING id
 			`
+			// The message that makes this conversation real, so a refusal below
+			// is about the mailbox it belongs to rather than about it not being
+			// there at all.
+			yield* insertRootMessage(rootId, inbox)
 			return rows[0]!.id
 		}),
 	)
@@ -234,6 +258,7 @@ beforeEach(async () => {
 		Effect.gen(function* () {
 			const sql = yield* SqlClient.SqlClient
 			yield* sql`DELETE FROM email_drafts WHERE organization_id = ${ORG}`
+			yield* sql`DELETE FROM email_messages WHERE organization_id = ${ORG}`
 			yield* sql`DELETE FROM email_thread_links WHERE organization_id = ${ORG}`
 			yield* sql`DELETE FROM inboxes WHERE organization_id = ${ORG}`
 		}),
@@ -266,6 +291,7 @@ afterAll(async () => {
 		Effect.gen(function* () {
 			const sql = yield* SqlClient.SqlClient
 			yield* sql`DELETE FROM email_drafts WHERE organization_id = ${ORG}`
+			yield* sql`DELETE FROM email_messages WHERE organization_id = ${ORG}`
 			yield* sql`DELETE FROM email_thread_links WHERE organization_id = ${ORG}`
 			yield* sql`DELETE FROM inboxes WHERE organization_id = ${ORG}`
 			yield* sql`DELETE FROM organization WHERE id = ${ORG}`

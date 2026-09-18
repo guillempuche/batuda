@@ -65,8 +65,21 @@ import type { ResolvedStaging, StagingRef } from './email-attachment-staging.js'
 import { EmailAttachmentStaging } from './email-attachment-staging.js'
 import type { DraftRow } from './email-draft-store.js'
 import { DraftStore } from './email-draft-store.js'
+import type { MessageFilters, ThreadFilters } from './email-list-filters.js'
+import {
+	messageConditions,
+	threadConditions,
+	threadOrder,
+} from './email-list-filters.js'
 import type { SendAttachmentInput } from './email-provider.js'
 import { EmailProvider } from './email-provider.js'
+import {
+	answerable,
+	inThread,
+	inThreadKey,
+	latestFirst,
+	startedWhereTheReaderCanSee,
+} from './email-threading-sql.js'
 import type {
 	DecryptedCreds,
 	OutboundAttachment,
@@ -1204,6 +1217,13 @@ export class EmailService extends Context.Service<EmailService>()(
 							// link back to the conversation this message belongs to.
 							let threadLinkId: string | null
 
+							// A brand-new conversation is written after its first message
+							// rather than before it: a conversation is only readable
+							// while it holds a message the reader may see, so writing the
+							// empty one first and reading its id back is refused. The
+							// subject waits here until then.
+							let newThreadSubject: string | null = null
+
 							if (args.existingThreadLink) {
 								// Reply: the conversation keeps its root id, and the row
 								// records the headers the message went out with. The root
@@ -1223,19 +1243,8 @@ export class EmailService extends Context.Service<EmailService>()(
 								externalThreadId = args.result.threadId
 								inReplyTo = null
 								referencesArr = []
-								const linkRows = yield* sql<{ id: string }>`
-									INSERT INTO email_thread_links ${sql.insert({
-										organizationId: currentOrg.id,
-										externalThreadId,
-										inboxId: args.inbox.id,
-										companyId: args.companyId,
-										contactId: args.contactId,
-										subject: args.subject,
-										status: 'open',
-									})}
-									RETURNING id
-								`
-								threadLinkId = linkRows[0]?.id ?? null
+								newThreadSubject = args.subject
+								threadLinkId = null
 							}
 
 							const sentAt = DateTime.toDateUtc(DateTime.nowUnsafe())
@@ -1244,6 +1253,7 @@ export class EmailService extends Context.Service<EmailService>()(
 									organizationId: currentOrg.id,
 									inboxId: args.inbox.id,
 									messageId: args.result.messageId,
+									threadKey: externalThreadId,
 									inReplyTo,
 									references: referencesArr,
 									direction: 'outbound',
@@ -1281,6 +1291,22 @@ export class EmailService extends Context.Service<EmailService>()(
 										'INSERT INTO email_messages RETURNING id yielded no row',
 									),
 								)
+							}
+
+							if (threadLinkId === null) {
+								const linkRows = yield* sql<{ id: string }>`
+									INSERT INTO email_thread_links ${sql.insert({
+										organizationId: currentOrg.id,
+										externalThreadId,
+										inboxId: args.inbox.id,
+										companyId: args.companyId,
+										contactId: args.contactId,
+										subject: newThreadSubject,
+										status: 'open',
+									})}
+									RETURNING id
+								`
+								threadLinkId = linkRows[0]?.id ?? null
 							}
 
 							const participants = buildParticipants(
@@ -1521,13 +1547,11 @@ export class EmailService extends Context.Service<EmailService>()(
 							       COALESCE(
 							         NULLIF(btrim(tl.subject), ''),
 							         (
-							           SELECT sm.subject FROM email_messages sm
-							           WHERE sm.organization_id = tl.organization_id
-							             AND (sm.message_id = tl.external_thread_id
-							                  OR sm."references" @> ARRAY[tl.external_thread_id]::text[])
-							             AND sm.subject IS NOT NULL
-							             AND btrim(sm.subject) <> ''
-							           ORDER BY sm.received_at ASC, sm.message_id ASC
+							           SELECT m.subject FROM email_messages m
+							           WHERE ${inThread(sql)}
+							             AND m.subject IS NOT NULL
+							             AND btrim(m.subject) <> ''
+							           ORDER BY m.received_at ASC, m.message_id ASC
 							           LIMIT 1
 							         )
 							       ) AS subject
@@ -1548,13 +1572,38 @@ export class EmailService extends Context.Service<EmailService>()(
 							return yield* new InboxInactive({ inboxId: link.id })
 						}
 
-						const inbox = yield* resolveInbox(link.inboxId).pipe(
+						// A conversation can begin in a mailbox that is not this
+						// sender's to write from — somebody's private one — and still be
+						// theirs to read, because a later message arrived in a shared
+						// mailbox. The answer then goes out through the mailbox the
+						// thread list reports for it, which is where the messages they
+						// can read actually landed. Without this, a conversation they
+						// are allowed to open is one they can never answer.
+						const answerFrom = yield* resolveInbox(link.inboxId).pipe(
 							Effect.flatMap(row =>
 								row
 									? Effect.succeed(row)
-									: Effect.fail(new InboxInactive({ inboxId: link.inboxId! })),
+									: sql<{ inboxId: string | null }>`
+											SELECT m.inbox_id
+											FROM email_messages m
+											WHERE ${inThreadKey(sql, currentOrg.id, link.externalThreadId)}
+											  AND ${answerable(sql)}
+											${latestFirst(sql)}
+											LIMIT 1
+										`.pipe(
+											Effect.orDie,
+											Effect.flatMap(rows => {
+												const fallback = rows[0]?.inboxId
+												return fallback && fallback !== link.inboxId
+													? resolveInbox(fallback)
+													: Effect.succeed(null)
+											}),
+										),
 							),
 						)
+						const inbox = yield* answerFrom
+							? Effect.succeed(answerFrom)
+							: Effect.fail(new InboxInactive({ inboxId: link.inboxId }))
 						yield* assertInboxUsable(inbox)
 
 						// Most recent message in the thread anchors the reply. We
@@ -1567,20 +1616,11 @@ export class EmailService extends Context.Service<EmailService>()(
 							direction: string
 							recipients: { from?: string | null; to?: string[] }
 						}>`
-							SELECT message_id, "references", direction, recipients
-							FROM email_messages
-							WHERE organization_id = ${currentOrg.id}
-							  AND (
-							    message_id = ${link.externalThreadId}
-							    OR "references" @> ARRAY[${link.externalThreadId}]::text[]
-							  )
-							  AND deleted_at IS NULL
-							-- The arrival time comes from the Date header, which counts
-							-- in whole seconds, so two messages can share one. The id
-							-- settles it, or which message is answered changes between
-							-- two otherwise identical replies.
-							ORDER BY received_at DESC NULLS LAST,
-							         status_updated_at DESC, message_id DESC
+							SELECT m.message_id, m."references", m.direction, m.recipients
+							FROM email_messages m
+							WHERE ${inThreadKey(sql, currentOrg.id, link.externalThreadId)}
+							  AND ${answerable(sql)}
+							${latestFirst(sql)}
 							LIMIT 1
 						`.pipe(Effect.orDie)
 						const lastMessage = lastMessages[0]
@@ -1751,8 +1791,6 @@ export class EmailService extends Context.Service<EmailService>()(
 							inboxEmail: string | null
 							inboxDisplayName: string | null
 							inboxDescription: string | null
-							inboxIsPrivate: boolean | null
-							inboxOwnerUserId: string | null
 						}>`
 							SELECT
 								tl.id,
@@ -1764,16 +1802,20 @@ export class EmailService extends Context.Service<EmailService>()(
 								-- began outbound. For inbound-first threads that column is
 								-- empty, so fall back to the earliest message's subject to
 								-- avoid showing "(no subject)" when the messages have one.
+								-- The column is also passed over when the conversation
+								-- began in a mailbox this reader may not see, since the
+								-- subject there came from a message they may not read.
 								COALESCE(
-									NULLIF(btrim(tl.subject), ''),
+									NULLIF(btrim(CASE
+										WHEN ${startedWhereTheReaderCanSee(sql, session.userId)}
+										THEN tl.subject
+									END), ''),
 									(
-										SELECT sm.subject FROM email_messages sm
-										WHERE sm.organization_id = tl.organization_id
-										  AND (sm.message_id = tl.external_thread_id
-										       OR sm."references" @> ARRAY[tl.external_thread_id]::text[])
-										  AND sm.subject IS NOT NULL
-										  AND btrim(sm.subject) <> ''
-										ORDER BY sm.received_at ASC, sm.message_id ASC
+										SELECT m.subject FROM email_messages m
+										WHERE ${inThread(sql)}
+										  AND m.subject IS NOT NULL
+										  AND btrim(m.subject) <> ''
+										ORDER BY m.received_at ASC, m.message_id ASC
 										LIMIT 1
 									)
 								) AS subject,
@@ -1781,13 +1823,26 @@ export class EmailService extends Context.Service<EmailService>()(
 								tl.last_read_at,
 								tl.created_at,
 								tl.updated_at,
-								i.email AS inbox_email,
-								i.display_name AS inbox_display_name,
-								i.description AS inbox_description,
-								i.is_private AS inbox_is_private,
-								i.owner_user_id AS inbox_owner_user_id
+								-- The mailbox shown is the one the conversation began in,
+								-- but only when that is one this reader may see. A
+								-- conversation can begin in somebody's private mailbox and
+								-- still be readable, because a later message arrived in a
+								-- shared one — naming the private mailbox here would say
+								-- who has one and what they call it. The same swap the
+								-- list makes.
+								CASE WHEN ${startedWhereTheReaderCanSee(sql, session.userId)} THEN i.email ELSE latest_inbox.email END AS inbox_email,
+								CASE WHEN ${startedWhereTheReaderCanSee(sql, session.userId)} THEN i.display_name ELSE latest_inbox.display_name END AS inbox_display_name,
+								CASE WHEN ${startedWhereTheReaderCanSee(sql, session.userId)} THEN i.description ELSE latest_inbox.description END AS inbox_description
 							FROM email_thread_links tl
 							LEFT JOIN inboxes i ON i.id = tl.inbox_id
+							LEFT JOIN LATERAL (
+								SELECT m.inbox_id
+								FROM email_messages m
+								WHERE ${inThread(sql)} AND ${answerable(sql)}
+								${latestFirst(sql)}
+								LIMIT 1
+							) latest ON true
+							LEFT JOIN inboxes latest_inbox ON latest_inbox.id = latest.inbox_id
 							WHERE tl.id = ${threadId}
 							  AND tl.organization_id = ${currentOrg.id}
 							LIMIT 1
@@ -1800,19 +1855,14 @@ export class EmailService extends Context.Service<EmailService>()(
 						}
 						const link = links[0]!
 
-						// Privacy gate: a thread anchored to a private inbox is
-						// invisible to anyone other than its owner. Surfaced as
-						// NotFound so org-mates cannot enumerate private inboxes
-						// by trial-and-error.
-						if (
-							link.inboxIsPrivate === true &&
-							link.inboxOwnerUserId !== session.userId
-						) {
-							return yield* new NotFound({
-								entity: 'EmailThreadLink',
-								id: threadId,
-							})
-						}
+						// No mailbox check here: whether a conversation is readable is
+						// the database's answer, not this query's. A conversation is
+						// readable while it holds a message this reader may read
+						// (migration 0073), so one made of nothing but somebody else's
+						// private mail has already answered nothing above, and a shared
+						// one arrives without the private messages inside it. Asking
+						// which mailbox it began in would be the wrong question: that
+						// mailbox can be private while the conversation is the team's.
 
 						// JOIN message_participants so the wire response can carry
 						// `from` per message — the table stores sender as a
@@ -1849,26 +1899,22 @@ export class EmailService extends Context.Service<EmailService>()(
 							inboundClassification: 'normal' | 'spam' | 'blocked' | null
 							statusUpdatedAt: Date
 						}>`
-							SELECT em.id, em.message_id, em.in_reply_to, em."references",
-							       em.direction, em.folder, em.subject, em.received_at,
-							       em.text_preview, em.text_body, em.html_body, em.recipients,
-							       em.attachments,
-							       em.status, em.status_reason, em.bounce_type, em.bounce_sub_type,
-							       em.inbound_classification, em.status_updated_at,
+							SELECT m.id, m.message_id, m.in_reply_to, m."references",
+							       m.direction, m.folder, m.subject, m.received_at,
+							       m.text_preview, m.text_body, m.html_body, m.recipients,
+							       m.attachments,
+							       m.status, m.status_reason, m.bounce_type, m.bounce_sub_type,
+							       m.inbound_classification, m.status_updated_at,
 							       (
 							         SELECT mp.email_address
 							         FROM message_participants mp
-							         WHERE mp.email_message_id = em.id
+							         WHERE mp.email_message_id = m.id
 							           AND mp.role = 'from'
 							         LIMIT 1
 							       ) AS from_address
-							FROM email_messages em
-							WHERE em.organization_id = ${currentOrg.id}
-							  AND (
-							    em.message_id = ${link.externalThreadId}
-							    OR em."references" @> ARRAY[${link.externalThreadId}]::text[]
-							  )
-							ORDER BY em.received_at ASC NULLS LAST, em.status_updated_at ASC
+							FROM email_messages m
+							WHERE ${inThreadKey(sql, currentOrg.id, link.externalThreadId)}
+							ORDER BY m.received_at ASC NULLS LAST, m.status_updated_at ASC
 						`.pipe(Effect.orDie)
 
 						// Flatten to the UI's expected shape (keys it actually
@@ -1990,69 +2036,142 @@ export class EmailService extends Context.Service<EmailService>()(
 						`
 					}).pipe(Effect.orDie),
 
-				listThreads: (filters?: {
-					inboxId?: string
-					companyId?: string
-					status?: string
-					query?: string
-					limit?: number
-					offset?: number
-					count?: CountMode
-				}) =>
+				listThreads: (
+					filters?: ThreadFilters & {
+						limit?: number
+						offset?: number
+						count?: CountMode
+					},
+				) =>
 					Effect.gen(function* () {
 						const currentOrg = yield* CurrentOrg
 						const session = yield* SessionContext
 
 						const page = pageOf(filters ?? {}, 100)
 						const { limit, offset, count } = page
+
+						const narrowing = threadConditions(sql, filters ?? {})
+						// Nothing below narrows by mailbox: which conversations the
+						// reader may see is the database's answer, not this query's. A
+						// conversation is readable while it holds a message the reader
+						// may read, and mail in somebody else's private mailbox is not
+						// one (migration 0073).
 						const conditions: Array<Statement.Fragment> = [
 							sql`tl.organization_id = ${currentOrg.id}`,
-							// Privacy gate: a private inbox is hidden from anyone
-							// other than its owner. Phrased as a join-side filter so
-							// thread rows that have NO inbox (legacy / inbox deleted)
-							// stay visible to whoever was already on the thread.
-							sql`(i.id IS NULL OR i.is_private = false OR i.owner_user_id = ${session.userId})`,
+							...narrowing.conditions,
 						]
-						if (filters?.inboxId)
-							conditions.push(sql`tl.inbox_id = ${filters.inboxId}`)
-						if (filters?.companyId)
-							conditions.push(sql`tl.company_id = ${filters.companyId}`)
-						if (filters?.status)
-							conditions.push(sql`tl.status = ${filters.status}`)
+
+						// The full-text search stays here rather than in the filters
+						// module: it is the one condition that reads the generated
+						// search column, which only this table's own query knows about.
 						if (filters?.query) {
 							const trimmedQuery = filters.query.trim()
 							if (trimmedQuery.length > 0) {
-								// FTS over each message's subject + preview + body; the
-								// separate participants subquery catches sender/recipient
-								// hits, which the tsvector deliberately omits (unbounded
-								// recipient sets would force a tsvector rebuild on every
-								// reply).
+								// Addresses are matched beside that column rather than
+								// written into it: everyone a message went to would have to
+								// go in, and the column would be rebuilt on every reply.
 								conditions.push(sql`(
 									EXISTS (
-										SELECT 1 FROM email_messages em
-										WHERE em.organization_id = tl.organization_id
-										  AND (em.message_id = tl.external_thread_id
-										       OR em."references" @> ARRAY[tl.external_thread_id]::text[])
-										  AND em.search_vector @@ plainto_tsquery('simple', ${trimmedQuery})
+										SELECT 1 FROM email_messages m
+										WHERE ${inThread(sql)}
+										  AND m.search_vector @@ plainto_tsquery('simple', ${trimmedQuery})
 									)
 									OR EXISTS (
-										SELECT 1 FROM email_messages em2
-										JOIN message_participants mp ON mp.email_message_id = em2.id
-										WHERE em2.organization_id = tl.organization_id
-										  AND (em2.message_id = tl.external_thread_id
-										       OR em2."references" @> ARRAY[tl.external_thread_id]::text[])
+										SELECT 1 FROM email_messages m
+										JOIN message_participants mp ON mp.email_message_id = m.id
+										WHERE ${inThread(sql)}
 										  AND mp.email_address ILIKE ${textAnywhere(trimmedQuery)}
 									)
 								)`)
 							}
 						}
 
+						const ordering = threadOrder(sql, filters?.sort)
+						// Reading by latest message reaches for the same per-conversation
+						// values a filter does, and so does the count beside it.
+						const needsThreadFacts =
+							narrowing.needsThreadFacts || filters?.sort === 'latest_message'
+
 						const whereClause = sql`WHERE ${sql.and(conditions)}`
 
-						// Window COUNT(*) OVER () gives total in the same scan; the
-						// per-thread sub-selects pivot on external_thread_id (the
-						// column the threading index lives on) so each row stays a
-						// constant-cost lookup.
+						// Everything a row says about its conversation is worked out
+						// once, here, from the messages the reader may see. The filters
+						// read the same values, so a conversation the list calls unread
+						// is exactly one the unread filter finds.
+						const threadFacts = sql`
+							FROM email_thread_links tl
+							LEFT JOIN inboxes i ON i.id = tl.inbox_id
+							LEFT JOIN LATERAL (
+								SELECT
+									count(*) AS message_count,
+									max(m.received_at) FILTER (
+										WHERE m.deleted_at IS NULL AND m.is_delivery_notice = false
+									) AS last_message_at,
+									max(m.received_at) FILTER (
+										WHERE m.direction = 'inbound'
+										  AND m.deleted_at IS NULL
+										  AND m.is_delivery_notice = false
+									) AS last_inbound_at,
+									-- Unread is about when mail reached us, not about the
+									-- date its sender wrote on it: mail that arrives late is
+									-- still new to whoever is reading. A failure notice counts
+									-- — it is worth reading, even though nobody is waiting on
+									-- an answer to it — but a message deleted from the mailbox
+									-- does not, or a conversation stays bold with nothing in
+									-- it to open.
+									max(m.status_updated_at) FILTER (
+										WHERE m.direction = 'inbound' AND m.deleted_at IS NULL
+									) AS last_arrival_at
+								FROM email_messages m
+								WHERE ${inThread(sql)}
+							) stats ON true
+							LEFT JOIN LATERAL (
+								-- What the filters read as well as the list: how the
+								-- latest message fared and what a check made of it, so
+								-- "waiting on them" can pass over one that bounced and
+								-- "needs a reply" can pass over junk.
+								SELECT m.direction, m.inbox_id, m.status, m.inbound_classification
+								FROM email_messages m
+								WHERE ${inThread(sql)} AND ${answerable(sql)}
+								${latestFirst(sql)}
+								LIMIT 1
+							) latest ON true
+							LEFT JOIN LATERAL (
+								-- What a check made of the last message they wrote: a
+								-- failure notice is from a mail server and a deleted one is
+								-- not there to be judged, so neither speaks for the
+								-- conversation.
+								SELECT m.inbound_classification
+								FROM email_messages m
+								WHERE ${inThread(sql)}
+								  AND m.direction = 'inbound'
+								  AND ${answerable(sql)}
+								${latestFirst(sql)}
+								LIMIT 1
+							) latest_inbound ON true
+							LEFT JOIN LATERAL (
+								-- The name a conversation goes by, when its own row has
+								-- none. Taken from a message still in the mailbox and
+								-- written by a person: naming a conversation after a
+								-- failure notice would put "Undelivered Mail Returned to
+								-- Sender" on the list.
+								SELECT m.subject
+								FROM email_messages m
+								WHERE ${inThread(sql)}
+								  AND ${answerable(sql)}
+								  AND m.subject IS NOT NULL
+								  AND btrim(m.subject) <> ''
+								ORDER BY m.received_at ASC, m.message_id ASC
+								LIMIT 1
+							) first_message ON true
+							LEFT JOIN inboxes latest_inbox ON latest_inbox.id = latest.inbox_id
+						`
+
+						const readerSeesWhereItStarted = startedWhereTheReaderCanSee(
+							sql,
+							session.userId,
+						)
+
 						const probed = yield* sql<{
 							id: string
 							externalThreadId: string
@@ -2077,83 +2196,32 @@ export class EmailService extends Context.Service<EmailService>()(
 							SELECT
 								tl.id,
 								tl.external_thread_id,
-								tl.inbox_id,
+								CASE WHEN ${readerSeesWhereItStarted} THEN tl.inbox_id ELSE latest.inbox_id END AS inbox_id,
 								tl.company_id,
 								tl.contact_id,
-								-- Thread links only carry their own subject when the thread
-								-- began outbound. For inbound-first threads that column is
-								-- empty, so fall back to the earliest message's subject to
-								-- avoid showing "(no subject)" when the messages have one.
 								COALESCE(
-									NULLIF(btrim(tl.subject), ''),
-									(
-										SELECT sm.subject FROM email_messages sm
-										WHERE sm.organization_id = tl.organization_id
-										  AND (sm.message_id = tl.external_thread_id
-										       OR sm."references" @> ARRAY[tl.external_thread_id]::text[])
-										  AND sm.subject IS NOT NULL
-										  AND btrim(sm.subject) <> ''
-										ORDER BY sm.received_at ASC, sm.message_id ASC
-										LIMIT 1
-									)
+									NULLIF(btrim(CASE WHEN ${readerSeesWhereItStarted} THEN tl.subject END), ''),
+									first_message.subject
 								) AS subject,
 								tl.status,
 								tl.last_read_at,
 								tl.created_at,
 								tl.updated_at,
-								i.email AS inbox_email,
-								i.display_name AS inbox_display_name,
-								i.description AS inbox_description,
-								(
-									SELECT COUNT(*) FROM email_messages m
-									WHERE m.organization_id = tl.organization_id
-									  AND (m.message_id = tl.external_thread_id
-									       OR m."references" @> ARRAY[tl.external_thread_id]::text[])
-								) AS message_count,
-								(
-									SELECT MAX(m.status_updated_at) FROM email_messages m
-									WHERE m.organization_id = tl.organization_id
-									  AND (m.message_id = tl.external_thread_id
-									       OR m."references" @> ARRAY[tl.external_thread_id]::text[])
-								) AS last_message_at,
-								(
-									SELECT m.direction FROM email_messages m
-									WHERE m.organization_id = tl.organization_id
-									  AND (m.message_id = tl.external_thread_id
-									       OR m."references" @> ARRAY[tl.external_thread_id]::text[])
-									ORDER BY m.status_updated_at DESC
-									LIMIT 1
-								) AS last_message_direction,
-								(
-									SELECT MAX(m.status_updated_at) FROM email_messages m
-									WHERE m.organization_id = tl.organization_id
-									  AND (m.message_id = tl.external_thread_id
-									       OR m."references" @> ARRAY[tl.external_thread_id]::text[])
-									  AND m.direction = 'inbound'
-								) AS last_inbound_at,
-								(
-									SELECT m.inbound_classification FROM email_messages m
-									WHERE m.organization_id = tl.organization_id
-									  AND (m.message_id = tl.external_thread_id
-									       OR m."references" @> ARRAY[tl.external_thread_id]::text[])
-									  AND m.direction = 'inbound'
-									ORDER BY m.status_updated_at DESC
-									LIMIT 1
-								) AS last_inbound_classification,
+								CASE WHEN ${readerSeesWhereItStarted} THEN i.email ELSE latest_inbox.email END AS inbox_email,
+								CASE WHEN ${readerSeesWhereItStarted} THEN i.display_name ELSE latest_inbox.display_name END AS inbox_display_name,
+								CASE WHEN ${readerSeesWhereItStarted} THEN i.description ELSE latest_inbox.description END AS inbox_description,
+								stats.message_count,
+								stats.last_message_at,
+								latest.direction AS last_message_direction,
+								stats.last_inbound_at,
+								latest_inbound.inbound_classification AS last_inbound_classification,
 								COALESCE(
-									(
-										SELECT MAX(m.status_updated_at) FROM email_messages m
-										WHERE m.organization_id = tl.organization_id
-										  AND (m.message_id = tl.external_thread_id
-										       OR m."references" @> ARRAY[tl.external_thread_id]::text[])
-										  AND m.direction = 'inbound'
-									) > COALESCE(tl.last_read_at, 'epoch'::timestamptz),
+									stats.last_arrival_at > COALESCE(tl.last_read_at, 'epoch'::timestamptz),
 									false
 								) AS is_unread
-							FROM email_thread_links tl
-							LEFT JOIN inboxes i ON i.id = tl.inbox_id
+							${threadFacts}
 							${whereClause}
-							ORDER BY tl.updated_at DESC
+							${ordering}
 							LIMIT ${probeLimit(limit)}
 							OFFSET ${offset}
 						`
@@ -2168,8 +2236,7 @@ export class EmailService extends Context.Service<EmailService>()(
 							count === 'exact'
 								? yield* sql<{ readonly count: string | number }>`
 										SELECT count(*) AS count
-										FROM email_thread_links tl
-										LEFT JOIN inboxes i ON i.id = tl.inbox_id
+										${needsThreadFacts ? threadFacts : sql`FROM email_thread_links tl`}
 										${whereClause}
 									`
 								: undefined
@@ -2207,25 +2274,19 @@ export class EmailService extends Context.Service<EmailService>()(
 						})
 					}).pipe(Effect.orDie),
 
-				listMessages: (filters?: {
-					contactId?: string
-					companyId?: string
-					status?: string
-					limit?: number
-					offset?: number
-					count?: CountMode
-				}) =>
+				listMessages: (
+					filters?: MessageFilters & {
+						limit?: number
+						offset?: number
+						count?: CountMode
+					},
+				) =>
 					Effect.gen(function* () {
 						const currentOrg = yield* CurrentOrg
 						const conditions: Array<Statement.Fragment> = [
 							sql`organization_id = ${currentOrg.id}`,
+							...messageConditions(sql, filters ?? {}),
 						]
-						if (filters?.contactId)
-							conditions.push(sql`contact_id = ${filters.contactId}`)
-						if (filters?.companyId)
-							conditions.push(sql`company_id = ${filters.companyId}`)
-						if (filters?.status)
-							conditions.push(sql`status = ${filters.status}`)
 
 						const page = pageOf(filters ?? {}, 50)
 						const probed = yield* sql<{ readonly total?: string | number }>`
@@ -3271,26 +3332,22 @@ export class EmailService extends Context.Service<EmailService>()(
 						if (!threadLinkId && draft.inReplyTo) {
 							const parentRows = yield* sql<{ id: string }>`
 								SELECT tl.id
-								FROM email_messages em
+								FROM email_messages m
 								JOIN email_thread_links tl
-								  ON tl.organization_id = em.organization_id
-								 AND (
-								   tl.external_thread_id = em.message_id
-								   OR tl.external_thread_id = ANY(em."references")
-								 )
-								WHERE em.organization_id = ${currentOrg.id}
-								  AND em.message_id = ${draft.inReplyTo}
+								  ON tl.organization_id = m.organization_id
+								 AND tl.external_thread_id = m.thread_key
+								WHERE m.organization_id = ${currentOrg.id}
+								  AND m.message_id = ${draft.inReplyTo}
 								  -- Same mailbox the draft is going out from: this send
 								  -- goes out from the draft's mailbox, so filing it under
 								  -- another one's conversation would put a message in a
 								  -- thread it was never part of.
 								  AND tl.inbox_id = ${inbox.id}
-								-- Same tie-break as the mail worker uses: oldest known
-								-- ancestor wins, so a split conversation always answers
-								-- with the same half.
-								ORDER BY array_position(em."references", tl.external_thread_id)
-								           ASC NULLS LAST,
-								         tl.created_at ASC, tl.id ASC
+								-- A message says which conversation it is in, so there is
+								-- one answer here rather than a chain to weigh up. The
+								-- order only settles the case where the same key somehow
+								-- answers twice, and settles it the same way every time.
+								ORDER BY tl.created_at ASC, tl.id ASC
 								LIMIT 1
 							`.pipe(Effect.orDie)
 							threadLinkId = parentRows[0]?.id ?? null
@@ -3321,13 +3378,11 @@ export class EmailService extends Context.Service<EmailService>()(
 								       COALESCE(
 								         NULLIF(btrim(tl.subject), ''),
 								         (
-								           SELECT sm.subject FROM email_messages sm
-								           WHERE sm.organization_id = tl.organization_id
-								             AND (sm.message_id = tl.external_thread_id
-								                  OR sm."references" @> ARRAY[tl.external_thread_id]::text[])
-								             AND sm.subject IS NOT NULL
-								             AND btrim(sm.subject) <> ''
-								           ORDER BY sm.received_at ASC, sm.message_id ASC
+								           SELECT m.subject FROM email_messages m
+								           WHERE ${inThread(sql)}
+								             AND m.subject IS NOT NULL
+								             AND btrim(m.subject) <> ''
+								           ORDER BY m.received_at ASC, m.message_id ASC
 								           LIMIT 1
 								         )
 								       ) AS subject
@@ -3345,16 +3400,11 @@ export class EmailService extends Context.Service<EmailService>()(
 									messageId: string
 									references: string[] | null
 								}>`
-									SELECT message_id, "references"
-									FROM email_messages
-									WHERE organization_id = ${currentOrg.id}
-									  AND (
-									    message_id = ${existingThreadLink.externalThreadId}
-									    OR "references" @> ARRAY[${existingThreadLink.externalThreadId}]::text[]
-									  )
-									  AND deleted_at IS NULL
-									ORDER BY received_at DESC NULLS LAST,
-									         status_updated_at DESC, message_id DESC
+									SELECT m.message_id, m."references"
+									FROM email_messages m
+									WHERE ${inThreadKey(sql, currentOrg.id, existingThreadLink.externalThreadId)}
+									  AND ${answerable(sql)}
+									${latestFirst(sql)}
 									LIMIT 1
 								`.pipe(Effect.orDie)
 								parentMessageId = lastRows[0]?.messageId ?? null
