@@ -5,7 +5,7 @@ import { DateTime, Effect, Schema } from 'effect'
 import { AsyncResult } from 'effect/unstable/reactivity'
 import { Search, X } from 'lucide-react'
 import { LayoutGroup, motion } from 'motion/react'
-import { css, styled } from 'next-yak'
+import { styled } from 'next-yak'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { CommaList } from '@batuda/controllers'
@@ -32,11 +32,12 @@ import { companyFacetsAtom, facetsQuery } from '#/atoms/company-facets-atoms'
 import { AttributeFilter } from '#/components/companies/attribute-filter'
 import { attributeRejectedMessage } from '#/components/companies/attribute-rejected'
 import { CompaniesHeader } from '#/components/companies/companies-header'
-import { ALL, FilterSelect } from '#/components/companies/filter-select'
 import { SavedViews } from '#/components/companies/saved-views'
 import { CompanyCard } from '#/components/shared/company-card'
 import { EmptyState } from '#/components/shared/empty-state'
 import { ErrorState } from '#/components/shared/error-state'
+import { FilterChip } from '#/components/shared/filter-chip'
+import { ALL, FilterSelect } from '#/components/shared/filter-select'
 import { InfiniteListFooter } from '#/components/shared/infinite-list-footer'
 import { LoadingSpinner } from '#/components/shared/loading-spinner'
 import { MultiSelectFilter } from '#/components/shared/multi-select-filter'
@@ -528,9 +529,8 @@ function CompaniesListPage() {
 				</SearchWrap>
 
 				<StatusFilters role='group' aria-label={t`Filter by status`}>
-					<StatusFilterButton
+					<FilterChip
 						type='button'
-						$active={chosenStatuses.length === 0}
 						onClick={clearStatus}
 						// It is the one chip that lights up while carrying no state a
 						// listener can hear, so the strip reads as eight toggles and one
@@ -541,24 +541,22 @@ function CompaniesListPage() {
 						data-testid='companies-status-all'
 					>
 						{t`All`}
-					</StatusFilterButton>
+					</FilterChip>
 					{STATUS_ORDER.map(status => (
-						<StatusFilterButton
+						<FilterChip
 							key={status}
 							type='button'
-							$active={chosenStatuses.includes(status)}
 							onClick={() => toggleStatus(status)}
 							aria-pressed={chosenStatuses.includes(status)}
 							data-testid={`companies-status-${status}`}
 						>
 							<StatusBadge status={status} />
-						</StatusFilterButton>
+						</FilterChip>
 					))}
 					{/* Separate from the stages on purpose: a deleted company has a
 					    stage too, so this is a different question about the same list. */}
-					<StatusFilterButton
+					<FilterChip
 						type='button'
-						$active={search.deleted === 'only'}
 						onClick={() =>
 							applyPatch({
 								deleted: search.deleted === 'only' ? undefined : 'only',
@@ -575,7 +573,7 @@ function CompaniesListPage() {
 						data-testid='companies-filter-deleted'
 					>
 						{t`Deleted`}
-					</StatusFilterButton>
+					</FilterChip>
 				</StatusFilters>
 
 				<SavedViews
@@ -970,52 +968,6 @@ const StatusFilters = styled.div`
 	> * {
 		flex: 0 0 auto;
 		scroll-snap-align: start;
-	}
-`
-
-const StatusFilterButton = styled.button<{ $active: boolean }>`
-	display: inline-flex;
-	align-items: center;
-	gap: var(--space-2xs);
-	padding: var(--space-2xs) var(--space-sm);
-	background: ${p => (p.$active ? 'var(--color-primary)' : 'transparent')};
-	color: ${p =>
-		p.$active ? 'var(--color-on-primary)' : 'var(--color-on-surface)'};
-	border: 2px
-		${p => (p.$active ? 'solid' : 'dashed')}
-		${p =>
-			p.$active
-				? 'color-mix(in oklab, var(--color-primary) 70%, black)'
-				: 'var(--color-outline)'};
-	border-radius: var(--shape-2xs);
-	font-family: var(--font-display);
-	font-size: var(--typescale-label-small-size);
-	line-height: var(--typescale-label-small-line);
-	font-weight: var(--font-weight-bold);
-	letter-spacing: 0.06em;
-	text-transform: uppercase;
-	cursor: pointer;
-	transition:
-		background 160ms ease,
-		color 160ms ease,
-		border-color 160ms ease;
-
-	${p =>
-		p.$active &&
-		css`
-			text-shadow: var(--text-shadow-engrave);
-			box-shadow:
-				inset 0 1px 3px var(--shadow-color-deep),
-				0 1px 0 var(--highlight-inset-soft);
-		`}
-
-	&:hover:not(:disabled) {
-		border-color: var(--color-primary);
-	}
-
-	&:focus-visible {
-		outline: none;
-		box-shadow: var(--glow-active);
 	}
 `
 

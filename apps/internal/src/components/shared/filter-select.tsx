@@ -7,8 +7,8 @@ import { PriSelect } from '@batuda/ui/pri'
 // spelling for every filter that offers it, since the value reaches the address.
 export const ALL = '__all__'
 
-// One filter of the companies bar that holds a single value: the trigger shows
-// what it is set to rather than what it filters, since several sit on a line and
+// One filter of a list's bar that holds a single value: the trigger shows what
+// it is set to rather than what it filters, since several sit on a line and
 // there is room for one of the two. The name is left to anyone listening.
 export function FilterSelect({
 	label,

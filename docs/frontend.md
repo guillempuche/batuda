@@ -889,6 +889,26 @@ The controls do two different jobs, which the wording has to keep apart. Risky a
 
 Documents also have a screen of their own at `/documents`, and one page each at `/documents/$id`.
 
+### Emails (`/emails`)
+
+- Chips: All / Open / Closed / Archived, several at once, then Unread and Has attachments
+- Dropdowns: mailbox, who is waiting for an answer, how long it has been quiet, the owner of the company it is with, and the order to read it in
+- Search box over subject, message text and addresses
+- Numbered pages of 100, with the total beside them
+
+The bar is the `/companies` one with a different set of questions, and shares its parts: `FilterChip` and `FilterSelect` in `components/shared/`, `MultiSelectFilter` for the owner menu, and `validateSearchWith` / `valueListOf` for reading the address.
+Its pure half — reading the address, turning it into a request, merging a change, ticking a value in a list — lives in `src/lib/emails-search-params.ts`, because a route's `validateSearch` and its loader ship to every page and must not drag the screen along with them.
+
+Two controls quietly lift each other, as the bin and the attention filter do on `/companies`.
+Waiting for an answer is something only an open conversation does, so choosing one drops Closed and Archived, and choosing any stage other than Open on its own puts "waiting on" down.
+Without that the bar would sit there with a lit chip that cannot match anything.
+
+The reader is told the resulting count through a live region, because every control here changes the list without moving the keyboard.
+Nothing is announced until a result is actually in, so switching filters never flashes "0 threads" on the way.
+
+Three filters the list accepts are deliberately not on the bar: the date range, which a screen expresses as "gone quiet for N days"; the contact; and an address or domain, which the search box already matches loosely and which has no business in a URL.
+A hand-written link carrying `?quietDays=10` is still read and shown as its own option, so it can be taken off again — but a value the server would refuse, like `?quietDays=9999`, is dropped here rather than sent, since a request refused over there would empty the list with nothing on screen saying why.
+
 ### Tasks (`/tasks`)
 
 - Today + overdue (urgent section, highlighted)

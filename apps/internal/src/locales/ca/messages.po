@@ -220,6 +220,10 @@ msgstr "{count} empreses"
 msgid "{count} people went with it"
 msgstr "S'hi han endut {count} persones"
 
+#: src/routes/_authed/emails/index.tsx
+msgid "{count} threads"
+msgstr "{count} fils"
+
 #: src/components/research/inbox/research-inbox.tsx
 msgid "{entered} changes entered the records."
 msgstr "{entered} canvis han entrat als registres."
@@ -265,8 +269,13 @@ msgid "{total} documents"
 msgstr "{total} documents"
 
 #: src/routes/_authed/emails/index.tsx
+#: src/routes/_authed/emails/index.tsx
 msgid "{total} threads"
 msgstr "{total} fils"
+
+#: src/routes/_authed/emails/index.tsx
+msgid "{total} threads with filters applied"
+msgstr "{total} fils amb filtres aplicats"
 
 #: src/routes/_authed/settings/organization/members.tsx
 msgid "{trimmed} is already in this organization."
@@ -322,12 +331,17 @@ msgid "1 person went with it"
 msgstr "S'hi ha endut 1 persona"
 
 #: src/routes/_authed/emails/index.tsx
+#: src/routes/_authed/emails/index.tsx
 msgid "1 thread"
 msgstr "1 fil"
 
 #: src/routes/_authed/emails/index.tsx
 msgid "1 thread selected"
 msgstr "1 fil seleccionat"
+
+#: src/routes/_authed/emails/index.tsx
+msgid "1 thread with filters applied"
+msgstr "1 fil amb filtres aplicats"
 
 #: src/components/research/inbox/research-inbox.tsx
 msgid "50%+"
@@ -627,6 +641,7 @@ msgstr "Totes les execucions"
 msgid "All stages"
 msgstr "Totes les etapes"
 
+#: src/routes/_authed/emails/index.tsx
 #: src/routes/_authed/pages/index.tsx
 msgid "All statuses"
 msgstr "Tots els estats"
@@ -734,6 +749,14 @@ msgstr "Qualsevol confiança"
 msgid "Any priority"
 msgstr "Qualsevol prioritat"
 
+#: src/routes/_authed/emails/index.tsx
+msgid "Any thread"
+msgstr "Qualsevol fil"
+
+#: src/routes/_authed/emails/index.tsx
+msgid "Any time"
+msgstr "Qualsevol moment"
+
 #: src/components/companies/attribute-filter.tsx
 msgid "Any value"
 msgstr "Qualsevol valor"
@@ -831,6 +854,7 @@ msgstr "Arxiva el fil"
 
 #: src/components/companies/conversations-tab.tsx
 #: src/routes/_authed/emails/$threadId.tsx
+#: src/routes/_authed/emails/index.tsx
 #: src/routes/_authed/emails/index.tsx
 msgid "Archived"
 msgstr "Arxivat"
@@ -1092,6 +1116,10 @@ msgstr "Per últim contacte"
 msgid "By last update"
 msgstr "Per última actualització"
 
+#: src/routes/_authed/emails/index.tsx
+msgid "By latest message"
+msgstr "Per últim missatge"
+
 #: src/routes/_authed/companies/index.tsx
 msgid "By name"
 msgstr "Per nom"
@@ -1103,6 +1131,10 @@ msgstr "Per prioritat"
 #: src/routes/_authed/settings/organization/spend.tsx
 msgid "By provider"
 msgstr "Per proveïdor"
+
+#: src/routes/_authed/emails/index.tsx
+msgid "By recent activity"
+msgstr "Per activitat recent"
 
 #: src/routes/_authed/settings/organization/spend.tsx
 msgid "By tool"
@@ -1343,6 +1375,7 @@ msgstr "Tanca el fil"
 #: src/components/shared/status-badge.tsx
 #: src/routes/_authed/emails/$threadId.tsx
 #: src/routes/_authed/emails/index.tsx
+#: src/routes/_authed/emails/index.tsx
 msgid "Closed"
 msgstr "Tancat"
 
@@ -1410,9 +1443,17 @@ msgstr "Empresa suprimida"
 msgid "Company enrichment"
 msgstr "Enriquiment d'empresa"
 
+#: src/routes/_authed/emails/index.tsx
+msgid "Company owner"
+msgstr "Propietari de l'empresa"
+
 #: src/routes/_authed/companies/$slug.tsx
 msgid "Company restored"
 msgstr "Empresa restaurada"
+
+#: src/routes/_authed/emails/index.tsx
+msgid "Company without owner"
+msgstr "Empresa sense propietari"
 
 #: src/components/research/research-dialog.tsx
 msgid "Competitor scan"
@@ -2936,6 +2977,10 @@ msgstr "En silenci"
 msgid "Gone quiet · {0}+ days"
 msgstr "En silenci · {0}+ dies"
 
+#: src/routes/_authed/emails/index.tsx
+msgid "Gone quiet · {days}+ days"
+msgstr "En silenci · {days}+ dies"
+
 #: src/components/instructions/template-transfer-dialog.tsx
 msgid "Hand it over"
 msgstr "Traspassa-la"
@@ -2952,6 +2997,14 @@ msgstr "Traspassa a un company"
 #: src/components/instructions/template-transfer-dialog.tsx
 msgid "Handing over…"
 msgstr "S’està traspassant…"
+
+#: src/routes/_authed/emails/index.tsx
+msgid "Has attachments"
+msgstr "Amb adjunts"
+
+#: src/routes/_authed/emails/index.tsx
+msgid "Has draft"
+msgstr "Amb esborrany"
 
 #: src/components/primitives/pri-rich-text.tsx
 msgid "Heading 1"
@@ -3769,6 +3822,7 @@ msgid "My default"
 msgstr "La meva predeterminada"
 
 #: src/routes/_authed/companies/index.tsx
+#: src/routes/_authed/emails/index.tsx
 msgid "My leads"
 msgstr "Els meus leads"
 
@@ -3806,6 +3860,10 @@ msgstr "Filtra aquesta llista"
 #: src/components/shared/multi-select-filter.tsx
 msgid "Narrow this list…"
 msgstr "Filtra aquesta llista…"
+
+#: src/routes/_authed/emails/index.tsx
+msgid "Needs a reply"
+msgstr "Has de respondre"
 
 #: src/routes/_authed/index.tsx
 #: src/routes/_authed/index.tsx
@@ -5058,6 +5116,10 @@ msgstr "Afegeix tasca ràpidament"
 msgid "Quick add: \"Call Acme tomorrow #high\""
 msgstr "Afegeix ràpid: «Truca a Acme demà #high»"
 
+#: src/routes/_authed/emails/index.tsx
+msgid "Quiet for"
+msgstr "En silenci des de"
+
 #: src/components/primitives/pri-rich-text.tsx
 msgid "Quote"
 msgstr "Cita"
@@ -5511,10 +5573,6 @@ msgstr "Programa una trucada amb Cal.com"
 msgid "Search by name, industry, or location…"
 msgstr "Cerca per nom, sector o ubicació…"
 
-#: src/routes/_authed/emails/index.tsx
-msgid "Search by subject…"
-msgstr "Cerca per assumpte…"
-
 #: src/routes/_authed/companies/index.tsx
 msgid "Search companies"
 msgstr "Cerca empreses"
@@ -5522,6 +5580,10 @@ msgstr "Cerca empreses"
 #: src/components/research/inbox/research-inbox.tsx
 msgid "Search name or query"
 msgstr "Cerca nom o consulta"
+
+#: src/routes/_authed/emails/index.tsx
+msgid "Search subject, message text, or address…"
+msgstr "Cerca per assumpte, text del missatge o adreça…"
 
 #: src/components/research/inbox/research-inbox.tsx
 msgid "Search the review queue"
@@ -5854,6 +5916,7 @@ msgid "Something went wrong. Try again."
 msgstr "Alguna cosa ha fallat. Prova-ho de nou."
 
 #: src/routes/_authed/companies/index.tsx
+#: src/routes/_authed/emails/index.tsx
 msgid "Sort"
 msgstr "Ordena"
 
@@ -6751,6 +6814,7 @@ msgid "Unnamed client"
 msgstr "Client sense nom"
 
 #: src/routes/_authed/emails/index.tsx
+#: src/routes/_authed/emails/index.tsx
 msgid "Unread"
 msgstr "No llegit"
 
@@ -6898,6 +6962,14 @@ msgstr "Visita"
 #: src/components/documents/document-kinds.ts
 msgid "Visit notes"
 msgstr "Notes de visita"
+
+#: src/routes/_authed/emails/index.tsx
+msgid "Waiting on"
+msgstr "A l'espera"
+
+#: src/routes/_authed/emails/index.tsx
+msgid "Waiting on them"
+msgstr "Esperes resposta"
 
 #: src/components/companies/company-channels-section.tsx
 msgid "Ways to reach"
