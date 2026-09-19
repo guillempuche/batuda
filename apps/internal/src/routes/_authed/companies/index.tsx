@@ -8,7 +8,6 @@ import { LayoutGroup, motion } from 'motion/react'
 import { styled } from 'next-yak'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
-import { CommaList } from '@batuda/controllers'
 import {
 	ATTENTION_FILTERS,
 	ATTRIBUTE_OPS,
@@ -66,7 +65,7 @@ import {
 	normaliseAttributeFilter,
 } from '#/lib/companies-search-params'
 import { useOrgMembers } from '#/lib/org-members'
-import { validateSearchWith } from '#/lib/search-schema'
+import { validateSearchWith, valueListOf } from '#/lib/search-schema'
 import { taggedFailure } from '#/lib/tagged-failure'
 import { brushedMetalPlate } from '#/lib/workshop-mixins'
 
@@ -88,11 +87,7 @@ type CompanyRow = {
 	readonly ownerId: string | null
 }
 
-// A filter holding several values arrives one of two ways, and both have to
-// decode: comma-separated from a link somebody wrote or a link this page built,
-// and as a list from the router's own round-trip of what it last put in the URL.
-// The same two cases `priority` already had, for the same reason.
-const ValueList = Schema.Union([Schema.Array(Schema.NonEmptyString), CommaList])
+const ValueList = valueListOf(Schema.NonEmptyString)
 
 /**
  * The field-by-field half of `validateSearch` below — runs on every
