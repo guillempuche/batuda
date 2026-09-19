@@ -3,7 +3,6 @@ import { ClientOnly, createFileRoute } from '@tanstack/react-router'
 import { Schema } from 'effect'
 import { styled } from 'next-yak'
 
-import { CommaList } from '@batuda/controllers'
 import {
 	ATTRIBUTE_OPS,
 	AttentionFilter as AttentionFilterSchema,
@@ -17,11 +16,9 @@ import {
 	companiesSearchToQuery,
 	normaliseAttributeFilter,
 } from '#/lib/companies-search-params'
-import { validateSearchWith } from '#/lib/search-schema'
+import { validateSearchWith, valueListOf } from '#/lib/search-schema'
 
-// Either comma-separated text from a link somebody wrote, or the list the router
-// hands back from what it last put in the address.
-const ValueList = Schema.Union([Schema.Array(Schema.NonEmptyString), CommaList])
+const ValueList = valueListOf(Schema.NonEmptyString)
 
 // Same filters as the list minus `status` — the board's columns are the statuses.
 //
