@@ -3,6 +3,13 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-09-19 (mail-worker-v2026.9.19)
+
+### Features
+
+* add a heartbeat to the API server and check alerts exist ([d2ddb9d](https://github.com/guillempuche/batuda/commit/d2ddb9dc52905d9b12e692f6850fa0426e618cda))
+* **server:** keep private mailboxes private and add email list filters ([e9532ae](https://github.com/guillempuche/batuda/commit/e9532ae0a26e90e12e51c74c3e07219acba360e5))
+
 ## 2026-09-15 (mail-worker-v2026.9.15)
 
 ### Features
