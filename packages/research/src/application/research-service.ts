@@ -5991,6 +5991,21 @@ export class ResearchService extends Context.Service<ResearchService>()(
 						const runPass = (basePrompt: string) =>
 							Effect.gen(function* () {
 								let prompt: Prompt.Prompt = Prompt.make(basePrompt)
+								// A round reports what the MODEL wrote; the run writes back
+								// between rounds too — a nudge to look harder, a correction for
+								// a fumbled call. Those grow the prompt just as much, and the
+								// ceiling that bounds context growth is meant to see both, so
+								// they ride on the next round's count.
+								let appendedChars = 0
+								const appendToPrompt = (text: string) => {
+									prompt = Prompt.concat(prompt, Prompt.make(text))
+									appendedChars += text.length
+								}
+								const takeAppendedChars = () => {
+									const written = appendedChars
+									appendedChars = 0
+									return written
+								}
 								const runRound = (round: number) =>
 									Effect.gen(function* () {
 										const roundStartedAtMs = DateTime.toEpochMillis(
@@ -6177,6 +6192,9 @@ export class ResearchService extends Context.Service<ResearchService>()(
 												}
 											}
 										}
+										// Charged to this round and to no other: the tally clears
+										// as it is read, so this is the one place that may read it.
+										const writtenBetweenRounds = takeAppendedChars()
 										yield* emitRound(
 											round,
 											response.text.length,
@@ -6188,7 +6206,9 @@ export class ResearchService extends Context.Service<ResearchService>()(
 											hasToolCalls: response.toolCalls.length > 0,
 											scrapeUrlHashes,
 											renderedResults,
-											promptChars: JSON.stringify(response.content).length,
+											promptChars:
+												JSON.stringify(response.content).length +
+												writtenBetweenRounds,
 											inputTokens: response.usage.inputTokens.total ?? 0,
 										}
 									})
@@ -6207,7 +6227,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 										)
 										if (correction === undefined) return false
 										toolCorrections++
-										prompt = Prompt.concat(prompt, Prompt.make(correction.text))
+										appendToPrompt(correction.text)
 										yield* Effect.logInfo('research.tool_call_corrected').pipe(
 											Effect.annotateLogs({
 												event: 'research.tool_call_corrected',
@@ -6238,10 +6258,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 											groundingRetries < MAX_GROUNDING_RETRIES
 										) {
 											groundingRetries++
-											prompt = Prompt.concat(
-												prompt,
-												Prompt.make(groundingRetryInstruction(schemaName)),
-											)
+											appendToPrompt(groundingRetryInstruction(schemaName))
 											return true
 										}
 										// Fact-completeness gate: an enrichment run that reached the company but
@@ -6255,10 +6272,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 											!hasHeadcountSignal(corpus)
 										) {
 											headcountRetries++
-											prompt = Prompt.concat(
-												prompt,
-												Prompt.make(HEADCOUNT_SEARCH_INSTRUCTION),
-											)
+											appendToPrompt(HEADCOUNT_SEARCH_INSTRUCTION)
 											return true
 										}
 										return false
