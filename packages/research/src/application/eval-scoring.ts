@@ -322,6 +322,8 @@ export const scoreRun = (
 		grounded,
 		groundable: expected.market === undefined,
 		marketWentUnanswered,
+		wentUnanswered: !endedWithAnAnswer(outcome.status),
+		searchingStopped: outcome.searchingStopped,
 		wrongCompany,
 		wrongCompanyAutoApplicable,
 		lowConfidence,
@@ -372,6 +374,8 @@ export const summarizeScores = (
 			scansSayingWhyTheyStopped: null,
 			scansCutOff: null,
 			scansThatNeverAnswered: null,
+			runsThatNeverAnswered: 0,
+			runsStoppedByProvider: 0,
 			partsThoughtAnswered: null,
 			duplicateRate: null,
 			possibleDuplicateRate: null,
@@ -444,6 +448,8 @@ export const summarizeScores = (
 	let scansSayingWhyTheyStopped = 0
 	let scansCutOff = 0
 	let scansThatNeverAnswered = 0
+	let runsThatNeverAnswered = 0
+	let runsStoppedByProvider = 0
 	let totalReportedMissing = 0
 	let totalReportedNeverSearched = 0
 	let totalReportedThoughtAnswered = 0
@@ -483,6 +489,8 @@ export const summarizeScores = (
 			totalFieldsFilled += score.profile.fieldsFilled
 		}
 		if (score.marketWentUnanswered) scansThatNeverAnswered++
+		if (score.wentUnanswered) runsThatNeverAnswered++
+		if (score.searchingStopped === 'provider_refused') runsStoppedByProvider++
 		if (score.market !== undefined) {
 			scansScored++
 			totalRowsReturned += score.market.rowsReturned
@@ -595,6 +603,8 @@ export const summarizeScores = (
 			scansScored + scansThatNeverAnswered === 0
 				? null
 				: scansThatNeverAnswered,
+		runsThatNeverAnswered,
+		runsStoppedByProvider,
 		partsThoughtAnswered:
 			scansReportingCoverage === 0 ? null : totalReportedThoughtAnswered,
 		duplicateRate: perRow(totalRowsDuplicated),

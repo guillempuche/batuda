@@ -368,6 +368,10 @@ export const evalSummaryAttributes = (
 		attributes['eval.scans_that_never_answered'] =
 			summary.scansThatNeverAnswered
 	}
+	// Always charted, nought included: nought is the reading that says the rates
+	// beside them were taken over the whole pass rather than over what survived it.
+	attributes['eval.runs_that_never_answered'] = summary.runsThatNeverAnswered
+	attributes['eval.runs_stopped_by_provider'] = summary.runsStoppedByProvider
 	// Reported whenever any scan ran, including nought — that is the reading that
 	// says the never-searched share above is blind rather than clean.
 	if (summary.scansReportingCoverage !== null) {
