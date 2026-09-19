@@ -320,7 +320,7 @@ const ListEmailThreads = Tool.make('list_email_threads', {
 
 const GetEmailThread = Tool.make('get_email_thread', {
 	description:
-		'Get a full email thread with all messages from the provider. Each message is enriched with deliverability state (status, bounce_type) from email_messages. Returns null when no such thread exists in the active organization.',
+		"Read one conversation in full: every message on it, each carrying how it fared (status, bounce_type). Answers null when there is no such conversation for you to read — an id belonging to another organization, one that never existed, and one whose mail sits in a colleague's private mailbox all answer the same way, so a null is not evidence the id was wrong. A private message that is not yours is left out of a conversation you can otherwise read, and the subject and mailbox shown are taken from the messages you can read.",
 	parameters: Schema.Struct({
 		thread_id: EmailThreadIdParam,
 	}),
@@ -381,7 +381,7 @@ const MarkThreadUnread = Tool.make('mark_email_thread_unread', {
 
 const ListEmailMessages = Tool.make('list_email_messages', {
 	description:
-		'List one message at a time rather than by conversation: what was stored, which way it went, and how it fared. Use it to audit which sends failed and why. `status` is what became of the message — normal for ordinary mail, bounced for one a mail server refused, spam or blocked for one a check set aside — and takes a list matching ANY of those words; asking for a word that is not on that list is refused rather than answered with an empty page. `direction` is inbound or outbound. `bounce_type` is how final a refusal was: hard is "no such address", soft is "not now"; a refusal that said neither matches neither. `received_after` and `received_before` take a day (2026-09-01) or a moment that says its timezone (2026-09-01T09:00:00Z); after includes that instant and before stops just short of it. `participant` is one address, or a whole domain written as @acme.com. `query` searches subject, preview, body and addresses. Mail in a colleague\'s private mailbox never appears. `hasMore` says whether more matched than were returned — read it before saying how many there are, and ask again with a larger `offset` if it is true.',
+		'List one message at a time rather than by conversation: what was stored, which way it went, and how it fared. Use it to audit which sends failed and why. `status` is what became of the message — normal for ordinary mail, bounced for one a mail server refused, spam or blocked for one a check set aside — and takes a list matching ANY of those words; asking for a word that is not on that list is refused rather than answered with an empty page. `direction` is inbound or outbound. `bounce_type` is how final a refusal was: hard is "no such address", soft is "not now"; a refusal that said neither matches neither. `received_after` and `received_before` take a day (2026-09-01) or a moment that says its timezone (2026-09-01T09:00:00Z); after includes that instant and before stops just short of it. `participant` is one address, or a whole domain written as @acme.com. `query` searches subject, preview, body and addresses. Mail in a colleague\'s private mailbox never appears, and an API key reads as the person who created it. `hasMore` says whether more matched than were returned — read it before saying how many there are, and ask again with a larger `offset` if it is true. Default limit is 100, max 500.',
 	parameters: Schema.Struct({
 		contact_id: Schema.optionalKey(Schema.String),
 		company_id: Schema.optionalKey(Schema.String),
@@ -412,7 +412,7 @@ const ListEmailMessages = Tool.make('list_email_messages', {
 
 const GetEmailMessage = Tool.make('get_email_message', {
 	description:
-		'Get a single per-message deliverability record by id. Returns status, recipient, subject, error, timestamps — the full audit row for one outbound send. Returns null when no such record exists in the active organization.',
+		"Read one message by id — how it fared, who it was to, its subject, any error and its times. Answers null when there is no such message for you to read — an id from another organization, one that never existed, and one in a colleague's private mailbox all answer the same way, so a null is not evidence the id was wrong.",
 	parameters: Schema.Struct({
 		message_id: EmailMessageIdParam,
 	}),
