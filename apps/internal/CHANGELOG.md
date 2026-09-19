@@ -3,6 +3,23 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-09-19 (internal-v2026.9.19)
+
+### Features
+
+* **internal:** add a filter bar to the emails screen ([0b2ca80](https://github.com/guillempuche/batuda/commit/0b2ca806353963b7f1374accac04de91992a9fe3))
+* **server:** keep private mailboxes private and add email list filters ([e9532ae](https://github.com/guillempuche/batuda/commit/e9532ae0a26e90e12e51c74c3e07219acba360e5))
+
+### Bug Fixes
+
+* **research:** count the instructions a run writes between rounds ([15cb652](https://github.com/guillempuche/batuda/commit/15cb65255be413d70b2dea07ba1345b829a15495))
+* **research:** stop the country argument losing its description ([b7a1ee1](https://github.com/guillempuche/batuda/commit/b7a1ee11e62fb50d0ac302122f04a1c1d03c3218))
+* **research:** tell the model what a refused tool call got wrong ([136b731](https://github.com/guillempuche/batuda/commit/136b731a211f65f5fb0331fd9d3de8f7d78ffda8)), closes [#660](https://github.com/guillempuche/batuda/issues/660)
+
+### Refactoring
+
+* **internal:** read multi-value address filters one way everywhere ([535f81e](https://github.com/guillempuche/batuda/commit/535f81ef0d7197a10ee4903cc87ece2e53793057))
+
 ## 2026-09-17 (internal-v2026.9.17-1)
 
 ### Bug Fixes
