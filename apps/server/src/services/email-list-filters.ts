@@ -11,7 +11,7 @@ import type {
 
 import { ownerCondition } from '../lib/owner-filter'
 import { asPlainText } from '../lib/search-text'
-import { answerable, inThread, latestFirst } from './email-threading-sql'
+import { inThread } from './email-threading-sql'
 
 /**
  * What a list of conversations, or of message records, can be narrowed by.
@@ -353,5 +353,3 @@ export const threadOrder = (
 	sort === 'latest_message'
 		? sql`ORDER BY stats.last_message_at DESC NULLS LAST, tl.id DESC`
 		: sql`ORDER BY tl.updated_at DESC, tl.id DESC`
-
-export { answerable, inThread, latestFirst }
