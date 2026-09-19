@@ -26,7 +26,7 @@ import {
 	Toolkit,
 } from 'effect/unstable/ai'
 
-import { AcceptedCountry, isRegistryCountry } from '../domain/country'
+import { AcceptedCountryParam, isRegistryCountry } from '../domain/country'
 import {
 	alreadyLookedUpResult,
 	approvalRequiredResult,
@@ -93,7 +93,7 @@ const ScrapePageParams = Schema.Struct({
 })
 
 const RegistryLookupParams = Schema.Struct({
-	country: AcceptedCountry.annotate({
+	country: AcceptedCountryParam.annotate({
 		description:
 			'ISO 3166-1 alpha-2 country code (any case). A country without a national registry returns {status:"no_registry"} — use discover_contacts there instead.',
 	}),

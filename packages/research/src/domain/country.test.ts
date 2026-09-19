@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
 	AcceptedCountry,
+	AcceptedCountryParam,
 	isRegistryCountry,
 	parseCountryAlpha2,
 	REGISTRY_COUNTRIES,
@@ -11,6 +12,47 @@ import {
 } from './country'
 
 const decodeCountry = Schema.decodeUnknownSync(AcceptedCountry)
+
+describe('AcceptedCountryParam', () => {
+	const decodeParam = Schema.decodeUnknownSync(AcceptedCountryParam)
+
+	describe('when the model writes a two-letter code', () => {
+		it('should accept it in any case, and leave the case alone', () => {
+			// GIVEN codes as a model might write them
+			// WHEN they are decoded
+			// THEN each passes through exactly as written: every handler raises the
+			// case itself, and a schema that raised it here would hand the provider
+			// its own words in place of the tool's description
+			expect(decodeParam('ES')).toBe('ES')
+			expect(decodeParam('gb')).toBe('gb')
+			expect(decodeParam('Us')).toBe('Us')
+		})
+
+		it('should accept a country with no national registry', () => {
+			// GIVEN a country with no national-registry adapter
+			// WHEN it is decoded
+			// THEN it is still a country a run may name — the lookup answers
+			// no_registry rather than the argument being unwritable
+			expect(decodeParam('FR')).toBe('FR')
+		})
+	})
+
+	describe('when the model writes something that is not a code', () => {
+		it('should refuse it rather than pass it to a paid lookup', () => {
+			// GIVEN a country name, a three-letter code, a single letter, a digit
+			// and nothing at all
+			// WHEN each is decoded
+			// THEN each is refused: the register is metered, so a value that cannot
+			// be a country should not reach it
+			for (const bad of ['Spain', 'ESP', 'E', 'E1', '', '  ']) {
+				expect(
+					() => decodeParam(bad),
+					`accepted ${JSON.stringify(bad)}`,
+				).toThrow()
+			}
+		})
+	})
+})
 
 describe('AcceptedCountry', () => {
 	describe('when the value is a two-letter code', () => {
