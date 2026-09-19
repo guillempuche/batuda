@@ -360,15 +360,10 @@ export const CompaniesApiLive = HttpApiBuilder.group(
 
 ### Error handling
 
-Define domain errors with Effect Schema:
+An error carries an Effect Schema when — and only when — a route answers a request with it. `HttpApi` uses the schema to write the error into the response body, and the typed client in `apps/internal` uses it to read that body back, so the codec is what makes the round trip work. Every such error lives together in `packages/controllers/src/errors.ts`, and a route names it through `HttpApiSchema.status()`.
 
 ```typescript
 import { Schema } from "effect"
-
-export class DatabaseError extends Schema.TaggedErrorClass<DatabaseError>()(
-  "DatabaseError",
-  { cause: Schema.Unknown }
-) {}
 
 export class NotFoundError extends Schema.TaggedErrorClass<NotFoundError>()(
   "NotFoundError",
@@ -376,7 +371,19 @@ export class NotFoundError extends Schema.TaggedErrorClass<NotFoundError>()(
 ) {}
 ```
 
-Map to HTTP responses in the route definition via `HttpApiSchema.status()`.
+Every other error is a `Data.TaggedError`: a failure that stays inside one bounded context, a service, or the CLI. Nothing encodes it, so a schema buys nothing there and costs something — it checks its own fields as the error is built, and a wrong type throws while a failure is being reported, hiding the real problem behind a validation error.
+
+```typescript
+import { Data } from "effect"
+
+export class DatabaseError extends Data.TaggedError("DatabaseError")<{
+  readonly cause: unknown
+}> {}
+```
+
+`Effect.catchTag` reads both the same way, so the choice is about the wire, never about how the error is caught.
+
+Some domain errors in `packages/research`, `packages/auth` and `packages/calendar` carry a schema with no route behind them. That is their settled state, not a cleanup waiting to happen: converting them would change no behaviour and would touch every place they are built, so they stay. Write new ones by the rule above rather than by their example.
 
 ### Effect Schema for validation
 
