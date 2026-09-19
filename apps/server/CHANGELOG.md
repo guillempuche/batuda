@@ -3,6 +3,27 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-09-19 (server-v2026.9.19)
+
+### Features
+
+* add a heartbeat to the API server and check alerts exist ([d2ddb9d](https://github.com/guillempuche/batuda/commit/d2ddb9dc52905d9b12e692f6850fa0426e618cda))
+* **server:** keep private mailboxes private and add email list filters ([e9532ae](https://github.com/guillempuche/batuda/commit/e9532ae0a26e90e12e51c74c3e07219acba360e5))
+
+### Bug Fixes
+
+* **research:** count the instructions a run writes between rounds ([15cb652](https://github.com/guillempuche/batuda/commit/15cb65255be413d70b2dea07ba1345b829a15495))
+* **research:** stop the country argument losing its description ([b7a1ee1](https://github.com/guillempuche/batuda/commit/b7a1ee11e62fb50d0ac302122f04a1c1d03c3218))
+* **research:** tell the model what a refused tool call got wrong ([136b731](https://github.com/guillempuche/batuda/commit/136b731a211f65f5fb0331fd9d3de8f7d78ffda8)), closes [#660](https://github.com/guillempuche/batuda/issues/660)
+
+### Refactoring
+
+* **server:** drop the unused second route to the threading helpers ([584df34](https://github.com/guillempuche/batuda/commit/584df341593360660d20a389b238f278c435b5de))
+
+### Documentation
+
+* **server:** say what a null answer from the email read tools means ([9db79eb](https://github.com/guillempuche/batuda/commit/9db79eb8e001eafd452e51e61faf986976cd69a8))
+
 ## 2026-09-17 (server-v2026.9.17-1)
 
 ### Bug Fixes
