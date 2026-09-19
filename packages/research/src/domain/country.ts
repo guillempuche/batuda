@@ -1,4 +1,4 @@
-import type { Schema } from 'effect'
+import { Schema } from 'effect'
 
 import { CompanyCountry } from '@batuda/domain'
 
@@ -20,6 +20,20 @@ export const isRegistryCountry = (cc: string): cc is RegistryCountry =>
 // CRM's, so a country a run may target and one a person may type are the same set.
 export const AcceptedCountry = CompanyCountry
 export type AcceptedCountry = Schema.Schema.Type<typeof AcceptedCountry>
+
+// The same two-letter country, in the form a tool argument needs.
+//
+// The CRM shape above raises the case as it reads a value, and a schema that
+// transforms hands over the words of what it turns INTO — so a tool's own
+// description of its argument is quietly replaced by "a string matching the
+// RegExp", which tells a model nothing about writing "ES" rather than "Spain".
+// Checking the shape without transforming keeps the written description; the
+// price is that a handler must raise the case itself before comparing —
+// `isRegistryCountry` and the stored country are both capitals, so a code left
+// as written matches nothing.
+export const AcceptedCountryParam = Schema.String.pipe(
+	Schema.check(Schema.isPattern(/^[A-Za-z]{2}$/)),
+)
 
 // Turn a model-supplied place hint into a two-letter country code (upper-case),
 // or nothing when it isn't clearly a country. Handles a bare code ("US"/"us")

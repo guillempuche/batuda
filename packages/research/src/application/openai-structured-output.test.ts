@@ -92,6 +92,20 @@ describe('researchToolkit', () => {
 						property.description,
 						`${tool.name}.${name} lost its description`,
 					).toBeTruthy()
+
+					// AND the description is one somebody wrote, not one the schema
+					// wrote about its own shape. A schema that transforms hands over
+					// the words of what it turns into, so an argument can arrive
+					// carrying "a string matching the RegExp ^[A-Za-z]{2}$" — which
+					// passes the check above while telling a model nothing it could
+					// act on, in place of the sentence telling it to write "ES" rather
+					// than "Spain". The two wordings below are what the checks used
+					// here produce; a check that words itself differently would slip
+					// past, so this catches the mistake rather than proving against it.
+					expect(
+						property.description,
+						`${tool.name}.${name} carries a description the schema wrote about itself`,
+					).not.toMatch(/matching the RegExp|a value with a length of/i)
 				}
 			})
 		}
