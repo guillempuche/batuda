@@ -411,6 +411,12 @@ At a glance:
           once more whole, on every kind of run)
       site discovery (runs about one company): map its own domain and read
           its own pages first
+      a search's answer is kept whole for the checks that read it, while the
+          next round's prompt takes a shorter copy (each result's address,
+          title and opening), and the ceiling on a pass counts that copy —
+          so one long answer does not end the pass
+      a pass sent back out is told what the run already searched and which
+          results nobody opened, fenced, since it starts from a fresh prompt
       accumulate findings, record each page reached, archive the ones opened
 
   Phase 2 · structured extraction
@@ -427,7 +433,10 @@ At a glance:
           not a person, and nor is whoever a page credits with making the
           site ("Photographie", "Webdesign"); a reply cut off past the ceiling one
           reply may write is asked for once more, shorter, and if that one
-          is cut off too the part of it that arrived whole is kept
+          is cut off too the part of it that arrived whole is kept; on a
+          first reading, where nothing earlier stands in for it, the fuller
+          of the two replies is the one read, row by row if one row written
+          wrong would otherwise fail the whole of it
       validate the findings against the run's schema
       guard chain — named links, run in the order they are written; a link
           prunes what it cannot stand behind and the run carries on:
@@ -447,7 +456,8 @@ At a glance:
 
   tool calls stream to the web app over SSE as they happen
   rounds done are written to the run row throughout (readable by any client)
-  findings + sources + tool log persist
+  findings + sources + tool log persist (the log names each search's words
+      and each page opened, cut short; it stays on the run's own row)
   status = succeeded | succeeded_low_confidence | no_reliable_data
          | failed | cancelled
   proposed updates  →  a human (or the org's auto-apply threshold) applies each

@@ -16,6 +16,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import {
 	AgentLanguageModel,
 	ContactDiscovery,
+	CutOffReply,
 	ExtractLanguageModel,
 	MapProvider,
 	RegistryRouter,
@@ -87,6 +88,16 @@ interface Scenario {
 	readonly place?: string
 	/** What the place judge says about every row it is handed. */
 	readonly placeVerdict?: 'inside' | 'outside' | 'unclear'
+	/**
+	 * Texts the extraction model got to write before its reply was cut off, one
+	 * per reading, served before any whole answer in `findings`.
+	 */
+	readonly cutOffReplies?: ReadonlyArray<string>
+	/**
+	 * How many whole readings are served before the cut-offs begin. Absent, the
+	 * very first reading is the one cut off.
+	 */
+	readonly cutOffsAfterReadings?: number
 }
 
 // Rounds the agent has been asked for across every pass of the current run.
@@ -141,6 +152,7 @@ const agentLlm: LanguageModel.Service = {
 						: [],
 				toolResults: [
 					{
+						id: 'again',
 						name: 'web_search',
 						isFailure: false,
 						encodedResult: undefined,
@@ -191,6 +203,9 @@ let splitterCalls = 0
 // An extra caller then fails here, loudly, instead of quietly handing the next
 // scripted answer to the wrong extraction.
 let extractionCalls = 0
+
+// The cut-off replies the current case still has to serve.
+let cutOffsLeft: string[] = []
 
 const extractLlm: LanguageModel.Service = {
 	generateText: () => Effect.succeed({ text: '', content: [], usage }) as never,
@@ -258,6 +273,17 @@ const extractLlm: LanguageModel.Service = {
 			) {
 				return { usage, value: { verdicts: [] } }
 			}
+			// A reading the case scripted to be cut off fails the way a vendor's
+			// ceiling fails it, carrying what the model got to write.
+			const cutOff =
+				extractionCalls >= (scenario.cutOffsAfterReadings ?? 0)
+					? cutOffsLeft.shift()
+					: undefined
+			if (cutOff !== undefined)
+				return new CutOffReply(
+					{ provider: 'stub', message: 'reply cut off' },
+					cutOff,
+				)
 			extractionCalls++
 			// Past the end of the list, the last answer stands — a case that does not
 			// care how many extractions ran gives one answer and gets it every time.
@@ -270,7 +296,13 @@ const extractLlm: LanguageModel.Service = {
 						Math.min(extractionCalls - 1, scenario.findings.length - 1)
 					] ?? {},
 			}
-		})) as never,
+		}).pipe(
+			Effect.flatMap(answer =>
+				answer instanceof CutOffReply
+					? Effect.fail(answer)
+					: Effect.succeed(answer),
+			),
+		)) as never,
 	streamText: () =>
 		Stream.succeed({ type: 'text-delta' as const, delta: '' }) as never,
 }
@@ -369,6 +401,7 @@ interface StoredToolLogEntry {
 	readonly output?: {
 		readonly phase?: number
 		readonly round?: number
+		readonly query?: string
 		readonly gapRounds?: number
 	}
 }
@@ -409,6 +442,8 @@ const runScan = async (args: {
 	toolLog: ReadonlyArray<StoredToolLogEntry>
 	citationsSeen: number | undefined
 	citationsKept: number | undefined
+	// Whether the run says the answer it ships was cut short.
+	replyCut: boolean | undefined
 	prospects: ReadonlyArray<string>
 	prospectRows: ReadonlyArray<Record<string, unknown>>
 	// The same rows as a reader is handed them, which is not the same shape as
@@ -423,6 +458,7 @@ const runScan = async (args: {
 	extractionCalls = 0
 	briefPrompt = ''
 	agentRounds = 0
+	cutOffsLeft = [...(args.scenario.cutOffReplies ?? [])]
 	return runtime.runPromise(
 		Effect.gen(function* () {
 			const svc = yield* ResearchService
@@ -494,6 +530,7 @@ const runScan = async (args: {
 									searching_stopped?: string
 									citations_seen?: number
 									citations_kept?: number
+									reply_cut?: boolean
 									place?: StoredPlace
 									existence?: { confirmed?: number; candidates?: number }
 								}
@@ -515,6 +552,7 @@ const runScan = async (args: {
 					: [],
 				citationsSeen: quality?.citations_seen,
 				citationsKept: quality?.citations_kept,
+				replyCut: quality?.reply_cut,
 				// The names left on the list, for a check about which rows a guard took
 				// off rather than about what the run said of itself.
 				prospects: (
@@ -1522,6 +1560,193 @@ describe('what a discovery scan reports about itself', () => {
 				unclear: 0,
 			})
 			expect(result.status).toBe('succeeded')
+		}, 60_000)
+	})
+
+	describe('when the first reading of a scan is cut off twice', () => {
+		it('should ship the rows that arrived whole, row by row, and ask for a read', async () => {
+			// GIVEN a scan whose first reply is cut inside its first row, and whose
+			//   shorter second reply holds one row that does not fit the shape among
+			//   five that do, cut inside a seventh
+			const result = await runScan({
+				schemaName: 'prospect_scan_v1',
+				query: 'empresas de fontanería en Barcelona',
+				scenario: {
+					evidence: 'Un directorio de empresas de fontanería de Barcelona.',
+					cutOffReplies: [
+						'{"prospects": [{"name": "Fontanería Va',
+						'{"prospects": [{"name": "Fila Trencada SL", "citations": []}, {"name": "Fontanería Vall SL", "why_relevant": "Fontanería en Barcelona", "citations": []}, {"name": "Instalaciones Besòs SL", "why_relevant": "Fontanería en Barcelona", "citations": []}, {"name": "Aigües i Tubs SL", "why_relevant": "Fontanería en Barcelona", "citations": []}, {"name": "Lampistes Reunits SL", "why_relevant": "Fontanería en Barcelona", "citations": []}, {"name": "Fontaneria Poblenou SL", "why_relevant": "Fontanería en Barcelona", "citations": []}, {"name": "Tallada SL", "why_rel',
+					],
+					findings: [{ prospects: [] }],
+				},
+			})
+
+			// THEN the five whole rows ship — the row that did not fit and the one
+			//   the cut fell in are left out
+			expect(result.prospects).toEqual([
+				'Fontanería Vall SL',
+				'Instalaciones Besòs SL',
+				'Aigües i Tubs SL',
+				'Lampistes Reunits SL',
+				'Fontaneria Poblenou SL',
+			])
+			// AND the run says its answer was cut rather than passing as complete
+			expect(result.status).toBe('succeeded_low_confidence')
+			// AND no whole answer was ever served
+			expect(result.extractions).toBe(0)
+		}, 60_000)
+
+		it('should fail when no row of either reply arrived whole', async () => {
+			// GIVEN two replies both cut inside their first row
+			const result = await runScan({
+				schemaName: 'prospect_scan_v1',
+				query: 'empresas de fontanería en Barcelona',
+				scenario: {
+					evidence: 'Un directorio de empresas de fontanería de Barcelona.',
+					cutOffReplies: [
+						'{"prospects": [{"name": "Fontanería Va',
+						'{"prospects": [{"name": "Fontan',
+					],
+					findings: [{ prospects: [] }],
+				},
+			})
+
+			// THEN there is nothing to ship and the run fails
+			expect(result.status).toBe('failed')
+		}, 60_000)
+	})
+
+	describe('when a later reading of a scan is cut off', () => {
+		it('should keep the list the run already holds and not read the cut reply row by row', async () => {
+			// GIVEN a scan whose first reading comes back thin, so it searches
+			//   again, and whose second reading is cut off twice around a row that
+			//   does not fit the shape
+			const result = await runScan({
+				schemaName: 'prospect_scan_v1',
+				query: 'empresas de fontanería en Barcelona',
+				scenario: {
+					evidence: 'Un directorio de empresas de fontanería de Barcelona.',
+					findings: [
+						{
+							prospects: [
+								{
+									name: 'Fontanería Vall SL',
+									why_relevant: 'Fontanería en Barcelona',
+									citations: [],
+								},
+							],
+						},
+					],
+					cutOffsAfterReadings: 1,
+					cutOffReplies: [
+						'{"prospects": [{"name": "Fila Trencada SL", "citations": []}, {"name": "Fontanería Vall SL", "why_relevant": "Fontanería en Barcelona", "citations": []}, {"name": "Instalaciones Besòs SL", "why_relevant": "Fontanería en Barcelona", "citations": []}, {"name": "Aigües i Tubs SL", "why_relevant": "Fontanería en Barcelona", "citations": []}, {"name": "Lampistes Reunits SL", "why_relevant": "Fontanería en Barcelona", "citations": []}, {"name": "Fontaneria Poblenou SL", "why_relevant": "Fontanería en Barcelona", "citations": []}, {"name": "Tallada SL", "why_rel',
+						'{"prospects": [{"name": "Fila Trencada SL", "citations": []}, {"name": "Fontanería Vall SL", "why_relevant": "Fontanería en Barcelona", "citations": []}, {"name": "Instalaciones Besòs SL", "why_relevant": "Fontanería en Barcelona", "citations": []}, {"name": "Aigües i Tubs SL", "why_relevant": "Fontanería en Barcelona", "citations": []}, {"name": "Lampistes Reunits SL", "why_relevant": "Fontanería en Barcelona", "citations": []}, {"name": "Fontaneria Poblenou SL", "why_relevant": "Fontanería en Barcelona", "citations": []}, {"name": "Tallada SL", "why_rel',
+					],
+				},
+			})
+
+			// THEN the first reading's row still stands alone: the cut second
+			//   reading is dropped rather than read row by row
+			expect(result.refined).toBe(true)
+			expect(result.prospects).toEqual(['Fontanería Vall SL'])
+		}, 60_000)
+	})
+
+	describe('when a round searched', () => {
+		it('should log the words the search went out with', async () => {
+			// GIVEN a scan whose first round searches before the model settles
+			const result = await runScan({
+				schemaName: 'prospect_scan_v1',
+				query: 'empresas de fontanería en Barcelona',
+				scenario: {
+					evidence: 'Fontanería Vall SL — reformas de baños en Barcelona.',
+					settlesAfterRounds: 1,
+					findings: [
+						{
+							prospects: [
+								{
+									name: 'Fontanería Vall SL',
+									why_relevant: 'Fontanería en Barcelona',
+									citations: [],
+								},
+							],
+						},
+					],
+				},
+			})
+
+			// THEN the search's own entry says what was searched
+			const searched = result.toolLog
+				.filter(entry => entry.tool === 'web_search' && entry.type === 'result')
+				.map(entry => entry.output?.query)
+			expect(searched).toContain('more')
+		}, 60_000)
+	})
+
+	describe('when a scan pinned to a company has its first reading cut off and its second whole', () => {
+		it('should not call the answer it ships cut short', async () => {
+			// GIVEN a scan pinned to a company on file, whose first reading — the
+			//   one that only probes for a thin list — is cut off twice and rescued,
+			//   and whose second reading, the one that ships, comes back whole
+			const result = await runScan({
+				schemaName: 'prospect_scan_v1',
+				query: `Find prospects like ${ANCHOR_NAME}: marbristas`,
+				subjectId: anchorCompanyId,
+				scenario: {
+					evidence: `${ANCHOR_NAME} is a natural stone workshop in Puigcerdà, Girona. Directorio de marbristas.`,
+					cutOffReplies: [
+						'{"prospects": [{"name": "Marbres Ce',
+						'{"prospects": [{"name": "Marbres Cerdanya 0", "why_relevant": "Marbristas y piedra natural", "citations": []}, {"name": "Marbres Cerdanya 1", "why_relevant": "Marbristas y piedra natural", "citations": []}, {"name": "Marbres Cerdanya 2", "why_relevant": "Marbristas y piedra natural", "citations": []}, {"name": "Marbres Cerdanya 3", "why_relevant": "Marbristas y piedra natural", "citations": []}, {"name": "Marbres Cerdanya 4", "why_relevant": "Marbristas y piedra natural", "citations": []}, {"name": "Marbres Cerdanya 5", "why_relevant": "Marbristas y piedra natural", "citations": []}, {"name": "Tallada SL", "why_rel',
+					],
+					findings: [
+						{
+							prospects: Array.from({ length: 6 }, (_, index) => ({
+								name: `Marbres Cerdanya ${index}`,
+								why_relevant: 'Marbristas y piedra natural',
+								citations: [],
+							})),
+						},
+					],
+				},
+			})
+
+			// THEN the whole reading is the one that ran last and shipped
+			expect(result.extractions).toBe(1)
+			expect(result.prospects).toHaveLength(6)
+			// AND the run does not say its answer was cut, since nothing it ships was
+			expect(result.replyCut).not.toBe(true)
+		}, 60_000)
+	})
+
+	describe('when a rescued first reading is thin and the pass sent out after it is abandoned', () => {
+		it('should still say the answer it ships was cut short', async () => {
+			// GIVEN a scan whose first reading is cut off twice and rescued with two
+			//   rows — few enough to send it back out — and whose second reading is
+			//   cut off twice with nothing whole in either reply
+			const result = await runScan({
+				schemaName: 'prospect_scan_v1',
+				query: 'empresas de fontanería en Barcelona',
+				scenario: {
+					evidence: 'Un directorio de empresas de fontanería de Barcelona.',
+					cutOffReplies: [
+						'{"prospects": [{"name": "Fontanería Va',
+						'{"prospects": [{"name": "Fontanería Vall SL", "why_relevant": "Fontanería en Barcelona", "citations": []}, {"name": "Instalaciones Besòs SL", "why_relevant": "Fontanería en Barcelona", "citations": []}, {"name": "Tallada SL", "why_rel',
+						'{"prospects": [{"name": "Fontanería Va',
+						'{"prospects": [{"name": "Fontan',
+					],
+					findings: [{ prospects: [] }],
+				},
+			})
+
+			// THEN the rescued rows are what ships, the second pass having been
+			//   abandoned
+			expect(result.refined).toBe(true)
+			expect(result.prospects).toEqual([
+				'Fontanería Vall SL',
+				'Instalaciones Besòs SL',
+			])
+			// AND the run still says that list came from a reply that was cut
+			expect(result.replyCut).toBe(true)
 		}, 60_000)
 	})
 })
