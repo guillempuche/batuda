@@ -36,14 +36,20 @@ const client = createAuthClient({
 // `useHydrated…` hooks below, which know what the server drew. Everything
 // else (sign-in, sign-out, switching organisation, the mutations) is the
 // client as it is.
+//
+// Take the hooks by name and export the client untouched. `createAuthClient`
+// hands back a Proxy that answers any property asked of it and owns none, so
+// copying it with a rest spread — `const { useSession, ...rest } = client` —
+// yields an empty object: the spread asks for the keys it owns, gets none, and
+// every action is quietly lost. Reading a name straight off it works, which is
+// why the hooks below are fine and only the copy was broken.
 const {
 	useSession,
 	useActiveOrganization,
 	useListOrganizations,
 	useActiveMember,
-	...authClientWithoutStoreHooks
 } = client
-export const authClient = authClientWithoutStoreHooks
+export const authClient = client
 
 /** The signed-in person's session. */
 export function useHydratedSession() {

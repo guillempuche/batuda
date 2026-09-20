@@ -63,7 +63,14 @@ test.describe('org switcher', () => {
 	})
 
 	test.describe('when a multi-org user picks a different org', () => {
-		test('should re-scope visible data to the new org', async ({ page }) => {
+		// Tagged so it gates a pull request: CI's smoke subset is `--grep @smoke`.
+		// It has to be this case and not the one above, which only opens the
+		// dropdown — the switcher went on rendering its options for a week while
+		// picking one did nothing at all, so a case that never clicks reads green
+		// through exactly the breakage worth catching.
+		test('should re-scope visible data to the new org', {
+			tag: '@smoke',
+		}, async ({ page }) => {
 			// GIVEN Alice is on / and a Taller-only company is visible
 			await page.goto('/', { waitUntil: 'networkidle' })
 			await expect(page.getByTestId('active-org-name')).toContainText(
