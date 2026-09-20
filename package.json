@@ -52,7 +52,7 @@
 		"setup": "pnpm cli -- setup"
 	},
 	"devDependencies": {
-		"@biomejs/biome": "2.5.3",
+		"@biomejs/biome": "2.5.14",
 		"@release-it/bumper": "^7.0.6",
 		"@release-it/conventional-changelog": "^11.0.1",
 		"@secretlint/secretlint-rule-preset-recommend": "^13.0.2",

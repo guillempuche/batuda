@@ -47,11 +47,12 @@
             # via nix so `/pr` media upload works on every contributor's laptop
             # with no manual install.
             pkgs.awscli2
-            # ffmpeg — compresses /pr screen recordings before upload.
-            # agent-browser records full-resolution WebM with no quality knob,
-            # so a few desktop seconds is several MB; ffmpeg downscales, drops
-            # the frame rate, and transcodes to a compact MP4. Installed via nix
-            # so the /pr media flow is identical on every contributor's laptop.
+            # ffmpeg — agent-browser records through it, so without this on PATH
+            # `record start` refuses outright. It also downscales a .webm/.mov
+            # /pr capture before upload — a full-resolution desktop take runs
+            # to several MB — though recording straight to .mp4 skips that
+            # step instead. Installed via nix so the /pr media flow is
+            # identical on every contributor's laptop.
             pkgs.ffmpeg
             # libwebp — provides `cwebp`, which the /pr uploader uses to convert
             # PNG/JPEG screenshots to WebP (crisp UI text, ~8x smaller). Paired

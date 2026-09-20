@@ -69,18 +69,15 @@ describe('resolveDatabaseHost', () => {
 
 describe('isLocalDatabaseHost', () => {
 	describe('when the host is on this machine', () => {
-		it.each([
-			'localhost',
-			'127.0.0.1',
-			'0.0.0.0',
-			'::1',
-			'/tmp',
-		])('should accept %s', host => {
-			// GIVEN a loopback address or a socket path
-			// WHEN it is classified
-			// THEN it counts as local
-			expect(isLocalDatabaseHost(host)).toBe(true)
-		})
+		it.each(['localhost', '127.0.0.1', '0.0.0.0', '::1', '/tmp'])(
+			'should accept %s',
+			host => {
+				// GIVEN a loopback address or a socket path
+				// WHEN it is classified
+				// THEN it counts as local
+				expect(isLocalDatabaseHost(host)).toBe(true)
+			},
+		)
 	})
 
 	describe('when the host is somewhere else', () => {

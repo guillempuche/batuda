@@ -423,8 +423,8 @@ export function EditableCombobox({
 	return (
 		<Field>
 			<FieldLabel>{label}</FieldLabel>
-			{/* biome-ignore lint/a11y/noStaticElementInteractions: the keys belong to
-			    the input inside; the wrapper only sees the ones it did not act on. */}
+			{/* The keys belong to the input inside; this wrapper only sees the ones
+			    it did not act on, so it carries no role of its own. */}
 			<ComboboxShell
 				onKeyDown={e => {
 					if (e.key === 'Escape') {
