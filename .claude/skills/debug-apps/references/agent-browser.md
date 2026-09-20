@@ -193,16 +193,20 @@ agent-browser --session <name> close   # reset ONLY this session (safe while oth
 
 `agent-browser close --all` — and any `pkill -f .../browsers/chrome` — kill **every** session's Chrome at once, so never use them to fix one session while other worktree windows are live; reach for them only when nothing else is running. Reset the moment 2–3 calls in a row fail or time out, rather than burning attempts (see the `pr` skill's "avoid rabbit holes" guidance).
 
-## Record a video (WebM)
+## Record a video
 
-Native Playwright recording — no ffmpeg. The recorder runs in a fresh context but preserves cookies and localStorage, so logging in (or navigating to the target page) before `record start` keeps the session; with no URL it captures the current page.
+Recording needs **ffmpeg on PATH** with the libvpx and libx264 encoders — `agent-browser doctor` checks it, and the nix dev shell provides it. It captures the page you already have open, without a new context, a new tab, or a reload, so set up state (log in, navigate) before `record start` and hydration is not re-run cold. Pass a URL only when you want the tab navigated first.
+
+Either `.webm` (VP8) or `.mp4` (H.264) works; writing `.mp4` straight out skips a transcode step for a pull request, though it is not automatically the smaller file — one 10-second desktop take came out at 86 KB/s as H.264 against 46 KB/s as VP8, so check the size rather than assuming, and let the `/pr` uploader compact whichever you took. Add `--cursor` whenever the flow is click-driven: it draws the pointer and a click ripple into the video, which is the difference between a reviewer seeing *what* you clicked and watching the page change for no visible reason.
 
 ```bash
-agent-browser open https://batuda.localhost/companies   # set up state / log in first
-agent-browser record start /tmp/demo.webm               # defaults to current page if url omitted
+agent-browser open https://batuda.localhost/companies      # set up state / log in first
+agent-browser record start /tmp/demo.mp4 --cursor          # 30 fps; --fps 1-60 to change
 # ... perform the flow: click / fill / press / etc. ...
-agent-browser record stop                               # saves the .webm
-agent-browser record restart /tmp/demo2.webm [url]      # stop current, start a new one
+agent-browser record stop
+agent-browser record restart /tmp/demo2.mp4 [url]          # stop current, start a new one
 ```
 
-Use a recording (over a screenshot) for flows, animations, and multi-step interactions. Keep it concise — set up state before `record start`, then perform only the steps that show the change. For embedding the file in a PR, see the `pr` skill → *Embedding media*.
+30 fps keeps scrolls and CSS transitions smooth; raise it to 60 for short motion-heavy takes, lower it for long sessions where size matters more than motion. Use a recording (over a screenshot) for flows, animations, and multi-step interactions, and keep it concise — set up state before `record start`, then perform only the steps that show the change. For embedding the file in a PR, see the `pr` skill → *Embedding media*.
+
+`record stop` sometimes reports `✗ Failed to read: Resource temporarily unavailable (os error 35) … daemon may be busy` after having stopped perfectly well. Check the file rather than the message — `ffprobe -v error -show_entries format=duration,size -of default=nw=1 <file>` gives a duration and a size for a good recording, and re-running `stop` then says `No recording in progress`. Only treat it as a failure when the file is missing or has no duration.

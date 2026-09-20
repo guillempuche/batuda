@@ -148,6 +148,14 @@ If the directory was removed manually before `worktree down`, run `pnpm cli work
   can leave it root-owned, which silently fails cert *signing* for every new host (the generated
   `host-certs/<host>.pem` lands 0 bytes). The `.portless` dir is yours, so `rm ~/.portless/ca.srl`,
   then restart this worktree's `pnpm dev` to re-mint the cert.
+- **`pnpm dev` refuses to start, naming a PID?** `"<label>.batuda.localhost" is already registered
+  by a running process (PID N). Use --force to override.` means the previous `pnpm dev` still holds
+  the host — and it holds it even once the server behind it has died, so the symptom is a web host
+  that answers and an API host returning 502. A second stack started over the first has served a
+  login page that 500s with `Cannot read properties of null (reading 'useState')`, so rule the
+  duplicate out before reading that as broken code. Confirm the PID belongs to this worktree
+  (`ps -p <PID> -o command=` names its path), `kill` it, check nothing is left
+  (`pgrep -f "worktrees/<name>"`), and only then start again.
 
 ## CORS / auth (works per worktree, no per-worktree env)
 

@@ -195,9 +195,21 @@ A click on an element below the fold does nothing and still prints `✓ Done`, w
 
 **Anchor a `page.route` pattern on `/v1/`, or it swallows the app's own source.** To watch a screen handle a failed request, block the endpoint — but in dev the browser fetches the app's modules by path too, so `**/company-facets*` also matches `company-facets-atoms.ts` and the page never boots. What you then see is a screen with no styling and "No active organization", which reads exactly like the failure you meant to stage, with nothing running to have caused it. Use `**/v1/company-facets*`, or the `failApi` helper in `apps/internal/tests/e2e/helpers/block-api.ts`, which anchors it for you. Note the SSR loader fetches server-side, where `page.route` never applies: to reach the browser's own call, load the page first and then change a filter.
 
-**A dropdown will not stay open under a synthetic click.** `agent-browser click` on a `PriSelect` trigger leaves `aria-expanded="false"` — Base UI opens on the press and closes again on the release. The options are still in the DOM afterwards (Base UI keeps them mounted), so a check that counts `[role=option]` reads as success while the popup is invisible and has zero height, and every attempt to click an option then fails as "covered". Open it from the keyboard instead — focus the trigger, press `ArrowDown` — and it stays open. Playwright's own `click` does not have this problem, so an e2e test can drive it directly.
+**Driving a Base UI popup needs agent-browser 0.38.1 or newer.** On 0.37.x a synthetic click on any Base UI trigger — `PriSelect`, `PriPopover`, the org switcher in the TopBar — left it shut, because Base UI opens on the press and closes again on the release. The options stay mounted in the DOM either way, so a check counting `[role=option]` reads as success while the popup is invisible and zero-height, and clicking an option fails as `✗ No element found` or as "covered" — a selector problem that is really a version problem.
+
+From 0.38.1 a plain click holds it open and the option is reachable:
+
+```bash
+agent-browser find testid "org-switcher" click
+agent-browser wait 1200
+agent-browser find testid "org-switcher-option-restaurant" click
+```
+
+Stuck on an older build, press `ArrowDown` after the click to re-open it — and note `find` has no `focus` verb (only `click`, `fill`, `check`, `hover`, `text`), so it has to start with the click. Playwright's own `click` never had the problem, so an e2e test can drive the popup on any version.
 
 **Wait after loading `/login` before filling anything.** Without a pause the password field is often not in the DOM yet, so `fill` reports `✗ Element not found`, the submit click posts an empty form, and the next `find testid "org-switcher"` also misses — three failures that together read exactly like broken auth. It is a hydration race, not a bug in the app. The same applies after `pnpm dev` restarts: the session cookie is gone, so a page you had open lands back on `/login?returnTo=…` and every subsequent `find` fails until you sign in again.
+
+Three seconds is enough on a warm server and not enough on a cold one, where `snapshot` answers `(empty page)` for another few seconds. Read the page back rather than trusting the pause — a `snapshot` showing the form is the signal to start filling, and it also hands you the `ref=eN` handles, which work when a `input[name=…]` selector does not.
 
 Quick login test:
 
