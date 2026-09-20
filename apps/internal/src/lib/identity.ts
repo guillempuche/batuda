@@ -49,7 +49,11 @@ export const ServerIdentityContext = createContext<ServerIdentity | undefined>(
 /** Makes the server's answers available to the auth hooks. Mounted once, by the root route. */
 export const ServerIdentityProvider = ServerIdentityContext.Provider
 
-type StoreResult = { readonly data: unknown; readonly isPending: boolean }
+type StoreResult = {
+	readonly data: unknown
+	readonly isPending: boolean
+	readonly error?: unknown
+}
 
 /**
  * Better Auth's store lives in the browser only, so on its own the server
@@ -74,7 +78,15 @@ export function serverFirst<T extends StoreResult, S>(
 	if (server === undefined) {
 		return hydrated ? live : { ...live, data: undefined }
 	}
-	const storeHasAnswered = !live.isPending || live.data != null
+	// A request that came back empty-handed is not an answer. The store reports
+	// a failure by dropping out of pending with no data, which otherwise reads
+	// as "the store has spoken" and replaces a perfectly good value the server
+	// already drew — one refused list of organisations and the org switcher
+	// turns into a plain label with nothing to pick from. Keep what the server
+	// said and let the store correct it when it actually manages to answer.
+	const storeFailed = live.data == null && live.error != null
+	const storeHasAnswered =
+		!storeFailed && (!live.isPending || live.data != null)
 	if (hydrated && storeHasAnswered) return live
 	return { ...live, data: server ?? undefined, isPending: false }
 }
