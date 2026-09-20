@@ -210,17 +210,27 @@ import { teamPagesForRows } from './scan-team-pages'
 import {
 	extractionSchemaFor,
 	type FreeformSchema,
+	foundRowsField,
 	isSchemaName,
 	schemaFieldNames,
 	schemaFillsAttributes,
 	schemaNameFor,
 } from './schemas/index'
 import {
+	promptCharsOf,
+	responsePartsForPrompt,
+} from './search-result-for-prompt'
+import {
 	coverageStoppedLooking,
 	mostBindingStop,
 	type SearchStopped,
 	wasCutOff,
 } from './search-stopped'
+import {
+	nothingSearchedYet,
+	searchedSoFarNote,
+	withRound,
+} from './searched-so-far'
 import { dropSharedHandles } from './shared-handles-guard'
 import {
 	hasHeadcountSignal,
@@ -248,6 +258,7 @@ import {
 	SCRAPE_COST_CENTS,
 	SEARCH_COST_CENTS,
 } from './tool-costs'
+import { whatTheCallAsked } from './tool-log-asked'
 import {
 	agentToolChoice,
 	isUnsupportedScrapeUrl,
@@ -3660,10 +3671,15 @@ export class ResearchService extends Context.Service<ResearchService>()(
 					// Phase-2 extraction + every grounding guard, shared so both the
 					// normal path and the discovery-scan retry run the same logic. Returns
 					// the cleaned findings; the caller writes the single phase-2 checkpoint.
+					// `noListToFallBackOn`: a reply cut off twice would lose the run, so
+					// it is worth reading row by row for the rows that did arrive. Where
+					// the run already holds a list, that one is the better answer and a
+					// cut-off leaves it standing.
 					const extractStructuredFindings = (
 						transcript: string,
 						evidenceCorpus: string,
 						pages: ReadonlyArray<string> = [],
+						noListToFallBackOn = false,
 					) =>
 						Effect.gen(function* () {
 							yield* publishEvent(researchId, 'tool.called', {
@@ -3733,7 +3749,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 							// A reply cut off before its JSON closed is asked for once more,
 							// shorter: the same evidence, told to write less per value. Once,
 							// since a second cut-off says the answer does not fit in one reply
-							// at all; what that reply got to write whole is then kept rather
+							// at all; what either reply got to write whole is then kept rather
 							// than the run lost — every value up to the cut is as grounded as
 							// any other, and the guards below read it the same way.
 							const structuredResponse = yield* extractLlm
@@ -3742,7 +3758,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 									prompt: extractionPrompt,
 								})
 								.pipe(
-									Effect.catchIf(isResponseCutOff, () =>
+									Effect.catchIf(isResponseCutOff, firstCutOff =>
 										Effect.logWarning('research.extraction.cut_off').pipe(
 											Effect.annotateLogs({
 												event: 'research.extraction.cut_off',
@@ -3765,6 +3781,12 @@ export class ResearchService extends Context.Service<ResearchService>()(
 																cutOff,
 																outputSchema as typeof FreeformSchema,
 																researchId,
+																noListToFallBackOn
+																	? {
+																			listField: foundRowsField(schemaName),
+																			earlierCutOff: firstCutOff,
+																		}
+																	: {},
 															).pipe(
 																Effect.tap(() =>
 																	Effect.sync(() => {
@@ -6022,6 +6044,10 @@ export class ResearchService extends Context.Service<ResearchService>()(
 						// pass and a refined retry run here, under the SAME budget + toolkit:
 						// re-providing the layer would build a fresh MemoMap and reset the
 						// per-run spend, letting one run silently pay twice.
+						// What the run has searched and which results nobody opened, kept
+						// across passes: a pass starts from a fresh prompt and would
+						// otherwise pay to search the same words again.
+						let searchedSoFar = nothingSearchedYet
 						const runPass = (basePrompt: string) =>
 							Effect.gen(function* () {
 								let prompt: Prompt.Prompt = Prompt.make(basePrompt)
@@ -6071,9 +6097,20 @@ export class ResearchService extends Context.Service<ResearchService>()(
 											// the helper says why.
 											toolChoice: agentToolChoice(schemaName, round),
 										})
+										// The prompt takes a shorter copy of each search's answer;
+										// `response.content` itself is read whole below, for the
+										// passages the run has seen.
+										const partsForPrompt = responsePartsForPrompt(
+											response.content,
+										)
+										searchedSoFar = withRound(
+											searchedSoFar,
+											response.toolCalls,
+											response.toolResults,
+										)
 										prompt = Prompt.concat(
 											prompt,
-											Prompt.fromResponseParts(response.content),
+											Prompt.fromResponseParts(partsForPrompt),
 										)
 										// Attribute sources only to scrapes that actually returned
 										// content this round — read off the tool RESULTS, not the
@@ -6162,7 +6199,17 @@ export class ResearchService extends Context.Service<ResearchService>()(
 										//
 										// The output is a short shape rather than the provider's
 										// answer: a scraped page is tens of thousands of characters and
-										// is already stored as a source.
+										// is already stored as a source. What was asked rides along —
+										// the words searched, the page opened — because a count of
+										// characters cannot say why a run read a directory and not
+										// the firms on it. Those words are the tenant's, so they go
+										// on the run's own row and into no log line.
+										const askedByCallId = new Map(
+											response.toolCalls.map(call => [
+												call.id,
+												whatTheCallAsked(call.name, call.params),
+											]),
+										)
 										for (const tr of response.toolResults) {
 											if (!tr.isFailure) providerCallsLogged += 1
 											if (
@@ -6199,6 +6246,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 														: {
 																output: {
 																	round,
+																	...askedByCallId.get(tr.id),
 																	// The answer's own size, not the trimmed copy's:
 																	// bounded, every large page reports the same
 																	// number and a page that came back empty reads
@@ -6240,9 +6288,11 @@ export class ResearchService extends Context.Service<ResearchService>()(
 											hasToolCalls: response.toolCalls.length > 0,
 											scrapeUrlHashes,
 											renderedResults,
+											// What the prompt actually took, so the ceiling on a
+											// pass follows the prompt and not the size of what a
+											// search happened to send back.
 											promptChars:
-												JSON.stringify(response.content).length +
-												writtenBetweenRounds,
+												promptCharsOf(partsForPrompt) + writtenBetweenRounds,
 											inputTokens: response.usage.inputTokens.total ?? 0,
 										}
 									})
@@ -6330,7 +6380,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 						// first folds its transcript into what came before and the whole of
 						// it is extracted again, so a company found on any pass lands in
 						// the list once rather than in a list of its own.
-						const extractOverEverything = () =>
+						const extractOverEverything = (noListToFallBackOn = false) =>
 							extractStructuredFindings(
 								loop.researchText,
 								[
@@ -6338,6 +6388,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 									...scrapeCorpus.map(page => page.text),
 								].join('\n'),
 								scrapeCorpus.map(page => page.text),
+								noListToFallBackOn,
 							)
 
 						// Send the search out once more, with the reason for going appended
@@ -6347,8 +6398,9 @@ export class ResearchService extends Context.Service<ResearchService>()(
 						// parts forgets what it was working through.
 						const searchAgain = (instruction: string) =>
 							Effect.gen(function* () {
+								const alreadySearched = searchedSoFarNote(searchedSoFar)
 								const again = yield* runPass(
-									`${systemPrompt}\n\n${buildPhaseOneUserTurn({ query, anchorInstruction, partsInstruction })}\n\n${instruction}`,
+									`${systemPrompt}\n\n${buildPhaseOneUserTurn({ query, anchorInstruction, partsInstruction })}\n\n${instruction}${alreadySearched === '' ? '' : `\n\n${alreadySearched}`}`,
 								)
 								loop = {
 									researchText: [loop.researchText, again.researchText]
@@ -6395,12 +6447,17 @@ export class ResearchService extends Context.Service<ResearchService>()(
 						const searchAgainOrKeep = (instruction: string, soFar: unknown) =>
 							Effect.gen(function* () {
 								lastPassRefused = false
+								// `searchAgain` lowers the flag for the list it is about to
+								// write; when the pass is abandoned the earlier list ships
+								// after all, and what was true of it has to be true again.
+								const soFarWasCut = extractionSalvaged
 								return yield* searchAgain(instruction).pipe(
 									Effect.catchIf(
 										(error: unknown) => error instanceof ProviderError,
 										error =>
 											Effect.gen(function* () {
 												lastPassRefused = true
+												extractionSalvaged = soFarWasCut
 												yield* Effect.logWarning(
 													'research.pass.abandoned',
 												).pipe(
@@ -6434,7 +6491,8 @@ export class ResearchService extends Context.Service<ResearchService>()(
 						let refined = false
 						if (isDiscoveryScan(schemaName)) {
 							yield* linkRunSources(loop.scrapedUrlHashes)
-							findings = (yield* extractOverEverything()).findings
+							// No list in hand yet, so a cut-off reply is read row by row.
+							findings = (yield* extractOverEverything(true)).findings
 							if (
 								isDiscoveryScanThin(schemaName, findings) &&
 								canAffordAnotherRound(yield* budget.snapshot())
@@ -6733,6 +6791,10 @@ export class ResearchService extends Context.Service<ResearchService>()(
 								(anchorHashes.has(a.urlHash) ? 0 : 1) -
 								(anchorHashes.has(b.urlHash) ? 0 : 1),
 						)
+						// The list this reading writes is the one that ships: there is
+						// nothing to fall back on if it is cut off, and a reply cut off in
+						// an earlier reading does not describe it.
+						extractionSalvaged = false
 						const extracted = yield* extractStructuredFindings(
 							researchText,
 							[
@@ -6741,6 +6803,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 								...groundedPageTexts(entityTargets, scrapeCorpus),
 							].join('\n'),
 							labelledGroundedPages(entityTargets, anchorFirstCorpus),
+							true,
 						)
 						findings = extracted.findings
 						// A company field dropped for coming from a person page or a social
