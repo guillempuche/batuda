@@ -42,5 +42,10 @@ export const normalizePaidActionTool = (tool: unknown): string | null => {
 	if (typeof tool !== 'string') return null
 	const key = tool.trim().toLowerCase()
 	if (PAID_FOLLOWUP_TOOLS.has(key)) return key
+	// Ask only for names this table was given. Every object in JavaScript already
+	// answers to a handful of built-in ones, and `constructor` is one of them, so
+	// a run naming that as its tool was told it had found a real one and went on
+	// waiting for somebody to approve it.
+	if (!Object.hasOwn(PAID_TOOL_ALIASES, key)) return null
 	return PAID_TOOL_ALIASES[key] ?? null
 }

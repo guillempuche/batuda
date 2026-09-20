@@ -734,6 +734,21 @@ const KNOWN_PAID_ACTION_CENTS: Record<string, number> = {
 	registry_lookup: REGISTRY_LOOKUP_COST_CENTS,
 }
 
+// The largest whole number the estimate's column can hold.
+const MAX_CENTS = 2147483647
+
+// A price as cents can actually be counted. Round a part-cent up, because a
+// lookup that does cost money must not record as free. Anything below zero or
+// past what the column holds is not a price at all, so it is recorded as no
+// estimate rather than forced into range: a run that asks for 99999999999
+// means nothing by it, and folding that down to the largest number that fits
+// would put £21m in front of somebody as a figure to approve.
+const wholeCents = (value: unknown): number | null => {
+	if (typeof value !== 'number' || !Number.isFinite(value)) return null
+	if (value < 0 || value > MAX_CENTS) return null
+	return Math.ceil(value)
+}
+
 // A paid action as it will be stored: pointed at the real tool it names, and
 // priced at what that tool really costs.
 //
@@ -744,6 +759,11 @@ const KNOWN_PAID_ACTION_CENTS: Record<string, number> = {
 // because what the run wanted to do is worth seeing, but it stops waiting on a
 // person: it can never be approved, so putting it in front of somebody asks for a
 // decision nobody can give.
+//
+// The price gets the same treatment as the name. A figure arrives as whatever
+// the model wrote — 0.05, 5.0, a negative, something astronomical — and contact
+// discovery is priced from it rather than from a table, so it is the one that
+// reaches storage unexamined.
 const settlePaidAction = (
 	item: Record<string, unknown>,
 ): Record<string, unknown> => {
@@ -754,7 +774,8 @@ const settlePaidAction = (
 	return {
 		...item,
 		tool: canonical,
-		...(realCost === undefined ? {} : { estimated_cents: realCost }),
+		estimated_cents:
+			realCost === undefined ? wholeCents(item['estimated_cents']) : realCost,
 	}
 }
 
@@ -1253,8 +1274,21 @@ export const queryPendingPaidActions = (
 					COALESCE(pa->>'tool', '') AS tool,
 					CASE WHEN jsonb_typeof(pa->'args') = 'object'
 						THEN pa->'args' ELSE '{}'::jsonb END AS args,
+					-- Read the estimate through numeric, not straight to int. A run
+					-- writes this figure itself, and "a number" in JSON covers 0.05
+					-- and 5.0 as readily as 5; handing either of those to int as
+					-- text is an error that fails the whole list, so one run with a
+					-- fraction in it used to take the page down for the org. Round a
+					-- part-cent up so something that does cost money never reads as
+					-- free, and hold the result inside what the column can carry.
 					CASE WHEN jsonb_typeof(pa->'estimated_cents') = 'number'
-						THEN (pa->>'estimated_cents')::int END AS estimated_cents,
+						THEN LEAST(
+							GREATEST(
+								CEIL((pa->>'estimated_cents')::numeric),
+								-2147483648
+							),
+							2147483647
+						)::int END AS estimated_cents,
 					pa->>'reason' AS reason,
 					-- A run anchored to exactly one company or person names it here.
 					-- The count guard is what keeps a run about several of them from
