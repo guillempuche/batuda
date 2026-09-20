@@ -1321,29 +1321,29 @@ describe('scoring a run that answered for a whole market', () => {
 	})
 
 	describe('when the run never reached an answer', () => {
-		it.each([
-			'failed',
-			'cancelled',
-		] as const)('should score no market at all for a %s run', status => {
-			// GIVEN a market request whose run died — an outage, or the time limit
-			// cutting a long search short — so it returned nothing for that reason
-			const score = scoreRun(
-				marketGolden({
-					parts: [
-						{ id: 'electrical', terms: ['instalacion electrica'] },
-						{ id: 'solar', terms: ['fotovoltaica'] },
-					],
-				}),
-				outcome({ status, companies: [] }),
-			)
+		it.each(['failed', 'cancelled'] as const)(
+			'should score no market at all for a %s run',
+			status => {
+				// GIVEN a market request whose run died — an outage, or the time limit
+				// cutting a long search short — so it returned nothing for that reason
+				const score = scoreRun(
+					marketGolden({
+						parts: [
+							{ id: 'electrical', terms: ['instalacion electrica'] },
+							{ id: 'solar', terms: ['fotovoltaica'] },
+						],
+					}),
+					outcome({ status, companies: [] }),
+				)
 
-			// WHEN scored
-			// THEN there is no market reading to fold into the pass. Counting it
-			// would put the parts it was asked for into the denominator with
-			// nothing above the line, so one crashed run in two would halve the
-			// coverage figure and read as a regression the research never had
-			expect(score.market).toBeUndefined()
-		})
+				// WHEN scored
+				// THEN there is no market reading to fold into the pass. Counting it
+				// would put the parts it was asked for into the denominator with
+				// nothing above the line, so one crashed run in two would halve the
+				// coverage figure and read as a regression the research never had
+				expect(score.market).toBeUndefined()
+			},
+		)
 	})
 
 	describe('when rows say where the company is', () => {

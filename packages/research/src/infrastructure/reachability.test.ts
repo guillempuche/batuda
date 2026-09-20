@@ -337,17 +337,18 @@ describe('asking whether this machine can reach a vendor', () => {
 	})
 
 	describe('when the vendor is having a bad minute', () => {
-		it.each([
-			429, 500, 503,
-		])('should report reachable on %i — the connection still got there', async status => {
-			// GIVEN a vendor rate-limiting or falling over
-			const results = await probe([GROQ], answeringClient([], status))
+		it.each([429, 500, 503])(
+			'should report reachable on %i — the connection still got there',
+			async status => {
+				// GIVEN a vendor rate-limiting or falling over
+				const results = await probe([GROQ], answeringClient([], status))
 
-			// WHEN asked — THEN this check is about the connection, not the vendor's
-			// health, so an answer of any kind is an answer
-			expect(results[0]?.verdict).toBe('reachable')
-			expect(results[0]?.status).toBe(status)
-		})
+				// WHEN asked — THEN this check is about the connection, not the vendor's
+				// health, so an answer of any kind is an answer
+				expect(results[0]?.verdict).toBe('reachable')
+				expect(results[0]?.status).toBe(status)
+			},
+		)
 	})
 
 	describe('when the vendor answers with a redirect', () => {
@@ -367,19 +368,20 @@ describe('asking whether this machine can reach a vendor', () => {
 	})
 
 	describe('when something on this network answers in the vendor’s place', () => {
-		it.each([
-			407, 511,
-		])('should report unreachable on %i, not a vendor that answered', async status => {
-			// GIVEN a proxy or a sign-in portal intercepting the request
-			const results = await probe([GROQ], answeringClient([], status))
+		it.each([407, 511])(
+			'should report unreachable on %i, not a vendor that answered',
+			async status => {
+				// GIVEN a proxy or a sign-in portal intercepting the request
+				const results = await probe([GROQ], answeringClient([], status))
 
-			// WHEN asked
-			// THEN the request stopped short of the vendor, so a green here would
-			// be a green that is not one
-			expect(results[0]?.verdict).toBe('unreachable')
-			expect(results[0]?.blockedReason).toBe('proxy')
-			expect(results[0]?.status).toBeUndefined()
-		})
+				// WHEN asked
+				// THEN the request stopped short of the vendor, so a green here would
+				// be a green that is not one
+				expect(results[0]?.verdict).toBe('unreachable')
+				expect(results[0]?.blockedReason).toBe('proxy')
+				expect(results[0]?.status).toBeUndefined()
+			},
+		)
 	})
 
 	describe('when the connection is cut in different ways', () => {

@@ -169,19 +169,16 @@ describe('GET /v1/email/threads [routes/email.ts]', () => {
 	})
 
 	describe('when the quiet-days number is out of bounds', () => {
-		it.each([
-			'0',
-			'3651',
-			'7.5',
-			'abc',
-			'',
-		])('should refuse %s', async value => {
-			// GIVEN a number of days nobody can mean
-			// WHEN the request is made
-			const response = await get(`/v1/email/threads?quietDays=${value}`)
-			// THEN it is turned away
-			expect(response.status).toBe(400)
-		})
+		it.each(['0', '3651', '7.5', 'abc', ''])(
+			'should refuse %s',
+			async value => {
+				// GIVEN a number of days nobody can mean
+				// WHEN the request is made
+				const response = await get(`/v1/email/threads?quietDays=${value}`)
+				// THEN it is turned away
+				expect(response.status).toBe(400)
+			},
+		)
 
 		it.each(['1', '3650'])('should accept %s', async value => {
 			// GIVEN a number at the edge of what is allowed
