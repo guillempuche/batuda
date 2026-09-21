@@ -3,6 +3,19 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-09-21 (internal-v2026.9.21)
+
+### Bug Fixes
+
+* **internal:** restore every action on the auth client ([61303aa](https://github.com/guillempuche/batuda/commit/61303aaac30e8535763a86be611bc4fbff1974ec))
+* **research:** price a paid lookup in cents it can count ([bc68d39](https://github.com/guillempuche/batuda/commit/bc68d3944be338a33d04fd1acc39d22b6309685b))
+* **research:** read a cut-off reply the way a whole one is read ([28e9589](https://github.com/guillempuche/batuda/commit/28e95895f3d37ef0417900d2fff34e83332d469d))
+* **research:** rescue cut-off scans row by row and bound search text ([6fe0d37](https://github.com/guillempuche/batuda/commit/6fe0d376596021a3f5852fd9c19d2a9e7289a853))
+
+### Chores
+
+* update biome to 2.5.14 and correct the dev-shell notes ([bada3b9](https://github.com/guillempuche/batuda/commit/bada3b9d9a1e3f383b8ea392c3ca098ac3f5a4ed))
+
 ## 2026-09-19 (internal-v2026.9.19)
 
 ### Features
