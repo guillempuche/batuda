@@ -1,4 +1,5 @@
 import { Effect, Schema } from 'effect'
+import { OpenAiStructuredOutput } from 'effect/unstable/ai'
 
 import { closeCutOffJson } from '../domain/cut-off-reply'
 import { CutOffReply } from '../domain/errors'
@@ -19,6 +20,24 @@ export interface SalvagedReply<A> {
 const parsed = (text: string): unknown => {
 	try {
 		return JSON.parse(text)
+	} catch {
+		return undefined
+	}
+}
+
+// The shape as a model is sent it, or nothing for a shape that cannot be sent
+// that way (its root is not an object) — which no reply was ever asked for in.
+const modelReadingOf = <S extends Schema.Top>(
+	schema: S,
+):
+	| ((
+			input: unknown,
+	  ) => Effect.Effect<S['Type'], unknown, S['DecodingServices']>)
+	| undefined => {
+	try {
+		return Schema.decodeUnknownEffect(
+			OpenAiStructuredOutput.toCodecOpenAI(schema as never).codec,
+		) as never
 	} catch {
 		return undefined
 	}
@@ -50,8 +69,21 @@ export const salvageCutOffReply = <S extends Schema.Top>(
 	if (!(err instanceof CutOffReply)) return Effect.succeed(undefined)
 	const candidates = closeCutOffJson(err.responseText)
 	const totalChars = err.responseText.length
-	const decode = Schema.decodeEffect(Schema.fromJsonString(schema))
-	const decodeValue = Schema.decodeUnknownEffect(schema)
+	// A model asked for a structured reply is sent the shape with every field a
+	// row may go without written as one it must write, null when it has nothing —
+	// and a whole reply is read back through the same reading of the shape. A cut
+	// reply is the same text, so it is read that way first: held to the plain
+	// shape alone, every row carrying a null fails and nothing is ever kept. The
+	// plain shape still gets its turn, for a row the cut left short of the fields
+	// it would have written null.
+	const asThePlainShape = Schema.decodeUnknownEffect(schema)
+	const asTheModelWasAsked = modelReadingOf(schema)
+	const decodeValue = (input: unknown) =>
+		asTheModelWasAsked === undefined
+			? asThePlainShape(input)
+			: asTheModelWasAsked(input).pipe(
+					Effect.catch(() => asThePlainShape(input)),
+				)
 	type Reading = Effect.Effect<
 		SalvagedReply<S['Type']> | undefined,
 		never,
@@ -109,7 +141,7 @@ export const salvageCutOffReply = <S extends Schema.Top>(
 	const readWholeFrom = (at: number): Reading => {
 		const candidate = candidates[at]
 		if (candidate === undefined) return readRowByRowFrom(0)
-		return decode(candidate.text).pipe(
+		return decodeValue(parsed(candidate.text)).pipe(
 			Effect.map(value => ({
 				value,
 				keptChars: candidate.keptChars,

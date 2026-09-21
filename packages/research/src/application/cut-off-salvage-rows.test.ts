@@ -78,6 +78,35 @@ describe('salvageCutOffReply, read row by row', () => {
 		})
 	})
 
+	describe('when the model wrote null for what it had nothing for', () => {
+		it('should read the rows as a whole reply is read, null standing for a field left out', async () => {
+			// GIVEN a reply written the way a model writes one: every field a row
+			// may go without is there and null, and the cut falls in the third row
+			const written = (name: string) =>
+				`{"name": "${name}", "why_relevant": "installs", "website": null, "citations": [{"source_id": "https://${name}.example", "confidence": 1, "quote": null}]}`
+			const text = `{"summary": null, "prospects": [${written('alfa')}, ${written('beta')}, {"name": "gamma", "why_relevant": "inst`
+
+			// WHEN salvaged with the list named
+			const salvaged = await Effect.runPromise(
+				salvageCutOffReply(cutOff(text), ScanShape, 'prospects'),
+			)
+
+			// THEN both whole rows are kept, their nulls read as fields left out
+			expect(salvaged?.value.prospects).toEqual([
+				{
+					name: 'alfa',
+					why_relevant: 'installs',
+					citations: [{ source_id: 'https://alfa.example', confidence: 1 }],
+				},
+				{
+					name: 'beta',
+					why_relevant: 'installs',
+					citations: [{ source_id: 'https://beta.example', confidence: 1 }],
+				},
+			])
+		})
+	})
+
 	describe('when a key beside the list is written wrong', () => {
 		it('should lose that key alone and keep the others', async () => {
 			// GIVEN a shape with two keys beside its list, a reply whose `found`
