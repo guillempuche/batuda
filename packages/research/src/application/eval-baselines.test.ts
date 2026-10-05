@@ -16,6 +16,7 @@ const summary = {
 	fieldRecall: 1,
 	contactRecall: null,
 	costPerRun: 3.2,
+	knownCompanies: null,
 } as unknown as EvalSummary
 
 const runScore = (overrides: Partial<RunScore> = {}): RunScore =>
@@ -182,6 +183,85 @@ describe('stripReportForBaseline', () => {
 		})
 	})
 
+	describe('when the golden file names firms known to exist', () => {
+		it('should file how many were listed and missed, and none of their names', () => {
+			// GIVEN a market pass whose summary, market table and run all carry the
+			// names of known firms
+			const withKnown = {
+				...summary,
+				knownCompanies: {
+					found: [{ market: 'ES-GI', name: 'Instal Nom Real' }],
+					missed: [
+						{ market: 'ES-GI', name: 'Clima Nom Real' },
+						{ market: 'ES-GI', name: 'Solar Nom Real' },
+					],
+				},
+			} as EvalSummary
+			const market = {
+				name: 'ES-GI',
+				rowsReturned: 12,
+				listUse: {
+					rowsWithWebsite: 7,
+					rowsWithHeadcount: 1,
+					rowsPlacedNarrower: 5,
+					knownFound: ['Instal Nom Real'],
+					knownMissed: ['Clima Nom Real', 'Solar Nom Real'],
+				},
+			} as unknown as NonNullable<RunScore['market']>
+			const stripped = stripReportForBaseline({
+				...report([runScore({ market })]),
+				summary: withKnown,
+				byMarket: { 'ES-GI': withKnown },
+			})
+
+			// WHEN the filed copy is written out
+			const written = JSON.stringify(stripped)
+
+			// THEN no firm is named anywhere in it, AND the counts survive in the
+			// summary, the market table and the run, beside the run's other counts
+			expect(written).not.toContain('Nom Real')
+			expect(stripped.summary.knownCompanies).toEqual({ found: 1, missed: 2 })
+			expect(stripped.byMarket['ES-GI']?.knownCompanies).toEqual({
+				found: 1,
+				missed: 2,
+			})
+			expect(stripped.runs[0]?.market?.listUse).toEqual({
+				rowsWithWebsite: 7,
+				rowsWithHeadcount: 1,
+				rowsPlacedNarrower: 5,
+				knownFound: 1,
+				knownMissed: 2,
+			})
+			expect(stripped.runs[0]?.market?.rowsReturned).toBe(12)
+		})
+
+		it('should count, not name, the firms of a market whose run never answered', () => {
+			const stripped = stripReportForBaseline(
+				report([
+					runScore({
+						marketWentUnanswered: true,
+						knownUnanswered: {
+							market: 'ES-GI',
+							names: ['Instal Nom Real', 'Clima Nom Real'],
+						},
+					}),
+				]),
+			)
+			expect(JSON.stringify(stripped)).not.toContain('Nom Real')
+			expect(stripped.runs[0]?.knownUnanswered).toEqual({
+				market: 'ES-GI',
+				names: 2,
+			})
+		})
+
+		it('should file a pass that names none as it is', () => {
+			const stripped = stripReportForBaseline(report([runScore()]))
+			expect(stripped.summary.knownCompanies).toBeNull()
+			expect(stripped.byBucket['small']?.knownCompanies).toBeNull()
+			expect(stripped.runs[0]).not.toHaveProperty('market')
+		})
+	})
+
 	describe('when a run reported guard counts', () => {
 		it('should keep the counts and the verdicts', () => {
 			// GIVEN a run with its facts and its usage
@@ -235,7 +315,7 @@ describe('stripReportForBaseline', () => {
 			// WHEN the filed copy is read back
 			// THEN the summary and the breakdowns survive
 			expect(stripped.runs).toStrictEqual([])
-			expect(stripped.summary).toBe(summary)
+			expect(stripped.summary).toStrictEqual(summary)
 			expect(stripped.byBucket).toStrictEqual({ small: summary })
 			expect(stripped.byCountry).toStrictEqual({ ES: summary })
 		})

@@ -162,6 +162,8 @@ A row can ask for a whole market instead of one company — "installation compan
 
 Counting how many companies came back is not the grade either. A run on 13 August returned 62 rows, of which 23 were trade bodies and 10 were the same company written twice, and four of the five trades asked for were missing entirely — a healthy-looking count over a list nobody could use. A market row is graded on those faults instead.
 
+`golden-markets.example.json` holds seven markets of four sorts, because a check that is right for one sort of request is exactly what breaks another: installers by trade across a country (in three languages), **makers**, **engineering firms**, a **signal** question — firms of any trade that published a given job ad — and the installers of one small province. The kind check that removes trade bodies from an installers' list also removed the manufacturers from a list that asked for manufacturers, and a food producer hiring a systems technician from a list that asked for exactly that; three installer markets could never have shown it.
+
 Copy `golden-markets.example.json` and give the row a `market` block in place of the domains:
 
 ```json
@@ -213,6 +215,36 @@ It is allowed to be loose because of what the two figures cost when wrong. This 
 **Location fill** is how many rows say where the company is. The field is asked for a town or a province, but any stated place counts, so a row answering with the country alone still counts as filled.
 
 The **rows per market** count is still reported, as the scale those figures read against rather than as a grade. It is also what checking that every row is a real company would cost, so it needs a reading of its own before such a check exists.
+
+### What the list is worth to whoever works through it
+
+Every figure above asks whether the rows are the right kind of company. None of them asks what a salesperson asks first — can I reach this firm, where exactly is it, how big is it — so a list of sixty correct names with no web address and the province for a town passes all of them and is close to useless. Eleven production scans on 20 September came back that way: rows giving a directory as their website, while page one of a plain web search for the same trade showed thirteen to seventeen firms with sites of their own. These figures sit beside the others and are counted off what came back:
+
+- **with their own site** — rows whose website is the firm's. An address on a social platform does not count, and neither does a host that three or more differently-named rows of the same list give: that is a listing they were all read off, and a page about a firm on somebody else's site is what a run hands back when it never found the firm's own. Two rows sharing a host are left alone — one firm written twice, a parent and its branch. It errs both ways at the edges: a listing only one or two rows cite still counts as an own site, and a firm the list repeats under three different names of its own (a parent and two branches) reads as a listing and loses all three.
+- **with a headcount** — rows stating how many people work there, as a number. "Entre 5 y 25" is not one.
+- **narrower than asked** — rows whose place says more than the request did: a town, a street, a postcode, where the request named a province. Read only for markets whose golden row writes the asked place down (`placeWords`, below), and the percentage is over those markets' rows alone.
+- **known firms listed** — of the firms the golden rows name as known to exist (`knownCompanies`, below), how many some run of the pass listed, and **by name, under their market,** the ones no run did. A firm named on two markets' lists is counted once for each: being listed for one says nothing of the other. A market whose every run was lost still counts its firms, all as never listed. A handful of firms is not something to take a percentage of; which ones a whole pass never reached is the finding.
+- **Rounds per market** — how many rounds a run spent searching, and how many filling gaps in rows it already had, as the run itself counted them. **searches repeated** is the share of the searches the runs named that had already been made in the same run, word for word once case and spacing are set aside. Every search is charged, so that share is money spent to be told the same thing. A run's log keeps its first 60 provider calls, searches and page reads together, so on a long run this is a reading of the early searching and not of all of it; it reads `n/a` for runs stored before a run's log named its searches.
+- **Market runs lost … to a reply cut off** — of the market runs that came back with nothing, the ones whose answer had been written: the model's reply ran past its length limit and not one row of it could be kept (`research.extraction.salvage_empty`). Such a run searched, read and paid in full. It reads `n/a` when the pass collected no logged facts.
+
+Two optional keys on the `market` block feed the two figures that need a person's knowledge:
+
+```json
+"placeWords": ["Girona", "Gerona", "provincia de Girona", "Catalunya", "Espana"],
+"knownCompanies": [
+  { "name": "Instal·lacions Exemple, SL", "host": "instalacions.example", "from": "page one of a plain web search for \"instal·lador elèctric Girona\"" },
+  { "name": "Clima Exemple", "host": null, "from": "the guild's member search, by town" }
+]
+```
+
+- `placeWords` — the asked place's own names **and everything wider**: the province, the region, the country, in each language the rows answer in. Accents and case are set aside, as they are for `terms`. A row's place is narrower when it holds a word outside these of four letters or more, or a number — so "Província de Girona" says nothing new and "Figueres" or "17600" does. The cost of that rule is a town of three letters written with nothing beside it, which reads as the request said again — and so does a town that shares its name with the asked place. A row in Girona the city, written as "Girona" and nothing else, cannot be told from one that only repeated the province, so in a market named after its capital the figure reads low by however many rows sit in that capital. Leave the key out and the figure is not read for that market; an empty array is refused.
+- `knownCompanies` — firms you found yourself in about ten minutes of plain searching. `host` is the firm's own site written bare and lower-case (`acme.example`, no `www.`, no path), or `null` for a firm with none; `from` says where you found it and is required. A firm counts as listed when a row gives that host as its own site, or carries the same name once the legal form is off the end. Anything the scorer could not match is refused when the file is read, since it would count as missed on every pass.
+
+**Read "known firms listed" as reach, never as recall.** The list was made by searching, so it holds the firms a search finds — that is what `from` is for, and why it is required. The question it answers is "does a run reach what a person reaches in ten minutes", which is the floor a paid scan has to clear; it says nothing of the firms nobody's search turns up. A firm counts as listed when **any** run of the pass listed it, so the figure belongs to the pass and not to a run.
+
+The known firms in the shipped example are made up and sit on `.example` hosts, so a pass over that file reports every one of them as never listed. Replace them with firms you found before reading the line — in your own git-ignored copy, since a list of real firms tied to a customer's question is theirs.
+
+**A market pass has no grounding figure to hold two sides against** — grounding is scored per company and reads `n/a` when every row is a market. The control is what the runs did rather than what they found: market runs lost, rows per market, rounds per market, and the **Guard drops** section. If those moved a long way between two sides, the two sides did not meet the same web, and a difference in the rates above is not the change's.
 
 ### What this measures, and what it does not
 

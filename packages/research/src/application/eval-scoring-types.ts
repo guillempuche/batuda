@@ -92,6 +92,22 @@ export interface MarketPart {
 }
 
 /**
+ * A firm somebody found for a market without the pipeline's help, written down so
+ * a pass can say whether the run reached it.
+ */
+export interface KnownCompany {
+	readonly name: string
+	/** The firm's own site, bare and lower-case, or null for one that has none. */
+	readonly host: string | null
+	/**
+	 * Where the name came from — a guild's member list, a register, a plain web
+	 * search. It decides what a miss means: a firm off a member list the run never
+	 * opened is a different finding from one that tops an ordinary search.
+	 */
+	readonly from: string
+}
+
+/**
  * What a request for a whole market asks for, when a golden row is a market rather
  * than one company. A scan answers with a list, so nothing a profile is graded on —
  * reaching one company's site, filling that company's fields — is a question here.
@@ -113,6 +129,20 @@ export interface MarketExpectation {
 	 * still passes unmeasured, which is the honest limit of the figure.
 	 */
 	readonly notCompanies: ReadonlyArray<string>
+	/**
+	 * Firms known to be in this market, each with where it was found. Optional, and
+	 * a short list by nature: it says whether a run reaches what a person finds in
+	 * a few minutes, named firm by named firm, and is never a measure of how much
+	 * of the market a run covered.
+	 */
+	readonly knownCompanies?: ReadonlyArray<KnownCompany>
+	/**
+	 * The asked place's own names, in the languages rows answer in ("girona",
+	 * "gerona"). A row whose place says nothing beyond these has only repeated
+	 * the request; one that says more has named somewhere inside it. Optional:
+	 * without it a pass cannot tell the two apart and does not try.
+	 */
+	readonly placeWords?: ReadonlyArray<string>
 }
 
 /**
@@ -263,7 +293,29 @@ export interface RunOutcome {
 		 * rather than a missing one: nothing established that company.
 		 */
 		readonly confirmed: boolean
+		/** The headcount the row states, or null when it states none. */
+		readonly headcount: number | null
 	}>
+	/**
+	 * How much searching the run did, in its own count: rounds of the searching
+	 * model across every pass, and rounds spent afterwards filling what was still
+	 * empty. Null where the run stored none.
+	 */
+	readonly searching: {
+		readonly rounds: number | null
+		readonly gapRounds: number | null
+	}
+	/**
+	 * The web searches the run's own log names: how many, and how many different
+	 * ones. The gap is searches paid for twice. The log keeps a bounded number of
+	 * provider calls, so on a long run these are its earlier searches, not all of
+	 * them. Null for a run whose log names none — one that made none, and every
+	 * run logged before searches were named.
+	 */
+	readonly searches: {
+		readonly total: number
+		readonly distinct: number
+	} | null
 	/**
 	 * Whether an official-registry lookup this run resolved the target company by
 	 * its legal name. Independent of the fetched pages: a company confirmed in the
@@ -405,6 +457,40 @@ export interface MarketScore {
 	 * where it stored none.
 	 */
 	readonly searchingStopped: SearchStopped | null
+	/** What the list is worth to somebody who has to work through it. */
+	readonly listUse: ListUse
+	/** What the run spent getting it, as the run itself counted and logged. */
+	readonly searching: RunOutcome['searching']
+	readonly searches: RunOutcome['searches']
+}
+
+/**
+ * What a salesperson needs of a list, counted over every row the scan came back
+ * with: a way to reach the firm, where exactly it is, how big it is — and whether
+ * the firms a person finds with a plain search are on it.
+ */
+export interface ListUse {
+	/**
+	 * Rows carrying a web address that is the firm's own: not a social page, and
+	 * not a host several differently-named rows of the same list give.
+	 */
+	readonly rowsWithWebsite: number
+	readonly rowsWithHeadcount: number
+	/**
+	 * Rows whose place says more than the request did — a town, a street, a
+	 * postcode. Null when the golden row writes down no `placeWords`, without
+	 * which repeating the request cannot be told from narrowing it.
+	 */
+	readonly rowsPlacedNarrower: number | null
+	/** The firms the golden row names that are on the list, and the ones that are not. */
+	readonly knownFound: ReadonlyArray<string>
+	readonly knownMissed: ReadonlyArray<string>
+}
+
+/** A known firm, with the market whose golden row names it. */
+export interface KnownFirmOfMarket {
+	readonly market: string
+	readonly name: string
 }
 
 /**
@@ -505,6 +591,16 @@ export interface RunScore {
 	 * nothing to score at all.
 	 */
 	readonly marketWentUnanswered: boolean
+	/**
+	 * The known firms of a market whose run never answered. No list came back for
+	 * them to be on, so each is a firm this run did not list — without this a pass
+	 * that lost every run of a market would report fewer missed firms than one
+	 * that lost none.
+	 */
+	readonly knownUnanswered?: {
+		readonly market: string
+		readonly names: ReadonlyArray<string>
+	}
 	/** What the list got right, present only for a row that asked for a market. */
 	readonly market?: MarketScore
 }
@@ -693,6 +789,37 @@ export interface EvalSummary {
 	 * means every run stayed on its first choice and the scores speak for it.
 	 */
 	readonly cascadedRunRate: number | null
+	/** Of the rows scans came back with, the share carrying the firm's own web address. */
+	readonly websiteRate: number | null
+	/** Of those rows, the share stating a headcount. */
+	readonly headcountFill: number | null
+	/**
+	 * Of the rows of markets whose golden row writes down `placeWords`, the share
+	 * whose place says more than the request did. Null when no such market scored.
+	 */
+	readonly narrowerPlaceRate: number | null
+	/**
+	 * The firms golden rows name as known, each under its own market, split by
+	 * whether ANY run of the pass for that market listed them. Names, not a rate:
+	 * the lists are a handful of firms each, found by a person with a plain search,
+	 * so a share of them measures nothing — which firms were missed is the finding.
+	 * Null when no golden row names any.
+	 */
+	readonly knownCompanies: {
+		readonly found: ReadonlyArray<KnownFirmOfMarket>
+		readonly missed: ReadonlyArray<KnownFirmOfMarket>
+	} | null
+	/** Rounds of searching one scan took, and rounds spent filling gaps afterwards. */
+	readonly roundsPerScan: number | null
+	readonly gapRoundsPerScan: number | null
+	/** Of the searches scans named in their logs, the share that repeated an earlier one. */
+	readonly repeatedSearchShare: number | null
+	/**
+	 * Market runs that never answered because the reply holding their list was cut
+	 * off and nothing of it could be kept. Read off the run's own logged facts, so
+	 * null on a pass that collected none — not measured rather than none lost.
+	 */
+	readonly scansLostToExtraction: number | null
 }
 
 /** Case- and space-insensitive text, for comparing enum-ish field values. */
