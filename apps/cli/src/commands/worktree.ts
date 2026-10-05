@@ -414,10 +414,11 @@ const dropDatabase = (db: string) =>
 		),
 	)
 
-// The same image and release the storage-init sidecar uses, from the registry
-// MinIO publishes to — kept in step with docker/docker-compose.yml so a worktree
-// and the shared stack never speak to MinIO through two different clients.
-const MC_IMAGE = 'quay.io/minio/mc:RELEASE.2025-08-13T08-35-41Z'
+// The same image and release the storage-init sidecar uses, from this project's
+// own registry — kept in step with docker/docker-compose.yml so a worktree and
+// the shared stack never speak to MinIO through two different clients.
+const MC_IMAGE =
+	'ghcr.io/guillempuche/mc:RELEASE.2025-08-13T08-35-41Z@sha256:059daa5181a1d2410d7cc12cef338f61fc8c8389c069e8066f9fdef6731bd749'
 
 // The mc image's entrypoint is `mc` itself, so override it with a shell (as the
 // storage-init sidecar does) to set the alias then run one command, reaching the
