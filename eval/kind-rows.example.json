@@ -1,0 +1,83 @@
+[
+	{
+		"id": "makers-1",
+		"request": "Fabricantes de naves industriales en Cataluña: estructuras metálicas, prefabricados de hormigón, cerramientos y cubiertas.",
+		"requestKind": "makers",
+		"rows": [
+			{
+				"name": "Prefabricats Exemple, SL",
+				"describedAs": "Fabrica mòduls i panells de formigó prefabricat per a naus industrials.",
+				"websiteHost": "prefabricats.example",
+				"label": "company"
+			},
+			{
+				"name": "Estructures Metàl·liques Exemple",
+				"describedAs": "Taller de caldereria i estructures metàl·liques; fabrica i munta.",
+				"websiteHost": null,
+				"label": "company"
+			},
+			{
+				"name": "Associació de Fabricants Exemple",
+				"describedAs": "Agrupa els fabricants de prefabricats de formigó; publica el directori dels socis.",
+				"websiteHost": "associacio-fabricants.example",
+				"label": "other"
+			},
+			{
+				"name": "Naus Exemple Portal",
+				"describedAs": "Portal on comparar pressupostos de constructors de naus.",
+				"websiteHost": "portal-naus.example",
+				"label": "other"
+			},
+			{
+				"name": "Panells Exemple",
+				"describedAs": "",
+				"websiteHost": "panells.example",
+				"label": null
+			}
+		]
+	},
+	{
+		"id": "installers-1",
+		"request": "Empreses instal·ladores a la província de Girona: electricitat, fontaneria i climatització, energia solar.",
+		"requestKind": "installers",
+		"rows": [
+			{
+				"name": "Instal·lacions Exemple, SL",
+				"describedAs": "Instal·lacions elèctriques i plaques solars per a habitatges i naus.",
+				"websiteHost": "instalacions.example",
+				"label": "company"
+			},
+			{
+				"name": "Gremi d'Instal·ladors Exemple",
+				"describedAs": "Gremi provincial; els seus socis són empreses instal·ladores.",
+				"websiteHost": "gremi.example",
+				"label": "other"
+			},
+			{
+				"name": "Subministraments Exemple",
+				"describedAs": "Magatzem de material elèctric per a instal·ladors professionals.",
+				"websiteHost": "subministraments.example",
+				"label": "other"
+			}
+		]
+	},
+	{
+		"id": "signal-1",
+		"request": "Empresas de la provincia de Girona, de cualquier sector salvo la informática, que hayan publicado una oferta de técnico de sistemas.",
+		"requestKind": "signal",
+		"rows": [
+			{
+				"name": "Embotits Exemple, SA",
+				"describedAs": "Elabora embotits; busca un tècnic de sistemes per a la seva planta.",
+				"websiteHost": "embotits.example",
+				"label": "company"
+			},
+			{
+				"name": "Feina Exemple",
+				"describedAs": "Portal d'ofertes de feina on s'ha publicat l'anunci.",
+				"websiteHost": "feina.example",
+				"label": "other"
+			}
+		]
+	}
+]

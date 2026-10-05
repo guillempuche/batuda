@@ -33,6 +33,7 @@ import {
 	researchEvalContacts,
 	researchEvalInvariance,
 	researchFarmReplay,
+	researchKindReask,
 	researchProbe,
 	researchProbeConfig,
 } from './commands/research'
@@ -1326,6 +1327,32 @@ const researchFarmReplayCommand = Command.make(
 	),
 )
 
+const researchKindReaskCommand = Command.make(
+	'kind-reask',
+	{
+		rows: Flag.string('rows').pipe(
+			Flag.withDescription(
+				'Path to the labelled rows, grouped per run; a relative path is read from the repo root (JSON; see eval/kind-rows.example.json for the shape)',
+			),
+			Flag.withDefault('eval/kind-rows.json'),
+		),
+		asks: Flag.integer('asks').pipe(
+			Flag.withDescription(
+				'How many times to ask the whole file. The answers are a model’s and differ a little each time, so three askings of unchanged code give the range a change has to move a count outside of',
+			),
+			Flag.withDefault(3),
+		),
+	},
+	({ rows, asks }) => researchKindReask({ rows, asks }),
+).pipe(
+	Command.withShortDescription(
+		'Re-ask the company-of-this-kind check about rows scans already returned',
+	),
+	Command.withDescription(
+		"Put stored scan rows — the ones a run kept and the ones it removed — back to the check that decides whether a row is a company of the kind asked for, one run's list at a time as a run asks them, and score it against a person's label per row. Reports, by name, the firms of the kind asked for that it removes (the costly mistake) and the bodies, directories and portals it keeps, per sort of request, with the range over repeated askings. Calls the live extract model past the cache, so it costs a few cents and needs the research model settings and keys; it searches and fetches nothing and creates no run. Run it on unchanged code first: the range it prints is what a change has to beat. The rows are not in the repository, because they name real firms; build the file locally following eval/README.md, or point --rows at your own.",
+	),
+)
+
 const researchCommand = Command.make('research').pipe(
 	Command.withDescription('Research context tools'),
 	Command.withSubcommands([
@@ -1336,6 +1363,7 @@ const researchCommand = Command.make('research').pipe(
 		researchEvalContactsCommand,
 		researchEvalInvarianceCommand,
 		researchFarmReplayCommand,
+		researchKindReaskCommand,
 	]),
 )
 

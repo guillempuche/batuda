@@ -43,6 +43,7 @@ import {
 	goldenStem,
 	judgeOrganisationKinds,
 	type KindCandidate,
+	type KindReaskScore,
 	type MarketExpectation,
 	type MarketScore,
 	type ModelProbeResult,
@@ -51,7 +52,9 @@ import {
 	makeUsageMeter,
 	networkGuardJudge,
 	newestReportName,
+	OrganisationKindGuardVerdictsSchema,
 	OrganisationKindVerdictsSchema,
+	organisationKindGuardPrompt,
 	organisationKindPrompt,
 	outcomeFromContactRun,
 	outcomeFromRun,
@@ -59,6 +62,7 @@ import {
 	parseContactGoldenSet,
 	parseFarmCorpus,
 	parseGoldenSet,
+	parseKindCorpus,
 	placeReadOffATownPage,
 	placesNamed,
 	probeModelCapabilities,
@@ -71,12 +75,15 @@ import {
 	type RunScore,
 	type RunUsage,
 	removalAsCandidate,
+	removedFromRun,
 	researchProviderEndpoints,
 	researchToolkitWireFormat,
 	type SystemDefaults,
 	scoreContactRun,
 	scoreFarmReplay,
+	scoreKindReask,
 	scoreRun,
+	spreadOf,
 	stripReportForBaseline,
 	townPageJudge,
 	UsageMeter,
@@ -1717,3 +1724,163 @@ export const researchFarmReplay = (input: { readonly corpus: string }) =>
 			yield* Console.log(`    refused: ${name}`)
 		}
 	})
+
+/**
+ * Put rows scans already returned back to the check that decides whether a row is
+ * a company of the kind asked for, against a person's label for each row.
+ *
+ * It asks the live extract model — the check is a model's answer, so there is
+ * nothing to grade without one — and goes past the cache, since an answer read
+ * back from it is the first asking again and would make every repeat agree.
+ * Nothing is searched, nothing is fetched and no run is created.
+ *
+ * The corpus is not in the repository: it names real firms, and calling a named
+ * firm "not a company" in a shared file is a claim about that firm. The shape is
+ * `eval/kind-rows.example.json`; see `eval/README.md`.
+ */
+export const researchKindReask = (input: {
+	readonly rows: string
+	readonly asks: number
+}) =>
+	Effect.gen(function* () {
+		// Asked no times, the table below would print every sort as clean.
+		if (input.asks < 1) {
+			return yield* Effect.fail(
+				new Error(`--asks must be 1 or more, got ${input.asks}`),
+			)
+		}
+		const path = fromRepoRoot(input.rows)
+		const raw = yield* Effect.tryPromise({
+			try: () => readFile(path, 'utf8'),
+			catch: cause =>
+				new Error(`could not read the rows at ${path}: ${String(cause)}`),
+		})
+		const parsed = yield* Effect.try({
+			try: () => JSON.parse(raw) as unknown,
+			catch: cause => new Error(`${path} is not JSON: ${String(cause)}`),
+		})
+		const { runs, errors } = parseKindCorpus(parsed)
+		for (const error of errors) yield* Console.error(`skipped — ${error}`)
+		if (runs.length === 0) {
+			yield* Console.error('No runs to ask about.')
+			return
+		}
+		yield* requireLocalDatabase('research kind-reask')
+		yield* requireLiveProviders('research kind-reask', {
+			tiers: ['extract'],
+			capabilities: [],
+		})
+
+		// A judge that fell over answers for nobody, which the check reads as keep
+		// every row — the same score as a judge that found nothing to remove. So the
+		// batches it failed on are counted and said, rather than passing as clean.
+		let askedBatches = 0
+		let failedBatches = 0
+		const extract = yield* ExtractLanguageModel
+		const judge = (rows: Parameters<typeof organisationKindGuardPrompt>[0]) => {
+			askedBatches++
+			return extract
+				.generateObject({
+					schema: OrganisationKindGuardVerdictsSchema,
+					prompt: organisationKindGuardPrompt(rows),
+				})
+				.pipe(
+					Effect.map(response => ({ verdicts: response.value.verdicts })),
+					Effect.catch(() =>
+						Effect.sync(() => {
+							failedBatches++
+							return { verdicts: [] }
+						}),
+					),
+				)
+		}
+
+		const rowsTotal = runs.reduce((sum, run) => sum + run.rows.length, 0)
+		yield* Console.log(
+			`${rowsTotal} rows over ${runs.length} runs, asked ${input.asks} time(s), each run's list on its own\n`,
+		)
+
+		const askings: Array<ReturnType<typeof scoreKindReask>> = []
+		for (let asking = 1; asking <= input.asks; asking++) {
+			const removedByRun = new Map<string, ReadonlySet<string>>()
+			for (const run of runs)
+				removedByRun.set(run.id, yield* removedFromRun(run, judge))
+			askings.push(scoreKindReask(runs, removedByRun))
+		}
+
+		// Nothing answered is not a score of nought: the table would read as a check
+		// that removes nobody, and a baseline taken from it would be worthless.
+		if (askedBatches > 0 && failedBatches === askedBatches) {
+			return yield* Effect.fail(
+				new Error(
+					`the model answered none of the ${askedBatches} batch(es), so nothing was asked — check the extract tier's routing and key`,
+				),
+			)
+		}
+
+		const requestKinds = Object.keys(askings[0]?.byRequestKind ?? {}).sort()
+		const labelWidth = Math.max(
+			...['all', ...requestKinds].map(label => label.length),
+		)
+		const line = (label: string, scores: ReadonlyArray<KindReaskScore>) => {
+			const spread = spreadOf(scores)
+			const first = scores[0]
+			if (spread === null || first === undefined) return `${label}: not asked`
+			const range = (counts: { least: number; most: number }) =>
+				counts.least === counts.most
+					? `${counts.least}`
+					: `${counts.least}–${counts.most}`
+			return `${label.padEnd(labelWidth)} ${String(first.companies).padStart(4)} firms, ${String(first.others).padStart(3)} others, ${first.unlabelled} unlabelled   wrongly removed ${range(spread.wronglyRemoved)}   wrongly kept ${range(spread.wronglyKept)}`
+		}
+		yield* Console.log(
+			line(
+				'all',
+				askings.map(asking => asking.overall),
+			),
+		)
+		for (const requestKind of requestKinds) {
+			yield* Console.log(
+				line(
+					requestKind,
+					askings.flatMap(asking => asking.byRequestKind[requestKind] ?? []),
+				),
+			)
+		}
+
+		// By name, and from every asking: a count says the check is a few percent
+		// wrong, a name says which firm somebody asked for would have gone.
+		const named = (pick: (score: KindReaskScore) => ReadonlyArray<string>) => {
+			const times = new Map<string, number>()
+			for (const asking of askings)
+				for (const name of pick(asking.overall))
+					times.set(name, (times.get(name) ?? 0) + 1)
+			return [...times.entries()].sort(([a], [b]) => a.localeCompare(b))
+		}
+		const listed = (entries: ReadonlyArray<readonly [string, number]>) =>
+			entries.length === 0
+				? ['  none']
+				: entries.map(
+						([name, times]) => `  ${name}  (${times}/${input.asks} askings)`,
+					)
+		yield* Console.log('\nFirms of the kind asked for that were removed:')
+		for (const entry of listed(named(score => score.wronglyRemoved)))
+			yield* Console.log(entry)
+		yield* Console.log('\nRows that are not such firms and stayed:')
+		for (const entry of listed(named(score => score.wronglyKept)))
+			yield* Console.log(entry)
+		if (failedBatches > 0) {
+			yield* Console.error(
+				`\n${failedBatches} batch(es) got no answer from the model — their rows read as kept, so the counts above understate what the check removes.`,
+			)
+		}
+	}).pipe(
+		Effect.provide(makeResearchLlmLive),
+		Effect.provide(FetchHttpClient.layer),
+		Effect.provide(SqlLive),
+		Effect.provide(
+			ConfigProvider.layerAdd(
+				ConfigProvider.fromEnv({ env: { RESEARCH_CACHE_BYPASS: 'true' } }),
+				{ asPrimary: true },
+			),
+		),
+	)

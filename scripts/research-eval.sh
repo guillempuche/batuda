@@ -10,6 +10,8 @@
 #   scripts/research-eval.sh --env <infisical-env> --golden <file> [--runs N]
 #     [--production] [--dry-run] [--baseline] [--schema <name>] [--out <file>]
 #     [--org <id>] [--user <id>] [--concurrency N] [--show-routing]
+#   scripts/research-eval.sh --env <infisical-env> --kind-reask [--rows <file>] [--asks N]
+#     Re-ask the company-of-this-kind check about stored scan rows (eval/README.md).
 set -euo pipefail
 
 root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
@@ -17,6 +19,7 @@ cd "$root"
 
 env_name=""; golden=""; runs=3; schema=""; out=""; org=""; user=""; concurrency=1
 production=false; dry_run_only=false; baseline=false; show_routing=false
+kind_reask=false; rows=""; asks=""; pass_flags=""
 
 # Every flag that takes a value checks one is there: as the last word on the line
 # it would otherwise read an argument that does not exist, and under `set -u` that
@@ -26,23 +29,34 @@ need_value() { [ "$1" -ge 2 ] || { echo "$2 needs a value" >&2; exit 2; }; }
 while [ $# -gt 0 ]; do
 	case "$1" in
 		--env) need_value $# "$1"; env_name="$2"; shift 2 ;;
-		--golden) need_value $# "$1"; golden="$2"; shift 2 ;;
-		--runs) need_value $# "$1"; runs="$2"; shift 2 ;;
-		--schema) need_value $# "$1"; schema="$2"; shift 2 ;;
-		--out) need_value $# "$1"; out="$2"; shift 2 ;;
-		--org) need_value $# "$1"; org="$2"; shift 2 ;;
-		--user) need_value $# "$1"; user="$2"; shift 2 ;;
-		--concurrency) need_value $# "$1"; concurrency="$2"; shift 2 ;;
-		--production) production=true; shift ;;
-		--dry-run) dry_run_only=true; shift ;;
-		--baseline) baseline=true; shift ;;
+		--golden) pass_flags="$pass_flags $1"; need_value $# "$1"; golden="$2"; shift 2 ;;
+		--runs) pass_flags="$pass_flags $1"; need_value $# "$1"; runs="$2"; shift 2 ;;
+		--schema) pass_flags="$pass_flags $1"; need_value $# "$1"; schema="$2"; shift 2 ;;
+		--out) pass_flags="$pass_flags $1"; need_value $# "$1"; out="$2"; shift 2 ;;
+		--org) pass_flags="$pass_flags $1"; need_value $# "$1"; org="$2"; shift 2 ;;
+		--user) pass_flags="$pass_flags $1"; need_value $# "$1"; user="$2"; shift 2 ;;
+		--concurrency) pass_flags="$pass_flags $1"; need_value $# "$1"; concurrency="$2"; shift 2 ;;
+		--production) pass_flags="$pass_flags $1"; production=true; shift ;;
+		--dry-run) pass_flags="$pass_flags $1"; dry_run_only=true; shift ;;
+		--baseline) pass_flags="$pass_flags $1"; baseline=true; shift ;;
 		--show-routing) show_routing=true; shift ;;
-		-h|--help) sed -n '9,12p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;;
+		--kind-reask) kind_reask=true; shift ;;
+		--rows) need_value $# "$1"; rows="$2"; shift 2 ;;
+		--asks) need_value $# "$1"; asks="$2"; shift 2 ;;
+		-h|--help) sed -n '9,14p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;;
 		*) echo "unknown argument: $1" >&2; exit 2 ;;
 	esac
 done
-if [ -z "$env_name" ] || [ -z "$golden" ]; then echo "--env and --golden are required" >&2; exit 2; fi
-if [ ! -f "$golden" ]; then echo "golden file not found: $golden" >&2; exit 2; fi
+if [ -z "$env_name" ]; then echo "--env is required" >&2; exit 2; fi
+if [ "$kind_reask" = false ]; then
+	if [ -n "$rows" ] || [ -n "$asks" ]; then echo "--rows and --asks belong to --kind-reask" >&2; exit 2; fi
+	if [ -z "$golden" ]; then echo "--golden is required (or --kind-reask)" >&2; exit 2; fi
+	if [ ! -f "$golden" ]; then echo "golden file not found: $golden" >&2; exit 2; fi
+# A pass flag beside --kind-reask would be dropped without a word, and the pass
+# somebody meant to start would never run.
+elif [ -n "$pass_flags" ]; then
+	echo "--kind-reask takes only --env, --rows, --asks and --show-routing; not$pass_flags" >&2; exit 2
+fi
 
 # The database is always this checkout's own, under every Infisical environment:
 # a dev environment ships a DATABASE_URL of its own and would otherwise win.
@@ -62,6 +76,32 @@ if [ "${#routing[@]}" -eq 0 ]; then echo "no RESEARCH_* routing in apps/server/c
 # Names only. A value is never a secret here, but the habit of not printing the
 # environment is what keeps a key out of a log.
 if [ "$show_routing" = true ]; then printf 'routing carried in:'; printf ' %s' ${routing[@]+"${routing[@]%%=*}"}; printf '\n'; fi
+
+# The one place the committed routing and the local database are laid over the keys.
+run_it() {
+	# DATABASE_URL is laid on here, after `infisical run`, on purpose: exported
+	# before it, the dev environment's own value would displace it. It is this
+	# machine's local dev credential, not a vault secret.
+	# The ${a[@]+"${a[@]}"} spelling keeps an empty array from ending the script
+	# under `set -u` on the bash macOS ships (3.2).
+	nix develop --command infisical run "--env=$env_name" -- \
+		env ${routing[@]+"${routing[@]}"} ${extra[@]+"${extra[@]}"} \
+		"DATABASE_URL=$db_url" "$@"
+}
+
+# The re-ask is one question to the extract model about rows already written down:
+# it needs the routing, the keys and the local database (the model cache lives
+# there, and is gone past), and nothing else a pass needs.
+if [ "$kind_reask" = true ]; then
+	extra=()
+	reask=(pnpm cli research kind-reask)
+	if [ -n "$rows" ]; then reask+=(--rows "$rows"); fi
+	if [ -n "$asks" ]; then reask+=(--asks "$asks"); fi
+	log="eval/kind-reask-$(date +%Y-%m-%d-%H%M).log"
+	run_it "${reask[@]}" 2>&1 | tee "$log"
+	echo "log: $log"
+	exit 0
+fi
 
 # Org and user are seeded with generated ids, so they are read rather than typed.
 if { [ -z "$org" ] || [ -z "$user" ]; } && ! command -v psql >/dev/null; then
@@ -98,18 +138,6 @@ if [ -n "$schema" ]; then cli+=(--schema "$schema"); fi
 # Registries and the tiers this environment holds no key for go off for a comparison
 # pass, so a contact number cannot come from a source the change has nothing to do with.
 if [ "$production" = false ]; then cli+=(--quality); fi
-
-# The one place the committed routing and the local database are laid over the keys.
-run_it() {
-	# DATABASE_URL is laid on here, after `infisical run`, on purpose: exported
-	# before it, the dev environment's own value would displace it. It is this
-	# machine's local dev credential, not a vault secret.
-	# The ${a[@]+"${a[@]}"} spelling keeps an empty array from ending the script
-	# under `set -u` on the bash macOS ships (3.2).
-	nix develop --command infisical run "--env=$env_name" -- \
-		env ${routing[@]+"${routing[@]}"} ${extra[@]+"${extra[@]}"} \
-		"DATABASE_URL=$db_url" "$@"
-}
 
 # The free pre-flight always runs first: the database is local, no tier would answer
 # with canned data, every golden row parses, every vendor is reachable — and it is
