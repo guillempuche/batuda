@@ -450,3 +450,74 @@ const score = scoreFarmReplay(rows, townPageJudge({ reads: placeReadOffATownPage
 ```
 
 For a rule of your own, write a `FarmJudge` — handed the whole list, answering by id. A rule that really does read one row at a time is lifted with `rowByRow` and loses nothing. A row your answer leaves out is kept, so a rule that reaches no conclusion is never read as reaching one.
+
+## Re-asking the company-of-this-kind check, offline
+
+A scan removes rows that are not companies of the kind asked for — trade bodies, directories, portals, suppliers to the trade. The check that decides is one question to a model about rows already written down, and a market pass is the wrong tool for changing it: half an hour a run, real money, and more movement from one run to the next than most changes to the check produce. So the rows are put back to the check on their own: `packages/research/src/application/eval-kind-reask.ts`.
+
+### The rows
+
+Copy `kind-rows.example.json` to your own `kind-rows.json`. It is a list of runs; each run carries the request it answered, what sort of request that was, and **every row the check saw — the ones the run kept and the ones it removed**:
+
+```json
+{
+  "id": "makers-1",
+  "request": "Fabricantes de naves industriales en Cataluña: estructuras metálicas, prefabricados de hormigón…",
+  "requestKind": "makers",
+  "rows": [
+    { "name": "Prefabricats Exemple, SL", "describedAs": "Fabrica mòduls de formigó prefabricat…", "websiteHost": "prefabricats.example", "label": "company" },
+    { "name": "Associació de Fabricants Exemple", "describedAs": "Agrupa els fabricants…", "websiteHost": null, "label": "other" },
+    { "name": "Panells Exemple", "describedAs": "", "websiteHost": "panells.example", "label": null }
+  ]
+}
+```
+
+- `requestKind` — a word of your own for the sort of question (`installers`, `makers`, `engineering`, `signal`). The score is read per sort.
+- `describedAs` — the row's own words **exactly as the check reads them**: `why_relevant`, then `description`, then `industry`, whichever the row has, joined with " · " (a middle dot with a space either side). Take `why_relevant` alone and a row that also states its industry is re-asked on half of what the run asked it on. Empty when the row wrote none of the three, but never left out.
+- `websiteHost` — the bare host the row gave, lower-case, with no `www.` and no path (`acme.example`), or `null`. Anything else is refused when the file is read, because the check could not read it and the row would be asked without its site.
+- `label` — `company` for a firm of the kind the request asked for, `other` for a body, a directory, a portal or a firm that only sells to that kind, `null` until somebody has read about the firm. An unlabelled row is still asked — it shares a batch with the others, and which rows share a batch changes the answers — and is scored nowhere.
+
+To build it, dump the runs with `get_research`. The rows a run kept are its `prospects` (`name`, the three description fields joined as above, the host of the unwrapped `website`); the rows it removed are under `quality.not_companies`, which keeps `name`, `describedAs` already joined and `websiteHost` already bare. Both go in: a file of kept rows alone can only ever show bodies the check let through, never the firms it took off.
+
+**The label is a person's, read off the firm's own site.** One written by the model under test, or by whoever wrote the wording under test without opening the site, measures agreement and nothing else. Label for the request, not in general: a wholesaler of electrical material is `other` on an installers' list and `company` on a list that asked for wholesalers.
+
+**Hold a third of the runs out.** Tune a wording against two thirds and read the last third once, at the end. A wording adjusted until the rows it was adjusted on come out right has been fitted to those rows.
+
+The file names real firms, and calling a named firm "not a company" in a shared file is a claim about that firm, so it stays out of git — `.gitignore` covers `eval/*.json` and spares the `.example` templates, whose firms are all made up.
+
+### Running it
+
+```bash
+scripts/research-eval.sh --env dev --kind-reask
+```
+
+or, with the routing and keys already in the environment, `pnpm cli research kind-reask` (`--rows` for another file, `--asks` for how many askings; both are described under `--help`). It reads `eval/kind-rows.json`, asks the check that ships — the pipeline's own function, prompt and batches of 25 sorted by name, **one run's list at a time** — and prints the two mistakes by name. Against the shared template (`--rows eval/kind-rows.example.json --asks 2`) it printed, on the day this was written:
+
+```
+10 rows over 3 runs, asked 2 time(s), each run's list on its own
+
+all               4 firms,   5 others, 1 unlabelled   wrongly removed 0   wrongly kept 0
+installers        1 firms,   2 others, 0 unlabelled   wrongly removed 0   wrongly kept 0
+makers            2 firms,   2 others, 1 unlabelled   wrongly removed 0   wrongly kept 0
+signal            1 firms,   1 others, 0 unlabelled   wrongly removed 0   wrongly kept 0
+
+Firms of the kind asked for that were removed:
+  none
+
+Rows that are not such firms and stayed:
+  none
+```
+
+The template's rows are written to be easy, so nought is what it should read; real rows are not. A count that moved between askings prints as a range (`1–2`), and each mistake is named beneath with its run and how many of the askings made it — `makers-1: Prefabricats Exemple, SL  (3/3 askings)`.
+
+**Wrongly removed** is the costly mistake — a firm somebody paid to find, taken off the list with nothing said. **Wrongly kept** is the cheap one: a trade body a reader skips. A single accuracy figure hides both, in the direction that flatters a check which simply removes a lot.
+
+It calls the live extract model, so it needs the same routing and keys as a pass and costs a few cents; it searches nothing, fetches nothing and creates no run. It goes **past the model cache** on purpose: an answer read back from the cache is the first asking again, and three askings that are one asking agree perfectly about nothing. A batch the model failed on reads as "remove nobody" — the check fails open, as it does in a run — so failed batches are counted and said at the end rather than passing as a clean score, and a run in which **every** batch failed prints no table at all and exits with an error: nothing was asked, and a score of nought taken from it would be a baseline of nothing.
+
+### Reading it
+
+**Run it on unchanged code first, three askings.** The answers are a model's and move a little between askings; the range printed (`1–2`) is that movement. A change to the check has shown something only when it moves a count **outside** the range unchanged code gives. Inside it, nothing was measured.
+
+Read each sort of request on its own line. The reason the file is grouped that way is that the fixes pull against each other: a sentence that keeps manufacturers on a makers' list is one careless word from keeping suppliers on an installers' list, and the `all` line would show the two cancelling out.
+
+**What it cannot say** is what a wrong removal costs the rest of a run. A firm taken off in the first round is not there to have its website and headcount filled in the rounds after, and a removed name can come back under another spelling; neither shows in a list that is already finished. A change that looks free here is still owed one real run.

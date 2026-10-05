@@ -75,6 +75,17 @@ export {
 	type FramingOutcome,
 } from './application/eval-invariance'
 export {
+	type KindLabel,
+	type KindReaskScore,
+	type KindRow,
+	type KindRun,
+	parseKindCorpus,
+	parseKindRun,
+	removedFromRun,
+	scoreKindReask,
+	spreadOf,
+} from './application/eval-kind-reask'
+export {
 	judgeOrganisationKinds,
 	type KindCandidate,
 	type KindMethod,
@@ -119,6 +130,10 @@ export {
 	type NetworkGuardResult,
 	placesNamed,
 } from './application/network-guard'
+export {
+	OrganisationKindGuardVerdictsSchema,
+	organisationKindGuardPrompt,
+} from './application/organisation-kind-guard'
 export {
 	type PerRunOverrides,
 	resolvePolicy,
