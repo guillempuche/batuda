@@ -88,7 +88,7 @@ scripts/research-eval.sh --env dev --kind-reask            # eval/kind-rows.json
 scripts/research-eval.sh --env dev --kind-reask --rows eval/kind-rows.example.json --asks 2
 ```
 
-It costs a few cents, takes under a minute, goes past the model cache on purpose, and asks each run's list on its own in the pipeline's own batches. The procedure that keeps it honest:
+It costs a few cents, takes about a minute per asking of a 200-row file (so run the default three in the background), goes past the model cache on purpose, and asks each run's list on its own in the pipeline's own batches. The procedure that keeps it honest:
 
 1. **Unchanged code first, three askings.** The range it prints per count is the movement of the model alone; a change has shown something only when it moves a count outside that range.
 2. **Read each sort of request on its own line** (`installers`, `makers`, `signal`…). A wording that keeps the makers is one careless word from keeping suppliers on an installers' list, and the `all` line shows the two cancelling out.
