@@ -32,7 +32,7 @@ It does everything a pass needs to get right:
 - runs the free `--dry-run` pre-flight first and stops if it fails, pricing it from `eval/reports/<golden-stem>` when that folder exists;
 - prints where the report and the log went.
 
-Flags: `--env <infisical-env> --golden <file> [--runs N] [--production] [--dry-run] [--baseline] [--schema <name>] [--out <file>] [--org <id>] [--user <id>] [--concurrency N] [--show-routing]`.
+Flags: `--env <infisical-env> --golden <file> [--runs N] [--production] [--dry-run] [--baseline] [--schema <name>] [--out <file>] [--org <id>] [--user <id>] [--concurrency N] [--show-routing]`. A second mode, `--env <infisical-env> --kind-reask [--rows <file>] [--asks N]`, is described further down.
 
 Run it in the background — a pass outlives the foreground limit — and read the report when it lands.
 
@@ -76,6 +76,26 @@ For a change to a guard, read the printed **Guard drops** section and the per-ru
 Those are every number a run logs under a `research.` line, keyed `<line>.<field>` — the citation guard's `total`/`kept`, the contact rescue's `before`/`after`, the source-tier cap, the vocabulary mapping, the own-site verdict, and, on the runs where they fire, the drop counts of the scalar guard (`research.fields.ungrounded.dropped_*`), the website guard, the contact and value guards, and the prospect guards. Nothing is named in the eval's code, so a guard line added on the pipeline branch flows through once merged. The run's own closing `research.run` line is left out: its cost and tokens are already in `usage`. A guard whose counts only reach a span attribute does not appear at all — an absent line means "not logged", not "did not fire".
 
 Read credits from the per-run rows (`runs[].usage.creditsUsed`), not from the printed average.
+
+**A market pass has no grounding figure**, so its control is what the runs did: market runs lost (and how many of those to a reply cut off), rows per market, rounds per market and the guard drops. If those moved a long way between two sides, the sides did not meet the same web. Beside the kind and coverage figures it also prints what the list is worth to whoever works through it — rows with their own site, with a headcount, with a place narrower than the request's, and the known firms no run listed, by name. The last two need `placeWords` and `knownCompanies` on the golden row; `eval/README.md` → "What the list is worth to whoever works through it".
+
+## A change to the company-of-this-kind check: re-ask, do not re-scan
+
+The check that removes trade bodies, directories and portals from a scan's list is one model question about rows already written down. A market pass is the wrong tool for a change to it — half an hour a run, and more movement between two runs than most wordings produce. Re-ask stored rows instead:
+
+```bash
+scripts/research-eval.sh --env dev --kind-reask            # eval/kind-rows.json, three askings
+scripts/research-eval.sh --env dev --kind-reask --rows eval/kind-rows.example.json --asks 2
+```
+
+It costs a few cents, takes under a minute, goes past the model cache on purpose, and asks each run's list on its own in the pipeline's own batches. The procedure that keeps it honest:
+
+1. **Unchanged code first, three askings.** The range it prints per count is the movement of the model alone; a change has shown something only when it moves a count outside that range.
+2. **Read each sort of request on its own line** (`installers`, `makers`, `signal`…). A wording that keeps the makers is one careless word from keeping suppliers on an installers' list, and the `all` line shows the two cancelling out.
+3. **Tune on two thirds of the runs, read the held-out third once.**
+4. **Then one real run.** The re-ask cannot show what a wrong removal costs the rounds after it.
+
+`eval/kind-rows.json` is built by hand from `get_research` dumps (kept rows from `prospects`, with `why_relevant`, `description` and `industry` joined by " · " (a middle dot with a space either side) as the check reads them; removed ones from `quality.not_companies`, stored that way already) and labelled by a person who opened the firm's site. It names real firms, so it is git-ignored and never pasted into a PR, an issue or a commit message. A batch the model failed on reads as "remove nobody"; the command counts those and says so at the end — a run that ends with that line is not a score — and when every batch failed it prints no table and exits with an error.
 
 ## Guardrails that survive
 
