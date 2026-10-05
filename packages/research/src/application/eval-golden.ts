@@ -28,6 +28,7 @@ import {
 	SCORABLE_FIELDS,
 	type ScorableField,
 } from './eval-scoring'
+import { isSocialPlatformHost } from './social-sites'
 import { termTokens } from './term-match'
 
 /**
@@ -110,6 +111,14 @@ const parseKnownCompanies = (raw: unknown): KnownCompaniesParseResult => {
 			return {
 				ok: false,
 				error: `knownCompanies entry "${name}" needs a host written bare and lower-case ("acme.example"), or null for a firm with no site of its own`,
+			}
+		}
+		// A social page is never read as a firm's own site, so a host there could
+		// never match and the firm would be found by name alone; null says that.
+		if (host !== null && isSocialPlatformHost(host)) {
+			return {
+				ok: false,
+				error: `knownCompanies entry "${name}" gives a social platform as its host; a page there is not the firm's own site, so write null`,
 			}
 		}
 		const from = entry?.['from']

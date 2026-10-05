@@ -238,7 +238,7 @@ Two optional keys on the `market` block feed the two figures that need a person'
 ```
 
 - `placeWords` — the asked place's own names **and everything wider**: the province, the region, the country, in each language the rows answer in. Accents and case are set aside, as they are for `terms`. A row's place is narrower when it holds a word outside these of four letters or more, or a number — so "Província de Girona" says nothing new and "Figueres" or "17600" does. The cost of that rule is a town of three letters written with nothing beside it, which reads as the request said again — and so does a town that shares its name with the asked place. A row in Girona the city, written as "Girona" and nothing else, cannot be told from one that only repeated the province, so in a market named after its capital the figure reads low by however many rows sit in that capital. Leave the key out and the figure is not read for that market; an empty array is refused.
-- `knownCompanies` — firms you found yourself in about ten minutes of plain searching. `host` is the firm's own site written bare and lower-case (`acme.example`, no `www.`, no path), or `null` for a firm with none; `from` says where you found it and is required. A firm counts as listed when a row gives that host as its own site, or carries the same name once the legal form is off the end. Anything the scorer could not match is refused when the file is read, since it would count as missed on every pass.
+- `knownCompanies` — firms you found yourself in about ten minutes of plain searching. `host` is the firm's own site written bare and lower-case (`acme.example`, no `www.`, no path), or `null` for a firm with none — a page on a social platform counts as none, and is refused as a host; `from` says where you found it and is required. A firm counts as listed when a row gives that host as its own site, or carries the same name once the legal form is off the end. Anything the scorer could not match is refused when the file is read, since it would count as missed on every pass.
 
 **Read "known firms listed" as reach, never as recall.** The list was made by searching, so it holds the firms a search finds — that is what `from` is for, and why it is required. The question it answers is "does a run reach what a person reaches in ten minutes", which is the floor a paid scan has to clear; it says nothing of the firms nobody's search turns up. A firm counts as listed when **any** run of the pass listed it, so the figure belongs to the pass and not to a run.
 
@@ -496,10 +496,10 @@ or, with the routing and keys already in the environment, `pnpm cli research kin
 ```
 10 rows over 3 runs, asked 2 time(s), each run's list on its own
 
-all               4 firms,   5 others, 1 unlabelled   wrongly removed 0   wrongly kept 0
-installers        1 firms,   2 others, 0 unlabelled   wrongly removed 0   wrongly kept 0
-makers            2 firms,   2 others, 1 unlabelled   wrongly removed 0   wrongly kept 0
-signal            1 firms,   1 others, 0 unlabelled   wrongly removed 0   wrongly kept 0
+all           4 firms,   5 others, 1 unlabelled   wrongly removed 0   wrongly kept 0
+installers    1 firms,   2 others, 0 unlabelled   wrongly removed 0   wrongly kept 0
+makers        2 firms,   2 others, 1 unlabelled   wrongly removed 0   wrongly kept 0
+signal        1 firms,   1 others, 0 unlabelled   wrongly removed 0   wrongly kept 0
 
 Firms of the kind asked for that were removed:
   none

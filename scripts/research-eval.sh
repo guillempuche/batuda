@@ -10,7 +10,7 @@
 #   scripts/research-eval.sh --env <infisical-env> --golden <file> [--runs N]
 #     [--production] [--dry-run] [--baseline] [--schema <name>] [--out <file>]
 #     [--org <id>] [--user <id>] [--concurrency N] [--show-routing]
-#   scripts/research-eval.sh --env <infisical-env> --kind-reask [--rows <file>] [--asks N]
+#   scripts/research-eval.sh --env <infisical-env> --kind-reask [--rows <file>] [--asks N] [--show-routing]
 #     Re-ask the company-of-this-kind check about stored scan rows (eval/README.md).
 set -euo pipefail
 
@@ -97,10 +97,12 @@ if [ "$kind_reask" = true ]; then
 	reask=(pnpm cli research kind-reask)
 	if [ -n "$rows" ]; then reask+=(--rows "$rows"); fi
 	if [ -n "$asks" ]; then reask+=(--asks "$asks"); fi
-	log="eval/kind-reask-$(date +%Y-%m-%d-%H%M).log"
-	run_it "${reask[@]}" 2>&1 | tee "$log"
+	log="eval/kind-reask-$(date +%Y-%m-%d-%H%M%S).log"
+	# The log's path is printed whatever the re-ask's exit status: a failed run is
+	# the one somebody will want to read.
+	if run_it "${reask[@]}" 2>&1 | tee "$log"; then reask_status=0; else reask_status=$?; fi
 	echo "log: $log"
-	exit 0
+	exit "$reask_status"
 fi
 
 # Org and user are seeded with generated ids, so they are read rather than typed.

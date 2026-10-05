@@ -111,6 +111,17 @@ describe('parseKindRun', () => {
 					{ ...makers, rows: [firstRow, { ...firstRow, label: 'other' }] },
 					'twice',
 				],
+				[
+					'one firm twice, under two spellings of its legal form',
+					{
+						...makers,
+						rows: [
+							{ ...firstRow, name: 'Prefabricats Exemple, S.L.' },
+							{ ...firstRow, name: 'PREFABRICATS EXEMPLE SL', label: 'other' },
+						],
+					},
+					'twice',
+				],
 			]
 
 			for (const [what, run, named] of wrong) {
