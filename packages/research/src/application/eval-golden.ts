@@ -22,6 +22,7 @@ import {
 	GOLDEN_BUCKETS,
 	type GoldenBucket,
 	type GoldenExpectation,
+	type KnownCompany,
 	type MarketExpectation,
 	type MarketPart,
 	SCORABLE_FIELDS,
@@ -64,6 +65,64 @@ const parseExpectedOutput = (raw: unknown): Record<string, unknown> | null => {
 
 const isStringArray = (value: unknown): value is ReadonlyArray<string> =>
 	Array.isArray(value) && value.every(item => typeof item === 'string')
+
+type KnownCompaniesParseResult =
+	| {
+			readonly ok: true
+			readonly value: ReadonlyArray<KnownCompany> | undefined
+	  }
+	| { readonly ok: false; readonly error: string }
+
+// A host as the scorer compares it: no scheme, no `www.`, no path, lower-case.
+// Anything that is not one — an address with a path, a sentence — is refused
+// rather than tidied, since a host nobody can match reads as a firm never found.
+const BARE_HOST = /^(?!www\.)[a-z0-9-]+(\.[a-z0-9-]+)+$/
+
+export const isBareHost = (value: unknown): value is string =>
+	typeof value === 'string' && BARE_HOST.test(value)
+
+/**
+ * The firms a market row names as known to exist. Absent is fine and means none
+ * are written down; present, every entry has to be usable, because a firm the
+ * scorer cannot match would count as missed on every pass.
+ */
+const parseKnownCompanies = (raw: unknown): KnownCompaniesParseResult => {
+	if (raw === undefined) return { ok: true, value: undefined }
+	if (!Array.isArray(raw) || raw.length === 0) {
+		return {
+			ok: false,
+			error:
+				'knownCompanies must be a non-empty array (leave the key out when no firms are written down)',
+		}
+	}
+	const known: Array<KnownCompany> = []
+	for (const item of raw) {
+		const entry = asRecord(item)
+		const name = entry?.['name']
+		if (typeof name !== 'string' || termTokens(name).length === 0) {
+			return {
+				ok: false,
+				error: 'each knownCompanies entry needs a name this eval can read',
+			}
+		}
+		const host = entry?.['host']
+		if (host !== null && !isBareHost(host)) {
+			return {
+				ok: false,
+				error: `knownCompanies entry "${name}" needs a host written bare and lower-case ("acme.example"), or null for a firm with no site of its own`,
+			}
+		}
+		const from = entry?.['from']
+		if (typeof from !== 'string' || from.trim() === '') {
+			return {
+				ok: false,
+				error: `knownCompanies entry "${name}" needs a from saying where the firm was found`,
+			}
+		}
+		known.push({ name: name.trim(), host, from: from.trim() })
+	}
+	return { ok: true, value: known }
+}
 
 type MarketParseResult =
 	| { readonly ok: true; readonly value: MarketExpectation }
@@ -147,7 +206,41 @@ const parseMarket = (raw: unknown): MarketParseResult => {
 		}
 	}
 
-	return { ok: true, value: { name, parts, notCompanies } }
+	const knownCompanies = parseKnownCompanies(market['knownCompanies'])
+	if (!knownCompanies.ok) return knownCompanies
+
+	const placeWords = market['placeWords']
+	if (placeWords !== undefined) {
+		if (!isStringArray(placeWords) || placeWords.length === 0) {
+			return {
+				ok: false,
+				error:
+					"placeWords must be a non-empty array of the asked place's own names (leave the key out when none are written down)",
+			}
+		}
+		const unreadableWord = placeWords.find(
+			word => termTokens(word).length === 0,
+		)
+		if (unreadableWord !== undefined) {
+			return {
+				ok: false,
+				error: `a placeWords entry this eval cannot read: ${unreadableWord}`,
+			}
+		}
+	}
+
+	return {
+		ok: true,
+		value: {
+			name,
+			parts,
+			notCompanies,
+			...(knownCompanies.value !== undefined
+				? { knownCompanies: knownCompanies.value }
+				: {}),
+			...(isStringArray(placeWords) ? { placeWords } : {}),
+		},
+	}
 }
 
 /** Validate one raw row into a `GoldenExpectation`, or explain why it can't be. */

@@ -194,6 +194,14 @@ describe('evalSummaryAttributes', () => {
 				rowsPerScan: null,
 				callsByModel: {},
 				cascadedRunRate: 0,
+				websiteRate: null,
+				headcountFill: null,
+				narrowerPlaceRate: null,
+				knownCompanies: null,
+				roundsPerScan: null,
+				gapRoundsPerScan: null,
+				repeatedSearchShare: null,
+				scansLostToExtraction: null,
 			})
 
 			// WHEN flattened — THEN each top-line rate is present
@@ -249,6 +257,14 @@ describe('evalSummaryAttributes', () => {
 				rowsPerScan: null,
 				callsByModel: {},
 				cascadedRunRate: null,
+				websiteRate: null,
+				headcountFill: null,
+				narrowerPlaceRate: null,
+				knownCompanies: null,
+				roundsPerScan: null,
+				gapRoundsPerScan: null,
+				repeatedSearchShare: null,
+				scansLostToExtraction: null,
 			})
 
 			// WHEN flattened — THEN each null rate is left off, not charted as zero
@@ -329,6 +345,15 @@ describe('reporting a pass that held market requests', () => {
 				partsAnswered: 1,
 				reportedCoverage: null,
 				searchingStopped: null,
+				listUse: {
+					rowsWithWebsite: 0,
+					rowsWithHeadcount: 0,
+					rowsPlacedNarrower: null,
+					knownFound: [],
+					knownMissed: [],
+				},
+				searching: { rounds: null, gapRounds: null },
+				searches: null,
 				...over,
 			},
 		})
@@ -532,6 +557,14 @@ describe('reporting a pass that held market requests', () => {
 			creditsPerRun: null,
 			callsByModel: {},
 			cascadedRunRate: null,
+			websiteRate: null,
+			headcountFill: null,
+			narrowerPlaceRate: null,
+			knownCompanies: null,
+			roundsPerScan: null,
+			gapRoundsPerScan: null,
+			repeatedSearchShare: null,
+			scansLostToExtraction: null,
 			...over,
 		})
 
@@ -575,6 +608,41 @@ describe('reporting a pass that held market requests', () => {
 			expect(attrs['eval.rows_per_scan']).toBe(62)
 		})
 
+		it('should carry what the lists are worth as counts and shares, never as names', () => {
+			// GIVEN a market pass that measured all of it
+			const attrs = evalSummaryAttributes(
+				summary({
+					websiteRate: 0.5,
+					headcountFill: 0.1,
+					narrowerPlaceRate: 0.4,
+					knownCompanies: {
+						found: [
+							{ market: 'ES', name: 'Vall' },
+							{ market: 'ES', name: 'Electer' },
+						],
+						missed: [{ market: 'ES', name: 'Rivas' }],
+					},
+					roundsPerScan: 9,
+					gapRoundsPerScan: 4,
+					repeatedSearchShare: 0.25,
+					scansLostToExtraction: 0,
+				}),
+			)
+
+			// THEN each figure is there, a nought included
+			expect(attrs['eval.website_rate']).toBe(0.5)
+			expect(attrs['eval.headcount_fill']).toBe(0.1)
+			expect(attrs['eval.narrower_place_rate']).toBe(0.4)
+			expect(attrs['eval.known_companies_listed']).toBe(2)
+			expect(attrs['eval.known_companies_missed']).toBe(1)
+			expect(attrs['eval.rounds_per_scan']).toBe(9)
+			expect(attrs['eval.gap_rounds_per_scan']).toBe(4)
+			expect(attrs['eval.repeated_search_share']).toBe(0.25)
+			expect(attrs['eval.scans_lost_to_extraction']).toBe(0)
+			// AND no firm's name rides a span
+			expect(JSON.stringify(attrs)).not.toContain('Rivas')
+		})
+
 		it('should omit every market rate on a pass that held no market', () => {
 			// GIVEN an ordinary pass of company profiles
 			const attrs = evalSummaryAttributes(summary({ groundingAccuracy: 1 }))
@@ -585,6 +653,9 @@ describe('reporting a pass that held market requests', () => {
 			expect('eval.duplicate_rate' in attrs).toBe(false)
 			expect('eval.location_fill' in attrs).toBe(false)
 			expect('eval.rows_per_scan' in attrs).toBe(false)
+			expect('eval.website_rate' in attrs).toBe(false)
+			expect('eval.known_companies_listed' in attrs).toBe(false)
+			expect('eval.scans_lost_to_extraction' in attrs).toBe(false)
 		})
 	})
 

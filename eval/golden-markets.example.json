@@ -202,5 +202,256 @@
 				]
 			}
 		}
+	},
+	{
+		"id": "cat-industrial-building-makers",
+		"query": "Fabricantes de naves industriales en Cataluña: estructuras metálicas, prefabricados de hormigón, y cerramientos y cubiertas industriales. Para cada empresa: web, municipio y número de empleados si consta.",
+		"expectedOutput": {
+			"market": {
+				"name": "ES-CT makers",
+				"parts": [
+					{
+						"id": "metal-structures",
+						"terms": [
+							"estructura metalica",
+							"estructuras metalicas",
+							"estructures metal",
+							"construccion metalica",
+							"construccions metal",
+							"caldereria",
+							"steel structure"
+						]
+					},
+					{
+						"id": "precast-concrete",
+						"terms": [
+							"prefabricado",
+							"prefabricat",
+							"hormigon",
+							"formigo",
+							"precast"
+						]
+					},
+					{
+						"id": "cladding-roofing",
+						"terms": [
+							"cerramiento",
+							"tancament",
+							"cubierta",
+							"coberta",
+							"panel sandwich",
+							"fachada",
+							"facana",
+							"cladding"
+						]
+					}
+				],
+				"notCompanies": [
+					"ANDECE",
+					"Asociacion Nacional de la Industria del Prefabricado de Hormigon",
+					"ASCEM",
+					"Asociacion para la Construccion de Estructuras Metalicas",
+					"Gremi de Constructors d'Obres de Barcelona i Comarques",
+					"Unio Patronal Metal·lurgica"
+				],
+				"placeWords": [
+					"Catalunya",
+					"Cataluna",
+					"Catalonia",
+					"Espana",
+					"Espanya",
+					"Spain"
+				],
+				"knownCompanies": [
+					{
+						"name": "Prefabricats Exemple, SL",
+						"host": "prefabricats.example",
+						"from": "page one of a plain web search for \"prefabricats de formigó naus industrials\""
+					},
+					{
+						"name": "Estructures Metàl·liques Exemple",
+						"host": null,
+						"from": "the members page of the makers' trade body; it has no site of its own"
+					}
+				]
+			}
+		}
+	},
+	{
+		"id": "cat-industrial-engineering",
+		"query": "Ingenierías en Cataluña que proyectan naves e instalaciones industriales: ingeniería industrial, dirección de obra y legalización de actividades. Entre 5 y 250 empleados. Para cada empresa: web, municipio y número de empleados si consta.",
+		"expectedOutput": {
+			"market": {
+				"name": "ES-CT engineering",
+				"parts": [
+					{
+						"id": "industrial-engineering",
+						"terms": [
+							"ingenieria",
+							"enginyeria",
+							"ingenieros",
+							"enginyers",
+							"engineering"
+						]
+					},
+					{
+						"id": "site-management",
+						"terms": [
+							"direccion de obra",
+							"direccio d obra",
+							"direccion facultativa",
+							"direccio facultativa",
+							"project management"
+						]
+					},
+					{
+						"id": "permits",
+						"terms": [
+							"legalizacion",
+							"legalitzacio",
+							"licencia de actividad",
+							"llicencia d activitat",
+							"licencia ambiental",
+							"llicencia ambiental"
+						]
+					}
+				],
+				"notCompanies": [
+					"Col·legi d'Enginyers Industrials de Catalunya",
+					"Enginyers Industrials de Catalunya",
+					"ASINCA",
+					"TECNIBERIA",
+					"Consejo General de Colegios Oficiales de Ingenieros Industriales"
+				],
+				"placeWords": [
+					"Catalunya",
+					"Cataluna",
+					"Catalonia",
+					"Espana",
+					"Espanya",
+					"Spain"
+				]
+			}
+		}
+	},
+	{
+		"id": "girona-in-house-it-signal",
+		"query": "Empresas de la provincia de Girona, de cualquier sector salvo la informática, con 10 o más empleados, que hayan publicado una oferta de empleo de técnico de sistemas, administrador de sistemas o responsable de informática. Para cada empresa: web, municipio, sector y la oferta encontrada.",
+		"expectedOutput": {
+			"market": {
+				"name": "ES-GI signal",
+				"parts": [
+					{
+						"id": "systems-job-ad",
+						"terms": [
+							"tecnico de sistemas",
+							"tecnic de sistemes",
+							"administrador de sistemas",
+							"administrador de sistemes",
+							"responsable de informatica",
+							"responsable d informatica",
+							"responsable it",
+							"sysadmin",
+							"it manager"
+						]
+					}
+				],
+				"notCompanies": [
+					"Cambra de Comerc de Girona",
+					"FOEG",
+					"Federacio d'Organitzacions Empresarials de Girona",
+					"PIMEC",
+					"InfoJobs",
+					"LinkedIn"
+				],
+				"placeWords": [
+					"Girona",
+					"Gerona",
+					"provincia de Girona",
+					"comarques gironines",
+					"Catalunya",
+					"Cataluna",
+					"Catalonia",
+					"Espana",
+					"Espanya",
+					"Spain"
+				]
+			}
+		}
+	},
+	{
+		"id": "girona-installations",
+		"query": "Empreses instal·ladores a la província de Girona: electricitat, fontaneria i climatització, i energia solar. Per a cada empresa: web, municipi i nombre de treballadors si consta.",
+		"expectedOutput": {
+			"market": {
+				"name": "ES-GI installers",
+				"parts": [
+					{
+						"id": "electrical",
+						"terms": [
+							"instal lacions electriques",
+							"installacions electriques",
+							"instal lador electric",
+							"electricista",
+							"electricitat",
+							"instalacion electrica",
+							"instalaciones electricas",
+							"electricidad"
+						]
+					},
+					{
+						"id": "plumbing-heating",
+						"terms": [
+							"fontaneria",
+							"lampisteria",
+							"lampista",
+							"climatitzacio",
+							"climatizacion",
+							"calefaccio",
+							"calefaccion"
+						]
+					},
+					{
+						"id": "solar",
+						"terms": [
+							"fotovoltaic",
+							"energia solar",
+							"plaques solars",
+							"placas solares",
+							"autoconsum"
+						]
+					}
+				],
+				"notCompanies": [
+					"Gremi d'Instal·ladors de Girona",
+					"FEGICAT",
+					"Federacio de Gremis d'Instal·ladors de Catalunya"
+				],
+				"placeWords": [
+					"Girona",
+					"Gerona",
+					"provincia de Girona",
+					"comarques gironines",
+					"Catalunya",
+					"Cataluna",
+					"Catalonia",
+					"Espana",
+					"Espanya",
+					"Spain"
+				],
+				"knownCompanies": [
+					{
+						"name": "Instal·lacions Exemple, SL",
+						"host": "instalacions.example",
+						"from": "page one of a plain web search for \"instal·lador elèctric Girona\""
+					},
+					{
+						"name": "Clima Exemple",
+						"host": "clima.example",
+						"from": "the guild's member search, by town"
+					}
+				]
+			}
+		}
 	}
 ]

@@ -70,6 +70,41 @@ const enrichmentOf = (
 		: undefined
 }
 
+// A headcount as a row carries it: a number, alone or paired with the page it
+// was read from. Anything else — a range in words, a blank — is no headcount.
+const readHeadcount = (value: unknown): number | null => {
+	const stated = unwrapValue(value)
+	return typeof stated === 'number' && Number.isFinite(stated) ? stated : null
+}
+
+// A count the run wrote on its own quality block, or null where it wrote none.
+const storedCount = (quality: unknown, key: string): number | null => {
+	if (quality === null || typeof quality !== 'object') return null
+	const value = (quality as Record<string, unknown>)[key]
+	return typeof value === 'number' && Number.isFinite(value) ? value : null
+}
+
+// The web searches a run's log names. Compared as the run compares them —
+// spacing aside — so a search asked twice counts once among the different ones.
+const searchesNamedIn = (
+	toolLog: unknown,
+): { total: number; distinct: number } | null => {
+	if (!Array.isArray(toolLog)) return null
+	const asked: string[] = []
+	for (const entry of toolLog) {
+		if (entry === null || typeof entry !== 'object') continue
+		const { tool, output } = entry as { tool?: unknown; output?: unknown }
+		if (tool !== 'web_search' || output === null || typeof output !== 'object')
+			continue
+		const query = (output as { query?: unknown }).query
+		if (typeof query === 'string' && query.trim() !== '')
+			asked.push(query.replace(/\s+/g, ' ').trim().toLowerCase())
+	}
+	return asked.length === 0
+		? null
+		: { total: asked.length, distinct: new Set(asked).size }
+}
+
 /** Normalize a finished run into the shape the scorer consumes. */
 export const outcomeFromRun = (input: {
 	readonly status: string
@@ -78,6 +113,8 @@ export const outcomeFromRun = (input: {
 	readonly fetchedUrls: ReadonlyArray<string>
 	/** What the run was billed, read off its own row; absent when not read back. */
 	readonly usage?: RunUsage
+	/** The run's own log of tool calls, as stored; absent when not read back. */
+	readonly toolLog?: unknown
 	/**
 	 * Which shape the run answered in. A scan keeps its answer in a list of
 	 * companies rather than a profile, and the shape is what says where to look.
@@ -197,6 +234,7 @@ export const outcomeFromRun = (input: {
 		location: string | null
 		describedAs: string
 		confirmed: boolean
+		headcount: number | null
 	}> = []
 	for (const row of discoveryRows(input.schemaName, findings)) {
 		const name = readFieldValue(row['name'])
@@ -211,6 +249,7 @@ export const outcomeFromRun = (input: {
 			// two passes comparable: an unverified one scores a real nought, not a
 			// blank.
 			confirmed: isConfirmedRow(row),
+			headcount: readHeadcount(row['employee_estimate']),
 		})
 	}
 
@@ -229,6 +268,11 @@ export const outcomeFromRun = (input: {
 		registryConfirmed,
 		reportedCoverage,
 		searchingStopped,
+		searching: {
+			rounds: storedCount(quality, 'rounds'),
+			gapRounds: storedCount(quality, 'gap_rounds'),
+		},
+		searches: searchesNamedIn(input.toolLog),
 		// Only a run that was asked for a profile is measured on how full it came back.
 		// A search answers with a list and is never given one, so counting it reports
 		// every search as having filled none of a shape nobody asked it for — a failing

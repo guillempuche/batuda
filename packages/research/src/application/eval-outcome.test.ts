@@ -461,6 +461,7 @@ describe('outcomeFromRun', () => {
 					location: null,
 					describedAs: '',
 					confirmed: false,
+					headcount: null,
 				},
 				{
 					name: 'Beta',
@@ -468,6 +469,7 @@ describe('outcomeFromRun', () => {
 					location: null,
 					describedAs: '',
 					confirmed: false,
+					headcount: null,
 				},
 				{
 					name: 'Gamma',
@@ -475,6 +477,7 @@ describe('outcomeFromRun', () => {
 					location: null,
 					describedAs: '',
 					confirmed: false,
+					headcount: null,
 				},
 			])
 		})
@@ -567,6 +570,7 @@ describe('outcomeFromRun — what a scan row carries for the market figures', ()
 					describedAs:
 						'Instalaciones eléctricas Instalador eléctrico industrial en Córdoba',
 					confirmed: false,
+					headcount: null,
 				},
 			])
 		})
@@ -692,6 +696,115 @@ describe('outcomeFromRun — whether a scan row was established', () => {
 			// THEN it reads a real nought rather than a blank, which is what makes
 			// the before and after passes comparable
 			expect(outcome.companies[0]?.confirmed).toBe(false)
+		})
+	})
+})
+
+describe('outcomeFromRun — what a scan says of its rows and of its own searching', () => {
+	const scan = (findings: unknown, toolLog?: unknown) =>
+		outcomeFromRun({
+			status: 'succeeded',
+			schemaName: 'prospect_scan_v1',
+			findings,
+			fetchedUrls: [],
+			...(toolLog === undefined ? {} : { toolLog }),
+		})
+
+	describe('when rows state a headcount', () => {
+		it('should read a number, alone or paired with its page, and nothing else', () => {
+			// GIVEN a headcount paired with its page, a bare one, a nought, one in
+			// words, and a row stating none
+			const outcome = scan({
+				prospects: [
+					{ name: 'Alfa', employee_estimate: { value: 43, source_id: 'p' } },
+					{ name: 'Beta', employee_estimate: 12 },
+					{ name: 'Gamma', employee_estimate: { value: 0 } },
+					{ name: 'Delta', employee_estimate: { value: 'entre 5 y 25' } },
+					{ name: 'Epsilon' },
+				],
+			})
+
+			// THEN only numbers are headcounts, nought among them
+			expect(outcome.companies.map(company => company.headcount)).toEqual([
+				43,
+				12,
+				0,
+				null,
+				null,
+			])
+		})
+	})
+
+	describe('when the run counted its rounds', () => {
+		it('should carry both counts', () => {
+			const outcome = scan({
+				prospects: [],
+				quality: { rounds: 9, gap_rounds: 4 },
+			})
+			expect(outcome.searching).toEqual({ rounds: 9, gapRounds: 4 })
+		})
+
+		it('should leave absent what the run did not store', () => {
+			// GIVEN a run with no quality block, and one whose counts are not numbers
+			expect(scan({ prospects: [] }).searching).toEqual({
+				rounds: null,
+				gapRounds: null,
+			})
+			expect(
+				scan({ prospects: [], quality: { rounds: 'nine', gap_rounds: null } })
+					.searching,
+			).toEqual({ rounds: null, gapRounds: null })
+		})
+	})
+
+	describe('when the run log names its searches', () => {
+		it('should count them all and count a repeated one once among the different ones', () => {
+			// GIVEN a log with two searches for the same words, spaced and cased
+			// differently, a third search, a page opened, and a model call
+			const outcome = scan({ prospects: [] }, [
+				{
+					tool: 'web_search',
+					type: 'result',
+					output: { query: 'Gremi  Girona' },
+				},
+				{
+					tool: 'web_search',
+					type: 'result',
+					output: { query: 'gremi girona ' },
+				},
+				{
+					tool: 'web_search',
+					type: 'result',
+					output: { query: 'instal·ladors' },
+				},
+				{
+					tool: 'scrape_page',
+					type: 'result',
+					output: { url: 'https://x.test' },
+				},
+				{ tool: 'llm.generateText', type: 'call', input: { round: 1 } },
+			])
+
+			// THEN three were made and two were different
+			expect(outcome.searches).toEqual({ total: 3, distinct: 2 })
+		})
+
+		it('should say nothing for a log that names none', () => {
+			// GIVEN a log written before searches were named, one that is not a
+			// list, one with oddities in it, and a run read back without its log
+			const unnamed = [
+				{ tool: 'web_search', type: 'result', output: { chars: 9 } },
+			]
+			const odd = [
+				null,
+				'web_search',
+				{ tool: 'web_search' },
+				{ tool: 'web_search', output: { query: ' ' } },
+			]
+			expect(scan({ prospects: [] }, unnamed).searches).toBeNull()
+			expect(scan({ prospects: [] }, 'log').searches).toBeNull()
+			expect(scan({ prospects: [] }, odd).searches).toBeNull()
+			expect(scan({ prospects: [] }).searches).toBeNull()
 		})
 	})
 })

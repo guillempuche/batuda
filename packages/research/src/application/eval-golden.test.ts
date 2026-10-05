@@ -418,6 +418,117 @@ describe('parseGoldenRow — a row that asks for a whole market', () => {
 		})
 	})
 
+	describe('when the market names firms known to exist and the asked place', () => {
+		it('should carry both through, the firms tidied', () => {
+			// GIVEN a market with a firm that has a site, one that has none, and the
+			// place's own names
+			const result = parseGoldenRow(
+				marketRow({
+					...validMarket,
+					knownCompanies: [
+						{
+							name: ' Instal·lacions Vall ',
+							host: 'vall.example',
+							from: ' guild member list ',
+						},
+						{ name: 'Tallers Bergé', host: null, from: 'plain web search' },
+					],
+					placeWords: ['girona', 'gerona'],
+				}),
+			)
+
+			// THEN both are on the market, names and sources trimmed
+			expect(result.ok).toBe(true)
+			if (!result.ok) return
+			expect(result.value.market?.knownCompanies).toEqual([
+				{
+					name: 'Instal·lacions Vall',
+					host: 'vall.example',
+					from: 'guild member list',
+				},
+				{ name: 'Tallers Bergé', host: null, from: 'plain web search' },
+			])
+			expect(result.value.market?.placeWords).toEqual(['girona', 'gerona'])
+		})
+
+		it('should leave both keys off a market that names neither', () => {
+			// GIVEN the plain market
+			const result = parseGoldenRow(marketRow(validMarket))
+
+			// THEN neither key is invented
+			expect(result.ok).toBe(true)
+			if (!result.ok) return
+			expect('knownCompanies' in (result.value.market ?? {})).toBe(false)
+			expect('placeWords' in (result.value.market ?? {})).toBe(false)
+		})
+
+		it('should refuse a firm or a place word the scorer could never match', () => {
+			// GIVEN each way one of the two keys can be written wrong
+			const firm = { name: 'Vall', host: 'vall.example', from: 'guild' }
+			const wrong: ReadonlyArray<
+				readonly [string, Record<string, unknown>, string]
+			> = [
+				[
+					'firms that are not a list',
+					{ knownCompanies: firm },
+					'knownCompanies',
+				],
+				['an empty list of firms', { knownCompanies: [] }, 'knownCompanies'],
+				['a firm that is not an object', { knownCompanies: ['Vall'] }, 'name'],
+				[
+					'a firm with no readable name',
+					{ knownCompanies: [{ ...firm, name: ' — ' }] },
+					'name',
+				],
+				[
+					'a host written as an address',
+					{ knownCompanies: [{ ...firm, host: 'https://vall.example/' }] },
+					'host',
+				],
+				[
+					'a host with its www',
+					{ knownCompanies: [{ ...firm, host: 'www.vall.example' }] },
+					'host',
+				],
+				[
+					'a host in capitals',
+					{ knownCompanies: [{ ...firm, host: 'Vall.example' }] },
+					'host',
+				],
+				[
+					'a host left out rather than null',
+					{ knownCompanies: [{ name: 'Vall', from: 'guild' }] },
+					'host',
+				],
+				[
+					'a firm that does not say where it was found',
+					{ knownCompanies: [{ ...firm, from: '  ' }] },
+					'from',
+				],
+				[
+					'place words that are not a list',
+					{ placeWords: 'girona' },
+					'placeWords',
+				],
+				['an empty list of place words', { placeWords: [] }, 'placeWords'],
+				[
+					'a place word of punctuation',
+					{ placeWords: ['girona', '…'] },
+					'placeWords',
+				],
+			]
+
+			for (const [what, extra, named] of wrong) {
+				// WHEN parsed
+				const result = parseGoldenRow(marketRow({ ...validMarket, ...extra }))
+
+				// THEN it is refused, and the message names the key at fault
+				expect(result.ok, what).toBe(false)
+				if (!result.ok) expect(result.error, what).toContain(named)
+			}
+		})
+	})
+
 	describe('when the answer names neither a company nor a market', () => {
 		it('should reject it and name a market block as one way to be valid', () => {
 			// GIVEN an answer with no domain, no alt domains and no market

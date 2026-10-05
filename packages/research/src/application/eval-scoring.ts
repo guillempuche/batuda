@@ -47,6 +47,8 @@
  * are written against are in eval-scoring-types.ts.
  */
 
+import { SALVAGE_EMPTY_EVENT } from './cut-off-salvage'
+import { listUseOf } from './eval-list-use'
 import type { OrganisationKind } from './eval-organisation-kind'
 import {
 	contactNameMatches,
@@ -66,6 +68,7 @@ import {
 	type FieldOutcome,
 	type GoldenExpectation,
 	isSucceeded,
+	type KnownFirmOfMarket,
 	type MarketScore,
 	type RunOutcome,
 	type RunScore,
@@ -82,6 +85,9 @@ export {
 	type GoldenBucket,
 	type GoldenExpectation,
 	isSucceeded,
+	type KnownCompany,
+	type KnownFirmOfMarket,
+	type ListUse,
 	type MarketExpectation,
 	type MarketPart,
 	type MarketScore,
@@ -315,6 +321,9 @@ export const scoreRun = (
 					partsAnswered: partsAnsweredBy(rightKindRows, expectedMarket.parts),
 					reportedCoverage: outcome.reportedCoverage,
 					searchingStopped: outcome.searchingStopped,
+					listUse: listUseOf(outcome, expectedMarket),
+					searching: outcome.searching,
+					searches: outcome.searches,
 				}
 
 	return {
@@ -322,6 +331,14 @@ export const scoreRun = (
 		grounded,
 		groundable: expected.market === undefined,
 		marketWentUnanswered,
+		...(marketWentUnanswered && expectedMarket?.knownCompanies !== undefined
+			? {
+					knownUnanswered: {
+						market: expectedMarket.name,
+						names: expectedMarket.knownCompanies.map(firm => firm.name),
+					},
+				}
+			: {}),
 		wrongCompany,
 		wrongCompanyAutoApplicable,
 		lowConfidence,
@@ -342,6 +359,19 @@ export const scoreRun = (
 			: {}),
 	}
 }
+
+const knownFirmKey = (market: string, name: string): string =>
+	`${market}\u0000${name}`
+
+// The known firms that pass `wanted`, in a stable order: by market, then by name.
+const knownFirms = (
+	named: ReadonlyMap<string, KnownFirmOfMarket>,
+	wanted: (key: string) => boolean,
+): ReadonlyArray<KnownFirmOfMarket> =>
+	[...named]
+		.filter(([key]) => wanted(key))
+		.sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))
+		.map(([, firm]) => firm)
 
 /** Roll per-run scores up into the rates the harness reports. */
 export const summarizeScores = (
@@ -388,6 +418,14 @@ export const summarizeScores = (
 			creditsPerRun: null,
 			callsByModel: {},
 			cascadedRunRate: null,
+			websiteRate: null,
+			headcountFill: null,
+			narrowerPlaceRate: null,
+			knownCompanies: null,
+			roundsPerScan: null,
+			gapRoundsPerScan: null,
+			repeatedSearchShare: null,
+			scansLostToExtraction: null,
 		}
 	}
 
@@ -444,6 +482,21 @@ export const summarizeScores = (
 	let scansSayingWhyTheyStopped = 0
 	let scansCutOff = 0
 	let scansThatNeverAnswered = 0
+	let runsWithFacts = 0
+	let scansLostToExtraction = 0
+	let totalRowsWithWebsite = 0
+	let totalRowsWithHeadcount = 0
+	let rowsOfPlacedMarkets = 0
+	let totalRowsPlacedNarrower = 0
+	// Keyed by market and name: one firm may be named on two markets' lists, and
+	// being listed for one says nothing of the other.
+	const knownNamed = new Map<string, KnownFirmOfMarket>()
+	const knownFound = new Set<string>()
+	let scansCountingRounds = 0
+	let totalRounds = 0
+	let totalGapRounds = 0
+	let totalSearches = 0
+	let totalDistinctSearches = 0
 	let totalReportedMissing = 0
 	let totalReportedNeverSearched = 0
 	let totalReportedThoughtAnswered = 0
@@ -483,6 +536,22 @@ export const summarizeScores = (
 			totalFieldsFilled += score.profile.fieldsFilled
 		}
 		if (score.marketWentUnanswered) scansThatNeverAnswered++
+		if (score.knownUnanswered !== undefined) {
+			const { market, names } = score.knownUnanswered
+			for (const name of names)
+				knownNamed.set(knownFirmKey(market, name), { market, name })
+		}
+		if (score.facts !== undefined) {
+			runsWithFacts++
+			if (
+				score.marketWentUnanswered &&
+				// A logged line's numbers are keyed beneath its name.
+				Object.keys(score.facts).some(fact =>
+					fact.startsWith(SALVAGE_EMPTY_EVENT),
+				)
+			)
+				scansLostToExtraction++
+		}
 		if (score.market !== undefined) {
 			scansScored++
 			totalRowsReturned += score.market.rowsReturned
@@ -498,6 +567,28 @@ export const summarizeScores = (
 			totalRowsPossiblyDuplicated += score.market.rowsPossiblyDuplicated
 			totalPartsExpected += score.market.partsExpected
 			totalPartsAnswered += score.market.partsAnswered
+			const use = score.market.listUse
+			totalRowsWithWebsite += use.rowsWithWebsite
+			totalRowsWithHeadcount += use.rowsWithHeadcount
+			if (use.rowsPlacedNarrower !== null) {
+				rowsOfPlacedMarkets += score.market.rowsReturned
+				totalRowsPlacedNarrower += use.rowsPlacedNarrower
+			}
+			const market = score.market.name
+			for (const name of [...use.knownFound, ...use.knownMissed])
+				knownNamed.set(knownFirmKey(market, name), { market, name })
+			for (const name of use.knownFound)
+				knownFound.add(knownFirmKey(market, name))
+			const { searching, searches } = score.market
+			if (searching.rounds !== null) {
+				scansCountingRounds++
+				totalRounds += searching.rounds
+				totalGapRounds += searching.gapRounds ?? 0
+			}
+			if (searches !== null) {
+				totalSearches += searches.total
+				totalDistinctSearches += searches.distinct
+			}
 			const stopped = score.market.searchingStopped
 			if (stopped !== null) {
 				scansSayingWhyTheyStopped++
@@ -622,6 +713,31 @@ export const summarizeScores = (
 		creditsPerRun: runsWithUsage === 0 ? null : totalCredits / runsWithUsage,
 		callsByModel,
 		cascadedRunRate: runsWithUsage === 0 ? null : cascadedRuns / runsWithUsage,
+		websiteRate: perRow(totalRowsWithWebsite),
+		headcountFill: perRow(totalRowsWithHeadcount),
+		narrowerPlaceRate:
+			rowsOfPlacedMarkets === 0
+				? null
+				: totalRowsPlacedNarrower / rowsOfPlacedMarkets,
+		knownCompanies:
+			knownNamed.size === 0
+				? null
+				: {
+						found: knownFirms(knownNamed, key => knownFound.has(key)),
+						missed: knownFirms(knownNamed, key => !knownFound.has(key)),
+					},
+		roundsPerScan:
+			scansCountingRounds === 0 ? null : totalRounds / scansCountingRounds,
+		gapRoundsPerScan:
+			scansCountingRounds === 0 ? null : totalGapRounds / scansCountingRounds,
+		repeatedSearchShare:
+			totalSearches === 0 ? null : 1 - totalDistinctSearches / totalSearches,
+		// Only a market row can be a scan lost, and only logged facts can say why
+		// it was: with neither there is nothing to count against.
+		scansLostToExtraction:
+			runsWithFacts === 0 || scansScored + scansThatNeverAnswered === 0
+				? null
+				: scansLostToExtraction,
 	}
 }
 

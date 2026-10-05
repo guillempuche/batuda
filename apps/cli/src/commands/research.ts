@@ -313,6 +313,8 @@ interface FinishedRun {
 	readonly llmModels?: Record<string, number> | null
 	// The run's final entity verdict, from its own column (not the findings JSON).
 	readonly entityMatch?: string | null
+	// The run's own log of tool calls, which is where it names what it searched.
+	readonly toolLog?: unknown
 }
 
 // What the run recorded spending, taken from the row rather than tallied here,
@@ -433,6 +435,7 @@ const driveOne = (
 		const outcome = outcomeFromRun({
 			status: run?.status ?? 'failed',
 			findings: run?.findings,
+			toolLog: run?.toolLog,
 			schemaName,
 			fetchedUrls: sourceRows.map(row => row.url),
 			...(run ? { usage: usageOf(run) } : {}),
@@ -761,6 +764,29 @@ const formatGuardDrops = (
 		...drops.map(drop => `${drop.key.padEnd(48)} ${decimal(drop.mean)}`),
 	].join('\n')
 
+// The firms golden rows name as known, by name. A handful of firms a person
+// found with a plain search is not something to take a percentage of: which
+// ones a whole pass never listed is the finding.
+const formatKnownCompanies = (summary: EvalSummary): ReadonlyArray<string> => {
+	const known = summary.knownCompanies
+	if (known === null) return []
+	const firmsNamed = known.found.length + known.missed.length
+	const markets = [...new Set(known.missed.map(firm => firm.market))]
+	return [
+		`  known firms listed:   ${known.found.length}/${firmsNamed} in some run of the pass`,
+		...markets.map(
+			market =>
+				`    never listed (${market}): ${known.missed
+					.filter(firm => firm.market === market)
+					.map(firm => firm.name)
+					.join(', ')}`,
+		),
+	]
+}
+
+const lostToCutOff = (summary: EvalSummary): string =>
+	`  to a reply cut off:   ${count(summary.scansLostToExtraction)} (the answer was written and none of it could be kept)`
+
 // What a pass of market requests got right. Silent for a pass of company profiles,
 // which has no list to judge — the figures are all null there, and printing five
 // "n/a" lines on every ordinary pass buries the ones that mean something.
@@ -774,7 +800,8 @@ const formatMarketFigures = (summary: EvalSummary): ReadonlyArray<string> =>
 		? summary.scansThatNeverAnswered === null
 			? []
 			: [
-					`Market runs lost:       ${count(summary.scansThatNeverAnswered)} — every one of them, so there is nothing else to report`,
+					`Market runs lost:       ${count(summary.scansThatNeverAnswered)} — every one of them, so no list came back to grade`,
+					lostToCutOff(summary),
 				]
 		: [
 				`Rows per market:        ${decimal(summary.rowsPerScan)}`,
@@ -786,13 +813,20 @@ const formatMarketFigures = (summary: EvalSummary): ReadonlyArray<string> =>
 				`  duplicates:           ${pct(summary.duplicateRate)}`,
 				`    may be a repeat:    ${pct(summary.possibleDuplicateRate)}`,
 				`  with a location:      ${pct(summary.locationFill)}`,
+				`    narrower than asked: ${pct(summary.narrowerPlaceRate)} (of markets whose golden row writes the asked place down)`,
+				`  with their own site:  ${pct(summary.websiteRate)}`,
+				`  with a headcount:     ${pct(summary.headcountFill)}`,
+				...formatKnownCompanies(summary),
+				`Rounds per market:      ${decimal(summary.roundsPerScan)} searching, ${decimal(summary.gapRoundsPerScan)} filling gaps`,
+				`  searches repeated:    ${pct(summary.repeatedSearchShare)} of the searches the runs named`,
 				`Request coverage:       ${pct(summary.requestCoverage)}`,
 				`  never looked for:     ${pct(summary.neverSearchedShare)} of what came back missing`,
 				`  scans that reckoned:  ${count(summary.scansReportingCoverage)}`,
 				`  thought it had them:  ${count(summary.partsThoughtAnswered)} (want nought)`,
 				`Said why they stopped:  ${count(summary.scansSayingWhyTheyStopped)}`,
 				`  of those, cut off:    ${count(summary.scansCutOff)} (their lists were cut short)`,
-				`Market runs lost:       ${count(summary.scansThatNeverAnswered)} (came back with nothing, and store no reason)`,
+				`Market runs lost:       ${count(summary.scansThatNeverAnswered)} (came back with nothing)`,
+				lostToCutOff(summary),
 			]
 
 // Which models actually did the work. A tier is configured with a first choice

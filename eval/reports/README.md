@@ -13,6 +13,7 @@ And a later pass is read against them.
 
 - `summary`, `byBucket`, `byCountry` and `byMarket` — the rates, whole. `byMarket` is keyed by the golden set's own market names.
 - Per run: its golden id, bucket and country; the verdict flags and counts (grounded, wrong company, empty, fields expected/scored/correct, contacts expected/found); `usage` (cost, tokens, credits, calls per model); `facts` (the guard counts the run logged); and the `profile`, `people` and `market` count blocks.
+- The firms a golden row names as known to exist (`knownCompanies`) as **how many** some run listed and how many none did, in the summaries and in each run's `market` block — never which. The golden file that names them is kept out of git because it names real firms beside somebody's question, and these files are committed. The names are in the `--out` report.
 - Not the `fields` list. That is the one place a run's score carries a value read off a company's own pages — what the run filled a field with — and it is dropped before the copy is written. Everything above is a count, a verdict or a name from the golden file itself, so no page-read value survives into a committed file.
 
 What a run found stays in the `--out` report, which is not committed.

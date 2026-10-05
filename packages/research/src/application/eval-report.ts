@@ -390,6 +390,35 @@ export const evalSummaryAttributes = (
 	if (summary.confirmationRate !== null) {
 		attributes['eval.confirmation_rate'] = summary.confirmationRate
 	}
+	// What the lists are worth to somebody working through them. Counts and
+	// shares only: which known firms a pass missed is in the report, never here.
+	if (summary.websiteRate !== null) {
+		attributes['eval.website_rate'] = summary.websiteRate
+	}
+	if (summary.headcountFill !== null) {
+		attributes['eval.headcount_fill'] = summary.headcountFill
+	}
+	if (summary.narrowerPlaceRate !== null) {
+		attributes['eval.narrower_place_rate'] = summary.narrowerPlaceRate
+	}
+	if (summary.knownCompanies !== null) {
+		attributes['eval.known_companies_listed'] =
+			summary.knownCompanies.found.length
+		attributes['eval.known_companies_missed'] =
+			summary.knownCompanies.missed.length
+	}
+	if (summary.roundsPerScan !== null) {
+		attributes['eval.rounds_per_scan'] = summary.roundsPerScan
+	}
+	if (summary.gapRoundsPerScan !== null) {
+		attributes['eval.gap_rounds_per_scan'] = summary.gapRoundsPerScan
+	}
+	if (summary.repeatedSearchShare !== null) {
+		attributes['eval.repeated_search_share'] = summary.repeatedSearchShare
+	}
+	if (summary.scansLostToExtraction !== null) {
+		attributes['eval.scans_lost_to_extraction'] = summary.scansLostToExtraction
+	}
 	if (summary.rowsPerScan !== null) {
 		attributes['eval.rows_per_scan'] = summary.rowsPerScan
 	}

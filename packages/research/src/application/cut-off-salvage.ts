@@ -5,6 +5,9 @@ import { closeCutOffJson } from '../domain/cut-off-reply'
 import { CutOffReply } from '../domain/errors'
 import { isPlainObject } from './guard-shapes'
 
+/** Logged when a reply was cut off and not one row of it could be kept. */
+export const SALVAGE_EMPTY_EVENT = 'research.extraction.salvage_empty'
+
 export interface SalvagedReply<A> {
 	readonly value: A
 	/** How many characters of what the model wrote were kept, and how many it wrote. */
@@ -198,16 +201,16 @@ export const keepWhatArrived = <S extends Schema.Top, E>(
 				? earlier
 				: latest
 		if (salvaged === undefined) {
-			yield* Effect.logWarning('research.extraction.salvage_empty').pipe(
+			yield* Effect.logWarning(SALVAGE_EMPTY_EVENT).pipe(
 				Effect.annotateLogs({
-					event: 'research.extraction.salvage_empty',
+					event: SALVAGE_EMPTY_EVENT,
 					research_id: researchId,
 					total_chars:
 						cutOff instanceof CutOffReply ? cutOff.responseText.length : 0,
 				}),
 			)
 			yield* Effect.annotateCurrentSpan({
-				'research.extraction.salvage_empty': 1,
+				[SALVAGE_EMPTY_EVENT]: 1,
 			})
 			return yield* Effect.fail(cutOff)
 		}

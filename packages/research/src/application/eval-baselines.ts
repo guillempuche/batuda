@@ -12,7 +12,12 @@
  */
 
 import type { EvalReport } from './eval-report'
-import type { RunScore } from './eval-scoring-types'
+import type {
+	EvalSummary,
+	ListUse,
+	MarketScore,
+	RunScore,
+} from './eval-scoring-types'
 
 /** The golden set a pass measured, as the folder name its baselines live under. */
 export const goldenStem = (goldenPath: string): string => {
@@ -52,27 +57,107 @@ export const newestReportName = (
 	return [...reports].sort((a, b) => b.localeCompare(a))[0] ?? null
 }
 
-/** A run's score with what it found taken out. */
-export type BaselineRunScore = Omit<RunScore, 'fields'>
+/**
+ * The rates of a pass as they may be filed. The known firms a golden row names
+ * are kept as how many were listed and missed, never which: that golden file is
+ * out of version control because it names real firms beside somebody's question,
+ * and a filed copy is committed.
+ */
+export type BaselineSummary = Omit<EvalSummary, 'knownCompanies'> & {
+	readonly knownCompanies: {
+		readonly found: number
+		readonly missed: number
+	} | null
+}
+
+type BaselineListUse = Omit<ListUse, 'knownFound' | 'knownMissed'> & {
+	readonly knownFound: number
+	readonly knownMissed: number
+}
+
+/** A run's score with what it found, and the firms it was checked against, taken out. */
+export type BaselineRunScore = Omit<
+	RunScore,
+	'fields' | 'market' | 'knownUnanswered'
+> & {
+	readonly knownUnanswered?: {
+		readonly market: string
+		readonly names: number
+	}
+	readonly market?: Omit<MarketScore, 'listUse'> & {
+		readonly listUse: BaselineListUse
+	}
+}
 
 /** A filed report: every rate, and not one thing a run read off a page. */
 export interface BaselineReport {
-	readonly summary: EvalReport['summary']
+	readonly summary: BaselineSummary
 	readonly runs: ReadonlyArray<BaselineRunScore>
-	readonly byBucket: EvalReport['byBucket']
-	readonly byCountry: EvalReport['byCountry']
-	readonly byMarket: EvalReport['byMarket']
+	readonly byBucket: Record<string, BaselineSummary>
+	readonly byCountry: Record<string, BaselineSummary>
+	readonly byMarket: Record<string, BaselineSummary>
 }
 
+const summaryForBaseline = (summary: EvalSummary): BaselineSummary => ({
+	...summary,
+	knownCompanies:
+		summary.knownCompanies === null
+			? null
+			: {
+					found: summary.knownCompanies.found.length,
+					missed: summary.knownCompanies.missed.length,
+				},
+})
+
+const summariesForBaseline = (
+	groups: Record<string, EvalSummary>,
+): Record<string, BaselineSummary> =>
+	Object.fromEntries(
+		Object.entries(groups).map(([key, summary]) => [
+			key,
+			summaryForBaseline(summary),
+		]),
+	)
+
+const runForBaseline = ({
+	fields: _fields,
+	market,
+	knownUnanswered,
+	...rest
+}: RunScore): BaselineRunScore => ({
+	...rest,
+	...(knownUnanswered === undefined
+		? {}
+		: {
+				knownUnanswered: {
+					market: knownUnanswered.market,
+					names: knownUnanswered.names.length,
+				},
+			}),
+	...(market === undefined
+		? {}
+		: {
+				market: {
+					...market,
+					listUse: {
+						...market.listUse,
+						knownFound: market.listUse.knownFound.length,
+						knownMissed: market.listUse.knownMissed.length,
+					},
+				},
+			}),
+})
+
 /**
- * The report as it may be committed: the rates and the tables whole, and every
- * run stripped of `fields` — the one place a run's score carries what it read
- * off a company's pages rather than a count of how it did.
+ * The report as it may be committed: the rates and the tables, and every run
+ * stripped of `fields` — the one place a run's score carries what it read off a
+ * company's pages rather than a count of how it did — with the known firms
+ * counted instead of named throughout.
  */
 export const stripReportForBaseline = (report: EvalReport): BaselineReport => ({
-	summary: report.summary,
-	runs: report.runs.map(({ fields: _fields, ...rest }) => rest),
-	byBucket: report.byBucket,
-	byCountry: report.byCountry,
-	byMarket: report.byMarket,
+	summary: summaryForBaseline(report.summary),
+	runs: report.runs.map(runForBaseline),
+	byBucket: summariesForBaseline(report.byBucket),
+	byCountry: summariesForBaseline(report.byCountry),
+	byMarket: summariesForBaseline(report.byMarket),
 })

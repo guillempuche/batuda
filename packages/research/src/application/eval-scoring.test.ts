@@ -3,7 +3,9 @@ import { describe, expect, it } from 'vitest'
 import {
 	type GoldenExpectation,
 	groupSummaries,
+	type ListUse,
 	type MarketExpectation,
+	type MarketScore,
 	type RunOutcome,
 	type RunScore,
 	scoreRun,
@@ -30,6 +32,8 @@ const outcome = (over: Partial<RunOutcome>): RunOutcome => ({
 	removed: [],
 	searchingStopped: null,
 	reportedCoverage: null,
+	searching: { rounds: null, gapRounds: null },
+	searches: null,
 	people: { named: 0, titled: 0 },
 	...over,
 })
@@ -43,6 +47,7 @@ const company = (
 	location: null,
 	describedAs: '',
 	confirmed: false,
+	headcount: null,
 	...over,
 })
 
@@ -1447,6 +1452,15 @@ describe('scoring a run that answered for a whole market', () => {
 				partsAnswered: 0,
 				reportedCoverage: null,
 				searchingStopped: null,
+				listUse: {
+					rowsWithWebsite: 0,
+					rowsWithHeadcount: 0,
+					rowsPlacedNarrower: null,
+					knownFound: [],
+					knownMissed: [],
+				},
+				searching: { rounds: null, gapRounds: null },
+				searches: null,
 			})
 			expect(score.empty).toBe(true)
 		})
@@ -1518,6 +1532,14 @@ describe('summarizeScores', () => {
 				creditsPerRun: null,
 				callsByModel: {},
 				cascadedRunRate: null,
+				websiteRate: null,
+				headcountFill: null,
+				narrowerPlaceRate: null,
+				knownCompanies: null,
+				roundsPerScan: null,
+				gapRoundsPerScan: null,
+				repeatedSearchShare: null,
+				scansLostToExtraction: null,
 			})
 		})
 	})
@@ -1898,6 +1920,15 @@ describe('summarizing a pass that held market requests', () => {
 				partsAnswered: 5,
 				reportedCoverage: null,
 				searchingStopped: null,
+				listUse: {
+					rowsWithWebsite: 0,
+					rowsWithHeadcount: 0,
+					rowsPlacedNarrower: null,
+					knownFound: [],
+					knownMissed: [],
+				},
+				searching: { rounds: null, gapRounds: null },
+				searches: null,
 				...over,
 			},
 		})
@@ -2520,6 +2551,244 @@ describe('scoreRun — what happened to each field', () => {
 			// WHEN read — THEN the record is empty: a field nobody wrote an answer
 			// for is not a miss, and listing it would read as one
 			expect(score.fields).toEqual([])
+		})
+	})
+})
+
+describe('summarizing what the lists of a pass are worth', () => {
+	const use = (over: Partial<ListUse> = {}): ListUse => ({
+		rowsWithWebsite: 0,
+		rowsWithHeadcount: 0,
+		rowsPlacedNarrower: null,
+		knownFound: [],
+		knownMissed: [],
+		...over,
+	})
+	// A scan of so many rows, scored as usual and then handed the list-use counts
+	// the case is about, so each case states only those.
+	const withUse = (
+		rowsReturned: number,
+		listUse: ListUse,
+		spent: Partial<Pick<MarketScore, 'searching' | 'searches' | 'name'>> = {},
+	): RunScore => {
+		const scored = scoreRun(
+			marketGolden(),
+			outcome({
+				companies: Array.from({ length: rowsReturned }, (_, index) =>
+					company({ name: `Firm ${index}` }),
+				),
+			}),
+		)
+		return {
+			...scored,
+			...(scored.market === undefined
+				? {}
+				: { market: { ...scored.market, listUse, ...spent } }),
+		}
+	}
+
+	describe('when scans came back with rows', () => {
+		it('should report websites and headcounts over every row, and places over the markets that can tell', () => {
+			// GIVEN a ten-row scan of a market with place words, and a thirty-row
+			// scan of one without
+			const summary = summarizeScores([
+				withUse(
+					10,
+					use({
+						rowsWithWebsite: 6,
+						rowsWithHeadcount: 2,
+						rowsPlacedNarrower: 5,
+					}),
+				),
+				withUse(30, use({ rowsWithWebsite: 14, rowsWithHeadcount: 2 })),
+			])
+
+			// THEN the first two read against all forty rows, and the place figure
+			// against the ten rows of the market that wrote its place down
+			expect(summary.websiteRate).toBeCloseTo(20 / 40)
+			expect(summary.headcountFill).toBeCloseTo(4 / 40)
+			expect(summary.narrowerPlaceRate).toBeCloseTo(5 / 10)
+		})
+
+		it('should report no place figure when no market could tell', () => {
+			const summary = summarizeScores([
+				withUse(10, use({ rowsWithWebsite: 1 })),
+			])
+			expect(summary.narrowerPlaceRate).toBeNull()
+		})
+	})
+
+	describe('when golden rows name firms known to exist', () => {
+		it('should call a firm found when any run listed it, and name the rest', () => {
+			// GIVEN two runs of one market: each finds a different known firm, and
+			// neither finds the third
+			const summary = summarizeScores([
+				withUse(
+					5,
+					use({ knownFound: ['Vall'], knownMissed: ['Electer', 'Rivas'] }),
+				),
+				withUse(
+					5,
+					use({ knownFound: ['Electer'], knownMissed: ['Vall', 'Rivas'] }),
+				),
+			])
+
+			// THEN two are found across the pass and one is missed
+			const market = marketGolden().market?.name ?? ''
+			expect(summary.knownCompanies).toEqual({
+				found: [
+					{ market, name: 'Electer' },
+					{ market, name: 'Vall' },
+				],
+				missed: [{ market, name: 'Rivas' }],
+			})
+		})
+
+		it('should keep one firm named by two markets apart, found for one and missed for the other', () => {
+			// GIVEN the same firm on two markets' lists, listed by a run of the first only
+			const summary = summarizeScores([
+				withUse(5, use({ knownFound: ['Vall'] }), { name: 'Girona' }),
+				withUse(5, use({ knownMissed: ['Vall'] }), { name: 'Spain' }),
+			])
+
+			// THEN being listed for Girona does not answer for Spain
+			expect(summary.knownCompanies).toEqual({
+				found: [{ market: 'Girona', name: 'Vall' }],
+				missed: [{ market: 'Spain', name: 'Vall' }],
+			})
+		})
+
+		it('should count the firms of a market whose run never answered as never listed', () => {
+			// GIVEN a market naming two known firms whose only run failed
+			const known = marketGolden()
+			const lostMarket: GoldenExpectation = {
+				...known,
+				...(known.market === undefined
+					? {}
+					: {
+							market: {
+								...known.market,
+								knownCompanies: [
+									{ name: 'Vall', host: null, from: 'search' },
+									{ name: 'Rivas', host: 'rivas.example', from: 'search' },
+								],
+							},
+						}),
+			}
+			const lost = scoreRun(lostMarket, outcome({ status: 'failed' }))
+
+			// THEN the run carries them, AND the pass names both as missed rather
+			// than reading better for having lost the run
+			const market = known.market?.name ?? ''
+			expect(lost.knownUnanswered).toEqual({ market, names: ['Vall', 'Rivas'] })
+			expect(summarizeScores([lost]).knownCompanies).toEqual({
+				found: [],
+				missed: [
+					{ market, name: 'Rivas' },
+					{ market, name: 'Vall' },
+				],
+			})
+		})
+
+		it('should keep a firm found when another run of its market answered and listed it', () => {
+			// GIVEN one run of the market lost, and one that listed the firm
+			const market = marketGolden().market?.name ?? ''
+			const lost: RunScore = {
+				...scoreRun(marketGolden(), outcome({ status: 'failed' })),
+				knownUnanswered: { market, names: ['Vall'] },
+			}
+			const summary = summarizeScores([
+				lost,
+				withUse(5, use({ knownFound: ['Vall'] })),
+			])
+			expect(summary.knownCompanies).toEqual({
+				found: [{ market, name: 'Vall' }],
+				missed: [],
+			})
+		})
+
+		it('should report nothing when no golden row names any', () => {
+			expect(summarizeScores([withUse(5, use())]).knownCompanies).toBeNull()
+		})
+	})
+
+	describe('when runs counted their own searching', () => {
+		it('should average the rounds over the scans that counted, and share out the repeated searches', () => {
+			// GIVEN two scans that counted, one of them with no gap rounds stored,
+			// and one that counted nothing
+			const summary = summarizeScores([
+				withUse(5, use(), {
+					searching: { rounds: 6, gapRounds: 4 },
+					searches: { total: 20, distinct: 15 },
+				}),
+				withUse(5, use(), {
+					searching: { rounds: 12, gapRounds: null },
+					searches: { total: 20, distinct: 15 },
+				}),
+				withUse(5, use()),
+			])
+
+			// THEN the averages read over two scans and a quarter of searches repeat
+			expect(summary.roundsPerScan).toBe(9)
+			expect(summary.gapRoundsPerScan).toBe(2)
+			expect(summary.repeatedSearchShare).toBeCloseTo(0.25)
+		})
+
+		it('should report nothing when no scan counted', () => {
+			const summary = summarizeScores([withUse(5, use())])
+			expect(summary.roundsPerScan).toBeNull()
+			expect(summary.gapRoundsPerScan).toBeNull()
+			expect(summary.repeatedSearchShare).toBeNull()
+		})
+	})
+
+	describe('when a market run never answered', () => {
+		const lost = (facts?: Record<string, number>): RunScore => ({
+			...scoreRun(marketGolden(), outcome({ status: 'failed' })),
+			...(facts === undefined ? {} : { facts }),
+		})
+
+		it('should count it as lost to extraction when it logged a rescue that kept nothing', () => {
+			// GIVEN one run lost to a cut-off reply, one lost to something else, and
+			// one that answered
+			const summary = summarizeScores([
+				lost({ 'research.extraction.salvage_empty.total_chars': 46605 }),
+				lost({ 'research.citations.dropped.dropped': 3 }),
+				{ ...withUse(5, use()), facts: {} },
+			])
+
+			// THEN one of the two lost runs is put down to extraction
+			expect(summary.scansThatNeverAnswered).toBe(2)
+			expect(summary.scansLostToExtraction).toBe(1)
+		})
+
+		it('should say not measured when the pass collected no logged facts', () => {
+			expect(summarizeScores([lost()]).scansLostToExtraction).toBeNull()
+		})
+
+		it('should not put an answered run down to extraction for having logged a cut-off', () => {
+			// GIVEN a run that logged the fact and still answered
+			const summary = summarizeScores([
+				{
+					...withUse(5, use()),
+					facts: { 'research.extraction.salvage_empty.total_chars': 100 },
+				},
+			])
+			expect(summary.scansLostToExtraction).toBe(0)
+		})
+	})
+
+	describe('when the pass held no market at all', () => {
+		it('should report nothing for every one of these figures', () => {
+			const summary = summarizeScores([
+				{ ...scoreRun(acme, outcome({})), facts: {} },
+			])
+			expect(summary.websiteRate).toBeNull()
+			expect(summary.headcountFill).toBeNull()
+			expect(summary.narrowerPlaceRate).toBeNull()
+			expect(summary.knownCompanies).toBeNull()
+			expect(summary.roundsPerScan).toBeNull()
+			expect(summary.scansLostToExtraction).toBeNull()
 		})
 	})
 })
