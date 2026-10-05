@@ -1806,16 +1806,16 @@ export const researchKindReask = (input: {
 			for (const run of runs)
 				removedByRun.set(run.id, yield* removedFromRun(run, judge))
 			askings.push(scoreKindReask(runs, removedByRun))
-		}
-
-		// Nothing answered is not a score of nought: the table would read as a check
-		// that removes nobody, and a baseline taken from it would be worthless.
-		if (askedBatches > 0 && failedBatches === askedBatches) {
-			return yield* Effect.fail(
-				new Error(
-					`the model answered none of the ${askedBatches} batch(es), so nothing was asked — check the extract tier's routing and key`,
-				),
-			)
+			// Nothing answered is not a score of nought: the table would read as a check
+			// that removes nobody, and a baseline taken from it would be worthless. Read
+			// after every asking, so a dead key is found after one and not after three.
+			if (askedBatches > 0 && failedBatches === askedBatches) {
+				return yield* Effect.fail(
+					new Error(
+						`the model answered none of the ${askedBatches} batch(es), so nothing was asked — check the extract tier's routing and key`,
+					),
+				)
+			}
 		}
 
 		const requestKinds = Object.keys(askings[0]?.byRequestKind ?? {}).sort()

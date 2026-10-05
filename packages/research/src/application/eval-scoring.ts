@@ -360,6 +360,7 @@ export const scoreRun = (
 	}
 }
 
+// Joined on a character no name contains, so two pairs never merge into one key.
 const knownFirmKey = (market: string, name: string): string =>
 	`${market}\u0000${name}`
 
@@ -545,7 +546,7 @@ export const summarizeScores = (
 			runsWithFacts++
 			if (
 				score.marketWentUnanswered &&
-				// A logged line's numbers are keyed beneath its name.
+				// Facts are keyed `<line>.<field>`, so the line shows only as a prefix.
 				Object.keys(score.facts).some(fact =>
 					fact.startsWith(SALVAGE_EMPTY_EVENT),
 				)

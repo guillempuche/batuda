@@ -496,6 +496,11 @@ describe('parseGoldenRow — a row that asks for a whole market', () => {
 					'host',
 				],
 				[
+					'a host on a social platform',
+					{ knownCompanies: [{ ...firm, host: 'facebook.com' }] },
+					'host',
+				],
+				[
 					'a host left out rather than null',
 					{ knownCompanies: [{ name: 'Vall', from: 'guild' }] },
 					'host',

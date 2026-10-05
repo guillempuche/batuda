@@ -28,6 +28,7 @@ import { Effect } from 'effect'
 
 import { isBareHost } from './eval-golden'
 import { isPlainObject } from './guard-shapes'
+import { judgedRowKey } from './judged-rows'
 import {
 	dropNonCompanies,
 	type OrganisationKindGuardJudge,
@@ -140,15 +141,20 @@ export const parseKindRun = (raw: unknown): KindCorpusParseResult => {
 		if (!row.ok) return { ok: false, error: `run "${id}": ${row.error}` }
 		rows.push(row.value)
 	}
-	// The check keys what it remembers on a row's name, so two rows of one name in
-	// one run are one question with two labels waiting to disagree.
-	const names = rows.map(row => row.name.toLowerCase())
-	const repeated = names.find((name, index) => names.indexOf(name) !== index)
-	if (repeated !== undefined) {
-		return {
-			ok: false,
-			error: `run "${id}" names "${repeated}" twice — a row is asked once per run`,
+	// The check files its answers under a row's folded name, legal form and all
+	// stripped, so two rows that fold to one key are one question with two labels
+	// waiting to disagree.
+	const firstNamed = new Map<string, string>()
+	for (const row of rows) {
+		const key = judgedRowKey(row.name) ?? row.name.toLowerCase()
+		const earlier = firstNamed.get(key)
+		if (earlier !== undefined) {
+			return {
+				ok: false,
+				error: `run "${id}" names the same firm twice ("${earlier}", "${row.name}") — a row is asked once per run`,
+			}
 		}
+		firstNamed.set(key, row.name)
 	}
 	return { ok: true, value: { id, request, requestKind, rows } }
 }

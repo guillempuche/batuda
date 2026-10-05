@@ -69,8 +69,8 @@ const ownHostOf = (
 // A word short enough to be the "de" of "Província de Girona" names no place.
 // The cost is a town of three letters written with nothing else beside it, which
 // reads as the request said again; a street or a postcode next to it still counts.
-// So does a town that shares the asked place's name: "Girona" the city, alone,
-// cannot be told from "Girona" the province.
+// A town named like the asked place is missed the same way: "Girona" the city,
+// alone, cannot be told from "Girona" the province.
 const MIN_PLACE_WORD_LETTERS = 4
 
 /**
