@@ -47,9 +47,12 @@ services:
     # reusing what was already on the machine — and it could change underneath
     # a laptop between two mornings.
     #
-    # Taken from quay.io, which is where MinIO publishes these: the same
-    # releases under docker.io cannot be pulled, by CI or by anyone.
-    image: quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z
+    # Built by docker/minio.Dockerfile from the binary MinIO attaches to its
+    # GitHub release, and published to this project's own registry: since
+    # October 2026 MinIO's registries (quay.io and Docker Hub) refuse every pull,
+    # so CI and any fresh machine were left with nothing to start. Pinned to the
+    # digest as well as the tag, so a tag pushed again cannot change what runs.
+    image: ghcr.io/guillempuche/minio:RELEASE.2025-09-07T16-13-09Z@sha256:ab2656e8488a28d9aa63a3fc8db089d3e7ea9d6129add81534456d5bc1baef59
     command: server /data --console-address ":9001"
     ports:
       - "9000:9000" # S3 API
@@ -64,7 +67,8 @@ services:
   # safe to re-run; exits 0 once the bucket exists.
   storage-init:
     container_name: batuda-storage-init
-    image: quay.io/minio/mc:RELEASE.2025-08-13T08-35-41Z
+    # Built by docker/mc.Dockerfile the same way.
+    image: ghcr.io/guillempuche/mc:RELEASE.2025-08-13T08-35-41Z@sha256:059daa5181a1d2410d7cc12cef338f61fc8c8389c069e8066f9fdef6731bd749
     depends_on:
       - storage
     restart: "no"
