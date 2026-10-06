@@ -178,6 +178,14 @@ export const RequestPartsSchema = Schema.Struct({
 		}),
 	),
 	kindsOfCompany: Schema.Array(Schema.String),
+	// What the request asks its companies BY: the work they do, or anything
+	// else — size, place, something they published or use. Read by the check
+	// that removes bodies and directories, which otherwise takes a request for
+	// firms of any trade for a request about one trade. Optional and a plain
+	// string, for the reason `places` is optional: an answer left out, or one
+	// written in other words by a vendor that holds the model to no list, must
+	// not cost the run its parts. The reader narrows it to the two answers.
+	askedBy: Schema.optionalKey(Schema.String),
 	// Required and often empty rather than left out: a strict provider reads an
 	// absent key and a key holding nothing as two different answers, and only one
 	// of them is a request that named no place.
@@ -218,11 +226,13 @@ export const requestPartsPrompt = (query: string): string =>
 		'Separately, list the words a COMPANY NAME uses to say what kind of company it is rather than which company it is — group, holding, services, associates and the like. Give them in the language of the request, in the language of the country it is about, and in English, in the plural and singular forms a name actually writes. "Grup Puig" is a firm called Puig, so "grup" belongs on this list; "Puig" never does.',
 		'These are words for a KIND of company, never for a trade and never for a place: plumbing, lifts, Barcelona and France are all wrong here. A family name, a coined name or a brand is wrong here too, and putting one on this list takes its own name away from every firm called it — so leave out anything you are not sure of. Between 4 and 12 words. Return an empty list rather than guessing at a language you cannot place.',
 		'',
+		'Separately, say what the request asks its companies BY. Answer "trade" where it asks for companies that do a kind of work — the parts above — and "other" where it asks for companies of any trade, picked out by something else: their size, their place, something they published or use, who they sell to, or an advertisement they placed. A request that names a kind of work and adds a size or a place still asks by trade.',
+		'',
 		'Separately again, name the place the request wants its companies to BE IN, in the words the request uses ("Ripollet (Barcelona)", "Texas", "Baltimore metro"). Only where the request confines its answer to a place: a company named in passing, a place it sells into or travels to, and the country a language happens to belong to are all somewhere a company is not required to be, and each of them is an empty answer. Where the request names several, give the widest one that contains them all. Answer with an empty string whenever the request asks for companies anywhere.',
 		'',
 		"Separately again, list EVERY place the request names its companies must be in, each in the request's own words and on its own — a request naming three towns gives three, and one naming a town and its province gives both. This is the same reading as the place above, written out rather than collapsed, so a place that is an empty answer there is left out here too. Return an empty list whenever the request asks for companies anywhere.",
 		'',
-		'Return {"parts": [{"label": "...", "terms": ["...", "..."]}], "kindsOfCompany": ["...", "..."], "place": "...", "places": ["...", "..."]} and nothing else.',
+		'Return {"parts": [{"label": "...", "terms": ["...", "..."]}], "kindsOfCompany": ["...", "..."], "askedBy": "trade" | "other", "place": "...", "places": ["...", "..."]} and nothing else.',
 		'',
 		`Request:\n${query}`,
 	].join('\n')
@@ -363,6 +373,23 @@ export const readKindsOfCompany = (raw: unknown): ReadonlyArray<string> => {
 export const readRequestPlace = (raw: unknown): string => {
 	if (raw === null || typeof raw !== 'object') return ''
 	return readWording((raw as { place?: unknown }).place) ?? ''
+}
+
+/** What the request asks its companies by, as the splitter read it. */
+export type AskedBy = 'trade' | 'other'
+
+/**
+ * The splitter's reading of what the request asks by, or null where it gave
+ * none. Null rather than a guess: the check that reads this keeps rows on the
+ * strength of it, and a guessed "other" would keep every supplier on an
+ * installers' list.
+ */
+export const readAskedBy = (raw: unknown): AskedBy | null => {
+	if (raw === null || typeof raw !== 'object') return null
+	const answer = (raw as { askedBy?: unknown }).askedBy
+	if (typeof answer !== 'string') return null
+	const word = answer.trim().toLowerCase()
+	return word === 'trade' || word === 'other' ? word : null
 }
 
 /**

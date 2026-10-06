@@ -9,6 +9,7 @@ import {
 	MAX_REQUEST_PARTS,
 	MAX_WORDING_CHARS,
 	type RequestPart,
+	readAskedBy,
 	readKindsOfCompany,
 	readRequestParts,
 	readRequestPlace,
@@ -985,6 +986,51 @@ describe('readRequestPlaces', () => {
 			expect(readRequestPlaces(null)).toEqual([])
 			expect(readRequestPlaces('Barcelona')).toEqual([])
 			expect(readRequestPlaces({ places: 'Barcelona' })).toEqual([])
+		})
+	})
+})
+
+describe('readAskedBy', () => {
+	describe('when the splitter says what the request asks by', () => {
+		it('should read either answer as written', () => {
+			// GIVEN the two answers the splitter may give
+			// WHEN read — THEN each is kept as it is
+			expect(readAskedBy({ askedBy: 'trade' })).toBe('trade')
+			expect(readAskedBy({ askedBy: 'other' })).toBe('other')
+			// AND a vendor that holds the model to no list may capitalise or pad it
+			expect(readAskedBy({ askedBy: ' Other ' })).toBe('other')
+		})
+	})
+
+	describe('when the answer is missing or in other words', () => {
+		it('should read nothing rather than guess', () => {
+			// GIVEN an answer left out, one in other words, one in the wrong shape,
+			// and no answer at all
+			// WHEN read — THEN null every time: a guessed "other" would keep every
+			// supplier on an installers' list
+			expect(readAskedBy({ parts: [] })).toBeNull()
+			expect(readAskedBy({ askedBy: 'signal' })).toBeNull()
+			expect(readAskedBy({ askedBy: ['trade'] })).toBeNull()
+			expect(readAskedBy(null)).toBeNull()
+			expect(readAskedBy('trade')).toBeNull()
+		})
+	})
+})
+
+describe('requestPartsPrompt', () => {
+	describe('when the splitter is asked', () => {
+		it('should ask what the request asks its companies by, and name both answers in the shape to return', () => {
+			// GIVEN the question as it is asked
+			const prompt = requestPartsPrompt(
+				'Empresas de Girona con una oferta de técnico de sistemas',
+			)
+
+			// THEN both answers are offered, and the shape returned carries the key
+			expect(prompt).toMatch(
+				/Answer "trade" where it asks for companies that do a kind of work/,
+			)
+			expect(prompt).toMatch(/"other" where it asks for companies of any trade/)
+			expect(prompt).toContain('"askedBy": "trade" | "other"')
 		})
 	})
 })

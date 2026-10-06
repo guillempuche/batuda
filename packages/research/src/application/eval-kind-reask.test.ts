@@ -4,6 +4,7 @@ import { Effect } from 'effect'
 import { describe, expect, it } from 'vitest'
 
 import {
+	type KindReaskJudge,
 	type KindReaskScore,
 	type KindRun,
 	parseKindCorpus,
@@ -12,7 +13,6 @@ import {
 	scoreKindReask,
 	spreadOf,
 } from './eval-kind-reask'
-import type { OrganisationKindGuardJudge } from './organisation-kind-guard'
 
 const makers: KindRun = {
 	id: 'makers-1',
@@ -43,7 +43,7 @@ const makers: KindRun = {
 // A judge that calls "other" every row whose name is on its list, and says
 // nothing of the rest — which the check reads as leave it alone.
 const judgeCalling =
-	(others: ReadonlyArray<string>): OrganisationKindGuardJudge<never, never> =>
+	(others: ReadonlyArray<string>): KindReaskJudge =>
 	rows =>
 		Effect.succeed({
 			verdicts: rows
@@ -62,6 +62,62 @@ describe('parseKindRun', () => {
 
 			// THEN it parses to the same run
 			expect(result).toEqual({ ok: true, value: makers })
+		})
+	})
+
+	describe('when a run says what its request asked for', () => {
+		it('should carry the kinds and what it asked by, and leave the block off a run that has none', () => {
+			// GIVEN a run with the parser's reading, and the same run without it
+			const asked = {
+				parts: [' ingenierías industriales '],
+				askedBy: 'trade' as const,
+			}
+			const withAsked = parseKindRun({ ...makers, asked })
+			const without = parseKindRun(makers)
+
+			// THEN the first carries it, kinds trimmed, and the second has no key
+			expect(withAsked.ok && withAsked.value.asked).toEqual({
+				parts: ['ingenierías industriales'],
+				askedBy: 'trade',
+			})
+			expect(without.ok && 'asked' in without.value).toBe(false)
+		})
+
+		it('should refuse a block the check could not be told', () => {
+			// GIVEN each way the block can be written wrong
+			const wrong: ReadonlyArray<readonly [string, unknown, string]> = [
+				['not an object', 'trade', 'asked'],
+				[
+					'kinds that are not a list',
+					{ parts: 'x', askedBy: 'trade' },
+					'parts',
+				],
+				['an empty kind', { parts: [' '], askedBy: 'trade' }, 'parts'],
+				[
+					'more kinds than a run ever hands over',
+					{
+						parts: Array.from({ length: 13 }, (_, n) => `kind ${n}`),
+						askedBy: 'trade',
+					},
+					'parts',
+				],
+				[
+					'a kind longer than a run ever hands over',
+					{ parts: ['x'.repeat(81)], askedBy: 'trade' },
+					'parts',
+				],
+				[
+					'asked by something else',
+					{ parts: [], askedBy: 'signal' },
+					'askedBy',
+				],
+				['asked by nothing', { parts: [] }, 'askedBy'],
+			]
+			for (const [what, asked, named] of wrong) {
+				const result = parseKindRun({ ...makers, asked })
+				expect(result.ok, what).toBe(false)
+				if (!result.ok) expect(result.error, what).toContain(named)
+			}
 		})
 	})
 
@@ -215,12 +271,34 @@ describe('removedFromRun', () => {
 		})
 	})
 
+	describe('when the run says what it asked for', () => {
+		it('should hand the judge what was asked beside every batch, and nothing for a run that has none', async () => {
+			// GIVEN a judge that records what it is told the request asked for
+			const told: Array<unknown> = []
+			const recording: KindReaskJudge = (_rows, asked) => {
+				told.push(asked)
+				return Effect.succeed({ verdicts: [] })
+			}
+			const asked = {
+				parts: ['makers of precast concrete'],
+				askedBy: 'trade' as const,
+			}
+
+			// WHEN a run with the reading and one without are asked
+			await Effect.runPromise(removedFromRun({ ...makers, asked }, recording))
+			await Effect.runPromise(removedFromRun(makers, recording))
+
+			// THEN the first batch was told, the second told nothing
+			expect(told).toEqual([asked, undefined])
+		})
+	})
+
 	describe('when the judge sees the rows', () => {
 		it('should be shown each row’s own words and the host it gave', async () => {
 			// GIVEN a judge that records what it is handed
 			const seen: Array<{ name: string; describedAs: string; host: string }> =
 				[]
-			const recording: OrganisationKindGuardJudge<never, never> = rows => {
+			const recording: KindReaskJudge = rows => {
 				for (const row of rows)
 					seen.push({
 						name: row.name,

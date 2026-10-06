@@ -464,6 +464,7 @@ Copy `kind-rows.example.json` to your own `kind-rows.json`. It is a list of runs
   "id": "makers-1",
   "request": "Fabricantes de naves industriales en Cataluña: estructuras metálicas, prefabricados de hormigón…",
   "requestKind": "makers",
+  "asked": { "parts": ["estructuras metálicas", "prefabricados de hormigón"], "askedBy": "trade" },
   "rows": [
     { "name": "Prefabricats Exemple, SL", "describedAs": "Fabrica mòduls de formigó prefabricat…", "websiteHost": "prefabricats.example", "label": "company" },
     { "name": "Associació de Fabricants Exemple", "describedAs": "Agrupa els fabricants…", "websiteHost": null, "label": "other" },
@@ -473,6 +474,7 @@ Copy `kind-rows.example.json` to your own `kind-rows.json`. It is a list of runs
 ```
 
 - `requestKind` — a word of your own for the sort of question (`installers`, `makers`, `engineering`, `signal`). The score is read per sort.
+- `asked` — what the run's own parser read off the request, which the check is told: `parts`, the kinds of company it named (the labels under the run's `research.request_parts` line, copied as the run logged them — the parser often writes the bare trade, "metal" rather than "fabricantes de metal" — and empty when it named none), and `askedBy`, `"trade"` when the request asked for companies that do a kind of work and `"other"` when it asked for companies of any trade picked out by something else — their size, their place, something they published. Optional: a run without it is asked the question the check put before it was told anything, which is what a baseline of older code needs, and the command says up front how many runs carry it.
 - `describedAs` — the row's own words **exactly as the check reads them**: `why_relevant`, then `description`, then `industry`, whichever the row has, joined with " · " (a middle dot with a space either side). Take `why_relevant` alone and a row that also states its industry is re-asked on half of what the run asked it on. Empty when the row wrote none of the three, but never left out.
 - `websiteHost` — the bare host the row gave, lower-case, with no `www.` and no path (`acme.example`), or `null`. Anything else is refused when the file is read, because the check could not read it and the row would be asked without its site.
 - `label` — `company` for a firm of the kind the request asked for, `other` for a body, a directory, a portal or a firm that only sells to that kind, `null` until somebody has read about the firm. An unlabelled row is still asked — it shares a batch with the others, and which rows share a batch changes the answers — and is scored nowhere.

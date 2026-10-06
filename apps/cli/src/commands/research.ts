@@ -43,6 +43,7 @@ import {
 	goldenStem,
 	judgeOrganisationKinds,
 	type KindCandidate,
+	type KindReaskJudge,
 	type KindReaskScore,
 	type MarketExpectation,
 	type MarketScore,
@@ -1777,12 +1778,12 @@ export const researchKindReask = (input: {
 		let askedBatches = 0
 		let failedBatches = 0
 		const extract = yield* ExtractLanguageModel
-		const judge = (rows: Parameters<typeof organisationKindGuardPrompt>[0]) => {
+		const judge: KindReaskJudge<never, never> = (rows, asked) => {
 			askedBatches++
 			return extract
 				.generateObject({
 					schema: OrganisationKindGuardVerdictsSchema,
-					prompt: organisationKindGuardPrompt(rows),
+					prompt: organisationKindGuardPrompt(rows, asked),
 				})
 				.pipe(
 					Effect.map(response => ({ verdicts: response.value.verdicts })),
@@ -1796,8 +1797,13 @@ export const researchKindReask = (input: {
 		}
 
 		const rowsTotal = runs.reduce((sum, run) => sum + run.rows.length, 0)
+		// Said up front, since the question put to the model differs with it and a
+		// baseline taken without it is not the same measurement.
+		const runsToldWhatWasAsked = runs.filter(
+			run => run.asked !== undefined,
+		).length
 		yield* Console.log(
-			`${rowsTotal} rows over ${runs.length} runs, asked ${input.asks} time(s), each run's list on its own\n`,
+			`${rowsTotal} rows over ${runs.length} runs, asked ${input.asks} time(s), each run's list on its own; ${runsToldWhatWasAsked} of the runs say what their request asked for\n`,
 		)
 
 		const askings: Array<ReturnType<typeof scoreKindReask>> = []
