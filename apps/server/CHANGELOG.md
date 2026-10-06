@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-10-06 (server-v2026.10.6)
+
+### Features
+
+* **research:** grade a market list on what a seller can do with it ([093872a](https://github.com/guillempuche/batuda/commit/093872a6d6b1252affeed5578728829d679427a6))
+* **research:** re-ask the company-kind check on stored rows for cents ([10f7eb7](https://github.com/guillempuche/batuda/commit/10f7eb7d6e7e665177f3ce545bda5a8f48b75dbc))
+
+### Bug Fixes
+
+* refuse re-ask rows the check cannot score, fail fast on a dead key ([90e2a1c](https://github.com/guillempuche/batuda/commit/90e2a1c8f00835f98531b69679322f70b7edb835))
+* **research:** tell the company-kind check what the request asked for ([f0e7d4e](https://github.com/guillempuche/batuda/commit/f0e7d4e65dc83261d4280a1d5ae5d55cd98702da))
+
 ## 2026-09-21 (server-v2026.9.21)
 
 ### Bug Fixes
