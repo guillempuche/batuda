@@ -3,6 +3,14 @@
 		"id": "makers-1",
 		"request": "Fabricantes de naves industriales en Cataluña: estructuras metálicas, prefabricados de hormigón, cerramientos y cubiertas.",
 		"requestKind": "makers",
+		"asked": {
+			"parts": [
+				"estructuras metálicas",
+				"prefabricados de hormigón",
+				"cerramientos y cubiertas"
+			],
+			"askedBy": "trade"
+		},
 		"rows": [
 			{
 				"name": "Prefabricats Exemple, SL",
@@ -40,6 +48,10 @@
 		"id": "installers-1",
 		"request": "Empreses instal·ladores a la província de Girona: electricitat, fontaneria i climatització, energia solar.",
 		"requestKind": "installers",
+		"asked": {
+			"parts": ["electricitat", "fontaneria i climatització", "energia solar"],
+			"askedBy": "trade"
+		},
 		"rows": [
 			{
 				"name": "Instal·lacions Exemple, SL",
@@ -65,6 +77,10 @@
 		"id": "signal-1",
 		"request": "Empresas de la provincia de Girona, de cualquier sector salvo la informática, que hayan publicado una oferta de técnico de sistemas.",
 		"requestKind": "signal",
+		"asked": {
+			"parts": [],
+			"askedBy": "other"
+		},
 		"rows": [
 			{
 				"name": "Embotits Exemple, SA",

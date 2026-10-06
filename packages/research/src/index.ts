@@ -76,6 +76,7 @@ export {
 } from './application/eval-invariance'
 export {
 	type KindLabel,
+	type KindReaskJudge,
 	type KindReaskScore,
 	type KindRow,
 	type KindRun,
@@ -133,6 +134,7 @@ export {
 export {
 	OrganisationKindGuardVerdictsSchema,
 	organisationKindGuardPrompt,
+	type RequestAsked,
 } from './application/organisation-kind-guard'
 export {
 	type PerRunOverrides,

@@ -31,8 +31,11 @@ import { isPlainObject } from './guard-shapes'
 import { judgedRowKey } from './judged-rows'
 import {
 	dropNonCompanies,
+	type OrganisationCandidate,
 	type OrganisationKindGuardJudge,
+	type RequestAsked,
 } from './organisation-kind-guard'
+import { MAX_REQUEST_PARTS, MAX_WORDING_CHARS } from './request-parts'
 
 /** What a row is, established by reading about the firm rather than by the check. */
 export type KindLabel =
@@ -66,6 +69,13 @@ export interface KindRun {
 	 * one is exactly what breaks another.
 	 */
 	readonly requestKind: string
+	/**
+	 * What the request asked for, as the run's parser read it — the kinds of
+	 * company under `research.request_parts` and what it asked by. Optional:
+	 * a run without it is asked the question with nothing added about the
+	 * request, which is how a baseline of older code has to be asked.
+	 */
+	readonly asked?: RequestAsked
 	readonly rows: ReadonlyArray<KindRow>
 }
 
@@ -117,6 +127,46 @@ const parseKindRow = (
 	}
 }
 
+const parseAsked = (
+	raw: unknown,
+): { ok: true; value: RequestAsked } | { ok: false; error: string } => {
+	if (!isPlainObject(raw))
+		return {
+			ok: false,
+			error: 'asked must be an object with parts and askedBy',
+		}
+	const parts = raw['parts']
+	if (!Array.isArray(parts) || !parts.every(part => readText(part) !== null)) {
+		return {
+			ok: false,
+			error:
+				'asked.parts must be a list of the kinds of company the request named (empty when it named none)',
+		}
+	}
+	// A run's parser hands the check at most this many kinds, each this long, so
+	// a file carrying more would put a question to the check no run ever asks.
+	if (
+		parts.length > MAX_REQUEST_PARTS ||
+		parts.some(part => String(part).trim().length > MAX_WORDING_CHARS)
+	) {
+		return {
+			ok: false,
+			error: `asked.parts holds more kinds, or a longer one, than a run's parser hands over (at most ${MAX_REQUEST_PARTS}, each up to ${MAX_WORDING_CHARS} characters)`,
+		}
+	}
+	const askedBy = raw['askedBy']
+	if (askedBy !== 'trade' && askedBy !== 'other') {
+		return {
+			ok: false,
+			error: 'asked.askedBy must be "trade" or "other"',
+		}
+	}
+	return {
+		ok: true,
+		value: { parts: parts.map(part => String(part).trim()), askedBy },
+	}
+}
+
 export const parseKindRun = (raw: unknown): KindCorpusParseResult => {
 	if (!isPlainObject(raw))
 		return { ok: false, error: 'a run must be an object' }
@@ -131,6 +181,12 @@ export const parseKindRun = (raw: unknown): KindCorpusParseResult => {
 			ok: false,
 			error: `run "${id}" needs a requestKind saying what sort of question it was`,
 		}
+	}
+	let asked: RequestAsked | undefined
+	if (raw['asked'] !== undefined) {
+		const read = parseAsked(raw['asked'])
+		if (!read.ok) return { ok: false, error: `run "${id}": ${read.error}` }
+		asked = read.value
 	}
 	const rawRows = raw['rows']
 	if (!Array.isArray(rawRows) || rawRows.length === 0)
@@ -156,7 +212,16 @@ export const parseKindRun = (raw: unknown): KindCorpusParseResult => {
 		}
 		firstNamed.set(key, row.name)
 	}
-	return { ok: true, value: { id, request, requestKind, rows } }
+	return {
+		ok: true,
+		value: {
+			id,
+			request,
+			requestKind,
+			...(asked === undefined ? {} : { asked }),
+			rows,
+		},
+	}
 }
 
 export const parseKindCorpus = (
@@ -182,10 +247,19 @@ export const parseKindCorpus = (
 	return { runs, errors }
 }
 
+/**
+ * The judge a re-ask runs: the check's own judge, handed what the run asked
+ * for beside each batch, since the question put to the model depends on it.
+ */
+export type KindReaskJudge<E = never, R = never> = (
+	rows: ReadonlyArray<OrganisationCandidate>,
+	asked: RequestAsked | undefined,
+) => ReturnType<OrganisationKindGuardJudge<E, R>>
+
 /** The names the check removed from one run's list, asked the way a run asks. */
 export const removedFromRun = <E, R>(
 	run: KindRun,
-	judge: OrganisationKindGuardJudge<E, R>,
+	judge: KindReaskJudge<E, R>,
 ): Effect.Effect<ReadonlySet<string>, E, R> =>
 	dropNonCompanies(
 		{
@@ -198,7 +272,7 @@ export const removedFromRun = <E, R>(
 			})),
 		},
 		'rows',
-		judge,
+		rows => judge(rows, run.asked),
 	).pipe(Effect.map(result => new Set(result.dropped.map(row => row.name))))
 
 export interface KindReaskScore {

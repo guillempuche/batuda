@@ -128,6 +128,7 @@ import {
 	verificationQuery,
 } from './existence-verdict'
 import { contactFill, enrichmentFill } from './extraction-fill'
+import { withoutFenceMarkers } from './fenced-text'
 import { runForReaders } from './findings-for-readers'
 import { guardFitEvidence } from './fit-evidence-guard'
 import {
@@ -187,12 +188,14 @@ import {
 } from './prospect-criteria-guard'
 import { dedupeDiscoveryRows } from './prospect-dedupe-guard'
 import {
+	type AskedBy,
 	type CoveragePassVerdict,
 	coveragePassVerdict,
 	coverRequestParts,
 	type RequestCoverage,
 	type RequestPart,
 	RequestPartsSchema,
+	readAskedBy,
 	readKindsOfCompany,
 	readRequestParts,
 	readRequestPlace,
@@ -1600,14 +1603,6 @@ const DISCOVERY_UNCONFIRMED_DIRECTIVE =
 // carries the verdict/disqualifiers/fit_checks fields.
 const FIT_VERDICT_DIRECTIVE =
 	'Decide whether this company fits the target customer profile using the fit rules in the instructions above, and record it: set `verdict` (strong_fit / possible_fit / weak_fit / no_fit) with a short `verdict_rationale`; for a company that fails a rule, list each failure in `disqualifiers` with the rule and the evidence quote that shows it. Also fill `fit_checks` with one row per fit rule in the instructions — every rule, including the ones the company passes — each marked pass, fail, or unknown per the evidence, with the quote and source URL that decide it.'
-
-// A line inside a fence that reads as the fence's own closing marker would end
-// the fence early and let what follows read as the system's words. Such a line
-// is kept, with its dashes broken up so it no longer reads as a marker.
-const withoutFenceMarkers = (text: string): string =>
-	text.replace(/^[ \t]*-{3,}[ \t]*end [a-z ]+?-{3,}[ \t]*$/gim, line =>
-		line.replace(/-{3,}/g, '- - -'),
-	)
 
 // The request as every prompt quotes it: cut to the bound the whole system
 // shares and fenced as words to answer, so a request that tries to talk to the
@@ -3409,6 +3404,10 @@ export class ResearchService extends Context.Service<ResearchService>()(
 					// every run that is not a scan — there is no list then, so the run says
 					// nothing about coverage rather than reporting it covered none.
 					let requestParts: ReadonlyArray<RequestPart> = []
+					// What the request asks its companies by, read with the parts above
+					// and held apart from them: a request for firms of any trade has no
+					// parts and still has an answer here.
+					let askedBy: AskedBy | null = null
 					// The words those parts use for the trades, which is how every check
 					// that weighs an address against a name tells the trade in the name
 					// from the company (`run-words.ts`). Held beside the parts so the two
@@ -4035,6 +4034,20 @@ export class ResearchService extends Context.Service<ResearchService>()(
 									name: 'organisation-kind',
 									run: findings =>
 										Effect.gen(function* () {
+											// Told what was asked only on a prospect scan whose request was
+											// read: a competitor scan asks about one named company, and a
+											// request the parse failed on has nothing to hand over, so both
+											// are asked the question with nothing added.
+											const asked =
+												schemaName === 'prospect_scan_v1' &&
+												(requestParts.length > 0 || askedBy !== null)
+													? {
+															parts: requestParts.map(part => part.label),
+															// "trade" adds no line to the question, so a parse that
+															// gave no answer here changes nothing.
+															askedBy: askedBy ?? 'trade',
+														}
+													: undefined
 											const check = yield* dropNonCompanies(
 												findings,
 												discoveryResultField(schemaName),
@@ -4042,7 +4055,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 													extractLlm
 														.generateObject({
 															schema: OrganisationKindGuardVerdictsSchema,
-															prompt: organisationKindGuardPrompt(rows),
+															prompt: organisationKindGuardPrompt(rows, asked),
 														})
 														.pipe(
 															Effect.map(response => ({
@@ -5509,6 +5522,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 										kinds: readKindsOfCompany(response.value),
 										place: readRequestPlace(response.value),
 										places: readRequestPlaces(response.value),
+										askedBy: readAskedBy(response.value),
 									})),
 									Effect.catchCause(cause =>
 										Cause.hasInterruptsOnly(cause)
@@ -5526,11 +5540,13 @@ export class ResearchService extends Context.Service<ResearchService>()(
 														kinds: [] as ReadonlyArray<string>,
 														place: '',
 														places: [] as ReadonlyArray<string>,
+														askedBy: null as AskedBy | null,
 													}),
 												),
 									),
 								)
 							requestParts = split.parts
+							askedBy = split.askedBy
 							// Only where the caller named none: a hint that was given is what
 							// the caller asked to be held to, and a run overruling it with its
 							// own reading would answer a question nobody asked.
@@ -5558,16 +5574,22 @@ export class ResearchService extends Context.Service<ResearchService>()(
 								split.parts.flatMap(part => [part.label, ...part.terms]),
 								split.kinds,
 							)
-							if (requestParts.length > 0) {
+							// Logged whenever the parse read anything: a request for firms of
+							// any trade has no parts and is still a reading worth seeing.
+							if (requestParts.length > 0 || askedBy !== null) {
 								yield* Effect.logInfo('research.request_parts').pipe(
 									Effect.annotateLogs({
 										event: 'research.request_parts',
 										research_id: researchId,
 										parts: requestParts.map(part => part.label),
+										...(askedBy === null ? {} : { asked_by: askedBy }),
 									}),
 								)
 								yield* Effect.annotateCurrentSpan({
 									'research.request.parts': requestParts.length,
+									...(askedBy === null
+										? {}
+										: { 'research.request.asked_by': askedBy }),
 								})
 							}
 						}
