@@ -27,7 +27,7 @@ env:
   # deploy; run it with dummy values, since it prints every variable it
   # would send. 0.5 is the floor — below it, `-e` cuts its own value at
   # every comma.
-  UNIKRAFT_CLI_VERSION: "0.5.1"
+  UNIKRAFT_CLI_VERSION: "0.6.0"
   # Image namespace on Unikraft Cloud is the organization slug; published
   # images and running instances live under `<org>/<name>`.
   KRAFTCLOUD_ORG: gaaaa
