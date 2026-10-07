@@ -3,6 +3,8 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-10-07 (server-v2026.10.8)
+
 ## 2026-10-07 (server-v2026.10.7)
 
 ### CI/CD
