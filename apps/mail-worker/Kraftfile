@@ -6,6 +6,11 @@ name: batuda-mail-worker
 # node:* runtime regressed virtio-net init (2026-05-29 boot crash, -110).
 runtime: base-compat:latest
 
+# x86 only. Left out, the build covers every platform the runtime tag lists,
+# and the arm64 one it gained (2026-10-06) cannot be built on the x86 CI runner.
+targets:
+  - kraftcloud/x86_64
+
 labels:
   # Scale-to-zero is OFF: mail-worker holds long-lived IMAP IDLE
   # connections per inbox. A scale-to-zero suspend would drop those
