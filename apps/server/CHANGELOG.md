@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-10-07 (server-v2026.10.7)
+
+### CI/CD
+
+* **deploy:** build the server and mail-worker images for x86 only ([dbd6e1c](https://github.com/guillempuche/batuda/commit/dbd6e1c7b16f23136a61645d79c5289045d4c8ee))
+
 ## 2026-10-06 (server-v2026.10.6)
 
 ### Features
