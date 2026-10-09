@@ -3,6 +3,13 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-10-09 (server-v2026.10.9)
+
+### Bug Fixes
+
+* mark the size band, name empty columns and bar unpaid tools ([85aa912](https://github.com/guillempuche/batuda/commit/85aa912da123fb92e75d53b5ba2781153ce8569e))
+* **research:** ask for a town only on scans whose rows carry a place ([9240988](https://github.com/guillempuche/batuda/commit/9240988fcb12fcc8e15678e41a5d272dabe4bfbb))
+
 ## 2026-10-07 (server-v2026.10.8)
 
 ## 2026-10-07 (server-v2026.10.7)
