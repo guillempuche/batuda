@@ -128,8 +128,19 @@ export interface OrganisationKindGuardJudgeResult {
  *
  * It may be asked more than once for one list; see `JUDGE_BATCH_ROWS`.
  */
+/**
+ * Which asking a batch is. A second asking is told so in the question, which
+ * is also what keeps it from being answered from the cache: with one fresh row
+ * in a gap round the second question would otherwise be the first one again,
+ * word for word, and the cached answer would be the one vote dressed as two.
+ */
+export interface JudgeAsking {
+	readonly secondAsking: boolean
+}
+
 export type OrganisationKindGuardJudge<E = never, R = never> = (
 	rows: ReadonlyArray<OrganisationCandidate>,
+	asking?: JudgeAsking,
 ) => Effect.Effect<OrganisationKindGuardJudgeResult, E, R>
 
 // The strict json_schema the wired judge is asked to fill — also written into the
@@ -209,6 +220,7 @@ const askedLines = (asked: RequestAsked | undefined): ReadonlyArray<string> => {
 export const organisationKindGuardPrompt = (
 	rows: ReadonlyArray<OrganisationCandidate>,
 	asked?: RequestAsked,
+	asking?: JudgeAsking,
 ): string =>
 	[
 		'You are checking a list returned by a search for companies in a trade.',
@@ -222,6 +234,12 @@ export const organisationKindGuardPrompt = (
 		'Belonging to an association does not make a company one. A body known by its initials is still a body.',
 		'A company is not "other" merely for being large, for selling to businesses, or for working in several trades.',
 		...askedLines(asked),
+		...(asking?.secondAsking === true
+			? [
+					'',
+					'This is a second reading of rows a first reading called "other". Read each again on its own words, as if for the first time, and answer as you find it.',
+				]
+			: []),
 		'',
 		'Answer with one verdict per row, each carrying that row\'s id verbatim: {"verdicts":[{"id":"<id>","kind":"company"|"other"|"unsure","reason":"<a few words, only when kind is other>"}]}',
 		'',
@@ -321,9 +339,39 @@ export interface RememberedKind {
 	readonly judgedOnHost?: string | undefined
 }
 
+/** What a caller may tell the check about the rows beyond what they carry. */
+export interface OrganisationKindOptions {
+	/**
+	 * Hosts the judge must not be shown as a row's own site — a social platform,
+	 * or a directory this run has watched filing several of its companies. A
+	 * row whose only site is one of those is judged on its words alone; shown
+	 * the host, the judge reads the firm as the listing it was found on.
+	 */
+	readonly hideHost?: (host: string) => boolean
+	/**
+	 * Whether the run has no time left for another question. Read before each
+	 * batch, first asking and second alike: the batches run one after another
+	 * near the end of a window whose overrun destroys the run rather than
+	 * degrading it. Past it every row still unasked is kept, which is a list
+	 * not checked rather than a run lost.
+	 */
+	readonly outOfTime?: () => boolean
+}
+
 export interface OrganisationKindResult {
 	readonly findings: unknown
 	readonly dropped: ReadonlyArray<DroppedOrganisation>
+	/**
+	 * Rows this pass first ruled "other" and put to the judge a second time,
+	 * and how many of those the second asking did not call "other" and so
+	 * stayed. A removal takes two votes because one asking's verdicts move
+	 * from run to run on the same rows; a second asking is a few rows and a
+	 * few cents, and it is where that movement can be caught.
+	 */
+	readonly secondAsked: number
+	readonly secondKept: number
+	/** Whether the run's deadline stopped the asking before every batch went. */
+	readonly stoppedForTime: boolean
 	/** Rows put to the judge, as the scale the drops read against. */
 	readonly asked: number
 	/**
@@ -438,6 +486,19 @@ const candidatesOf = (
 	return { rows, idOf }
 }
 
+// The rows a pass first called "other", in the order they were asked.
+const secondAskingRows = (
+	verdicts: ReadonlyArray<OrganisationKindVerdict>,
+	asked: ReadonlyArray<OrganisationCandidate>,
+): ReadonlyArray<OrganisationCandidate> => {
+	const calledOther = new Set(
+		verdicts.flatMap(verdict => (verdict.kind === 'other' ? [verdict.id] : [])),
+	)
+	// Walked in the order the rows were asked, not the order they were
+	// answered, so the second batches are as settled as the first ones.
+	return asked.filter(row => calledOther.has(row.id))
+}
+
 /**
  * `listField` is the key holding this scan's companies — `prospects` or
  * `competitors`. Anything else passes through untouched: only a scan produces a
@@ -449,6 +510,7 @@ export const dropNonCompanies = <E, R>(
 	listField: string | undefined,
 	judge: OrganisationKindGuardJudge<E, R>,
 	remembered: ReadonlyMap<string, RememberedKind> = new Map(),
+	options: OrganisationKindOptions = {},
 ): Effect.Effect<OrganisationKindResult, E, R> =>
 	Effect.gen(function* () {
 		const nothing = {
@@ -456,11 +518,21 @@ export const dropNonCompanies = <E, R>(
 			dropped: [],
 			asked: 0,
 			ruled: 0,
+			secondAsked: 0,
+			secondKept: 0,
+			stoppedForTime: false,
 			learned: new Map<string, RememberedKind>(),
 		}
 		if (listField === undefined) return nothing
 
-		const { rows, idOf } = candidatesOf(findings, listField)
+		const { rows: candidateRows, idOf } = candidatesOf(findings, listField)
+		// A hidden host is hidden from the memory too, so an answer held for the
+		// row was reached on the same reading it is checked against here.
+		const rows = candidateRows.map(row =>
+			row.websiteHost !== '' && options.hideHost?.(row.websiteHost) === true
+				? { ...row, websiteHost: '' }
+				: row,
+		)
 		// Nothing to weigh, so nothing to pay for.
 		if (rows.length === 0) return nothing
 
@@ -512,25 +584,93 @@ export const dropNonCompanies = <E, R>(
 			})
 
 		const fresh: Array<OrganisationKindVerdict> = []
+		const outOfTime = options.outOfTime ?? (() => false)
+		let stoppedForTime = false
 		for (const batch of judgeBatches(toAsk, JUDGE_BATCH_ROWS)) {
+			if (outOfTime()) {
+				stoppedForTime = true
+				break
+			}
+			const inBatch = new Set(batch.map(row => row.id))
 			const ruling = yield* judge(batch)
 			// A judge that answers with something other than a list of verdicts is a
 			// judge that did not answer. Read as none rather than trusted, because
 			// reaching into it is how a failed call stops being a list that survives
-			// and becomes a run that dies.
-			if (Array.isArray(ruling.verdicts)) fresh.push(...ruling.verdicts)
+			// and becomes a run that dies. A verdict naming a row outside this batch
+			// is a renumbering slip and lands on nothing.
+			if (Array.isArray(ruling.verdicts))
+				fresh.push(
+					...ruling.verdicts.filter(verdict => inBatch.has(verdict.id)),
+				)
 		}
 
-		// What this pass learned, for the caller to carry into the next one. Every
-		// answer is kept, not only the drops: a row ruled a company must not be
-		// bought again either, as long as it is still described the same way.
-		const learned = new Map<string, RememberedKind>()
 		// Only the rows put to the judge this time. Built from `toAsk` rather than
 		// from the whole list, because a judge that renumbers its answers — the very
 		// slip the id scheme above guards against — would otherwise land a verdict on
 		// a row nobody asked about, dropping it and overwriting what was remembered
 		// for it.
 		const rowById = new Map(toAsk.map(row => [row.id, row] as const))
+
+		// A removal takes two votes. The rows this pass first called "other" go
+		// back to the judge on their own, and one the second asking does not call
+		// "other" stays, remembered as unsure on these words so a later pass may
+		// still ask about it. A row whose second question never went out — the
+		// clock stopped first, or the judge did not answer — has its first verdict
+		// withdrawn instead: it is kept this pass and remembered by nothing, so the
+		// next pass asks about it afresh, like a row the first asking never reached.
+		const secondRows = secondAskingRows(fresh, toAsk)
+		const askedAgain = new Set<string>()
+		const stillOther = new Set<string>()
+		const withdrawn = new Set<string>()
+		for (const batch of judgeBatches(secondRows, JUDGE_BATCH_ROWS)) {
+			const batchRowIds = batch.map(row => row.id)
+			if (stoppedForTime || outOfTime()) {
+				stoppedForTime = true
+				for (const id of batchRowIds) withdrawn.add(id)
+				continue
+			}
+			for (const id of batchRowIds) askedAgain.add(id)
+			const secondRuling = yield* judge(batch, { secondAsking: true })
+			// Only a verdict for a row of this batch is a vote. A row the answer
+			// does not name — an empty list, which is what a failed call is turned
+			// into, a renumbered answer, a list that stops short — got no second
+			// vote, and is withdrawn like one the clock stopped.
+			const answered = new Set<string>()
+			const inBatch = new Set(batchRowIds)
+			if (Array.isArray(secondRuling.verdicts))
+				for (const verdict of secondRuling.verdicts) {
+					if (!inBatch.has(verdict.id)) continue
+					answered.add(verdict.id)
+					if (verdict.kind === 'other') stillOther.add(verdict.id)
+				}
+			for (const id of batchRowIds) if (!answered.has(id)) withdrawn.add(id)
+		}
+
+		const keptBySecondVote = new Set<string>()
+		const settled: Array<OrganisationKindVerdict> = []
+		for (const verdict of fresh) {
+			if (verdict.kind !== 'other' || stillOther.has(verdict.id)) {
+				settled.push(verdict)
+				continue
+			}
+			if (withdrawn.has(verdict.id)) continue
+			keptBySecondVote.add(verdict.id)
+			settled.push({
+				id: verdict.id,
+				kind: 'unsure',
+				reason: 'the second asking did not call it other',
+			})
+		}
+		// From here on `fresh` holds only the verdicts that stand; a withdrawn row
+		// has none, so it is kept and learned nothing about.
+		fresh.length = 0
+		fresh.push(...settled)
+		const secondKept = keptBySecondVote.size
+
+		// What this pass learned, for the caller to carry into the next one. Every
+		// answer is kept, not only the drops: a row ruled a company must not be
+		// bought again either, as long as it is still described the same way.
+		const learned = new Map<string, RememberedKind>()
 		for (const verdict of fresh) {
 			const row = rowById.get(verdict.id)
 			// A verdict naming a row nobody was asked about is remembered by nothing
@@ -620,6 +760,9 @@ export const dropNonCompanies = <E, R>(
 			dropped,
 			asked: rows.length,
 			ruled,
+			secondAsked: askedAgain.size,
+			secondKept,
+			stoppedForTime,
 			learned,
 		}
 	})

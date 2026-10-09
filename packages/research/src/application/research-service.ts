@@ -246,6 +246,7 @@ import {
 	SizeRescueSchema,
 	sizeRescuePrompt,
 } from './size-rescue'
+import { isSocialPlatformHost } from './social-sites'
 import { rescueSocialWebsites } from './social-website-rescue'
 import {
 	hostOf,
@@ -456,6 +457,11 @@ const GAP_ROUND_DEADLINE_FRACTION = 0.8
 // it. Past this point every row is kept and the skip is logged, which is a list
 // that was not checked rather than a run that was lost.
 const PLACE_CHECK_DEADLINE_FRACTION = 0.85
+
+// The same margin for the company-kind check, which asks its batches the same
+// way and is entered once per extraction and after each gap round; with the
+// second asking it is two sets of questions a pass.
+const KIND_CHECK_DEADLINE_FRACTION = 0.85
 
 // No verification search starts beyond this share of the run deadline. Later
 // than the gap rounds, because verification is the last thing before the brief
@@ -4109,11 +4115,15 @@ export class ResearchService extends Context.Service<ResearchService>()(
 											const check = yield* dropNonCompanies(
 												findings,
 												discoveryResultField(schemaName),
-												rows =>
+												(rows, asking) =>
 													extractLlm
 														.generateObject({
 															schema: OrganisationKindGuardVerdictsSchema,
-															prompt: organisationKindGuardPrompt(rows, asked),
+															prompt: organisationKindGuardPrompt(
+																rows,
+																asked,
+																asking,
+															),
 														})
 														.pipe(
 															Effect.map(response => ({
@@ -4141,7 +4151,31 @@ export class ResearchService extends Context.Service<ResearchService>()(
 															),
 														),
 												organisationKinds,
+												{
+													// A social page is not a firm's own site, and shown as
+													// one it reads as the platform. This check runs before
+													// the website check that would blank it.
+													hideHost: isSocialPlatformHost,
+													outOfTime: () =>
+														DateTime.toEpochMillis(DateTime.nowUnsafe()) -
+															runStartedAtMs >
+														runDeadlineSeconds *
+															1000 *
+															KIND_CHECK_DEADLINE_FRACTION,
+												},
 											)
+											if (check.stoppedForTime) {
+												yield* Effect.logInfo(
+													'research.organisation_kind.deadline',
+												).pipe(
+													Effect.annotateLogs({
+														event: 'research.organisation_kind.deadline',
+														research_id: researchId,
+														asked: check.asked,
+														ruled: check.ruled,
+													}),
+												)
+											}
 											// What this pass learned is carried into the next one, so a
 											// gap round only pays for the rows it actually added.
 											for (const [key, kind] of check.learned)
@@ -4197,6 +4231,17 @@ export class ResearchService extends Context.Service<ResearchService>()(
 													// none ruled is a check that never ran at all.
 													'research.prospects.kind_asked': check.asked,
 													'research.prospects.kind_ruled': check.ruled,
+													// A second asking is what stands between one model's
+													// run-to-run movement and a removal, so how often it
+													// overturned the first is a number worth having.
+													'research.prospects.kind_second_asked':
+														check.secondAsked,
+													'research.prospects.kind_second_kept':
+														check.secondKept,
+													// Told apart from a judge that never answered, which
+													// also reads as rows asked and none ruled.
+													'research.prospects.kind_stopped_for_time':
+														check.stoppedForTime ? 1 : 0,
 												},
 											}
 										}),

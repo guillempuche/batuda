@@ -31,11 +31,13 @@ import { isPlainObject } from './guard-shapes'
 import { judgedRowKey } from './judged-rows'
 import {
 	dropNonCompanies,
+	type JudgeAsking,
 	type OrganisationCandidate,
 	type OrganisationKindGuardJudge,
 	type RequestAsked,
 } from './organisation-kind-guard'
 import { MAX_REQUEST_PARTS, MAX_WORDING_CHARS } from './request-parts'
+import { isSocialPlatformHost } from './social-sites'
 
 /** What a row is, established by reading about the firm rather than by the check. */
 export type KindLabel =
@@ -254,6 +256,7 @@ export const parseKindCorpus = (
 export type KindReaskJudge<E = never, R = never> = (
 	rows: ReadonlyArray<OrganisationCandidate>,
 	asked: RequestAsked | undefined,
+	asking?: JudgeAsking,
 ) => ReturnType<OrganisationKindGuardJudge<E, R>>
 
 /** The names the check removed from one run's list, asked the way a run asks. */
@@ -272,7 +275,10 @@ export const removedFromRun = <E, R>(
 			})),
 		},
 		'rows',
-		rows => judge(rows, run.asked),
+		(rows, asking) => judge(rows, run.asked, asking),
+		new Map(),
+		// The same reading the run gives its rows.
+		{ hideHost: isSocialPlatformHost },
 	).pipe(Effect.map(result => new Set(result.dropped.map(row => row.name))))
 
 export interface KindReaskScore {
