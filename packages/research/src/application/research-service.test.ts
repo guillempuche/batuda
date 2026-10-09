@@ -339,6 +339,43 @@ describe('buildResearchSystemPrompt', () => {
 		})
 	})
 
+	describe('when the run was given no budget for the tools that spend money', () => {
+		it('should send it to the team pages and not to a tool that will refuse', () => {
+			// GIVEN an enrichment run with nothing to spend, and the same run with
+			// a budget, and one built without saying either way
+			const unfunded = buildResearchSystemPrompt({
+				schemaName: 'company_enrichment_v1',
+				subjectContext: '',
+				hintsContext: '',
+				segments: [],
+				canPayForTools: false,
+			})
+			const funded = buildResearchSystemPrompt({
+				schemaName: 'company_enrichment_v1',
+				subjectContext: '',
+				hintsContext: '',
+				segments: [],
+				canPayForTools: true,
+			})
+			const unsaid = buildResearchSystemPrompt({
+				schemaName: 'company_enrichment_v1',
+				subjectContext: '',
+				hintsContext: '',
+				segments: [],
+			})
+			// THEN the unfunded run is told to read the pages itself and where to
+			// record the request, and never that the paid tool is the one to call
+			expect(unfunded).toContain('were given no budget on this run')
+			expect(unfunded).toContain('pending_paid_actions')
+			expect(unfunded).not.toContain(
+				'discover_contacts is the tool that finds them',
+			)
+			// AND a funded run, and one that said nothing, are told the tool as before
+			expect(funded).toContain('discover_contacts is the tool that finds them')
+			expect(unsaid).toContain('discover_contacts is the tool that finds them')
+		})
+	})
+
 	describe('when the run is a discovery scan', () => {
 		it('should tell it to break a many-part request up and work through it', () => {
 			// GIVEN a prospect scan, a competitor scan, and a run that is neither
@@ -514,6 +551,8 @@ describe('buildExtractionPrompt', () => {
 			// cover each part of a request that named several — nothing else in the
 			// pipeline ever asks a scan for breadth
 			expect(scan).toContain('List EVERY company')
+			// AND to place each company by its own town, never by the area asked for
+			expect(scan).toContain('the town it is based in')
 			expect(scan).toContain('not a small market')
 			expect(scan).toContain('Cover every part of the request')
 			// AND it is told to keep a company it could not find a website for, so
@@ -528,6 +567,7 @@ describe('buildExtractionPrompt', () => {
 			expect(scan).toContain('in its own language')
 			expect(scan).not.toContain('`gloss`')
 			expect(profile).not.toContain('List EVERY company')
+			expect(profile).not.toContain('the town it is based in')
 		})
 
 		it('should show extraction the request it is answering', () => {
@@ -1171,6 +1211,10 @@ describe('buildExtractionPrompt', () => {
 			expect(prompt).toContain('add an entry to `proposed_updates`')
 			// AND it must copy the identifiers, not work out a mapping
 			expect(prompt).toContain('c-1')
+			// AND it is told the bands a size may take, since a count of its own
+			// is only refused once a person accepts the proposal
+			expect(prompt).toContain('`sizeRange` takes one of these bands')
+			expect(prompt).toContain('51-200')
 		})
 
 		it('should tell the model the stored value is not itself evidence', () => {
@@ -1679,31 +1723,51 @@ describe('subjectsForPrompt', () => {
 				},
 			])
 
-			// THEN the identifiers are keyed as a proposed change keys them, and the
-			// sales working columns are dropped
+			// THEN the identifiers are keyed as a proposed change keys them, the
+			// sales working columns are dropped, and every column the run may fill
+			// is shown — empty ones as null, so a gap is a gap it can see
 			expect(projected[0]).toEqual({
 				subject_table: 'companies',
 				subject_id: 'c-1',
 				expected_version: 4,
-				current: { name: 'Acme', industry: 'retail' },
+				current: {
+					name: 'Acme',
+					taxId: null,
+					website: null,
+					industry: 'retail',
+					sizeRange: null,
+					location: null,
+					productsFit: null,
+					tags: null,
+				},
 			})
 		})
 	})
 
 	describe('when a snapshot column holds nothing', () => {
-		it('should leave it out rather than show an empty value', () => {
+		it('should show it as null, so the model can see what is missing', () => {
 			// GIVEN a row with a null column among the allowlisted ones
 			const projected = subjectsForPrompt([
 				{
 					table: 'companies',
 					id: 'c-1',
-					snapshot: { name: 'Acme', location: null },
+					snapshot: {
+						name: 'Acme',
+						location: null,
+						website: 'https://acme.example',
+					},
 					expected_version: 1,
 				},
 			])
 
-			// THEN the empty column is absent from the on-file picture
-			expect(projected[0]?.current).toEqual({ name: 'Acme' })
+			// THEN both the null column and the absent ones read as null, and the
+			// site the snapshot carries from the company's channels is shown as held
+			expect(projected[0]?.current).toMatchObject({
+				name: 'Acme',
+				location: null,
+				industry: null,
+				website: 'https://acme.example',
+			})
 		})
 	})
 
@@ -1719,8 +1783,12 @@ describe('subjectsForPrompt', () => {
 				},
 			])
 
-			// THEN only the contact's own fields are shown
-			expect(projected[0]?.current).toEqual({ name: 'Ada', role: 'CTO' })
+			// THEN only the contact's own fields are shown, the empty one as null
+			expect(projected[0]?.current).toEqual({
+				name: 'Ada',
+				role: 'CTO',
+				buyingRole: null,
+			})
 		})
 	})
 
@@ -2208,6 +2276,48 @@ describe('buildBriefPrompt — telling confirmed companies from candidates', () 
 			searchStopped: 'finished_looking',
 			existence,
 		})
+
+	describe('when the list is a scan', () => {
+		it('should tell the writer what the place and size marks mean', () => {
+			// GIVEN a scan's brief, whatever the existence split
+			const prompt = brief(undefined)
+			// THEN both marks are explained in words, so the writer says what each
+			// one means rather than copying the mark out as a token
+			expect(prompt).toContain('outside_requested_place')
+			expect(prompt).toContain('outside_requested_size')
+			expect(prompt).toContain('never as the mark itself')
+			// AND a brief about one company is told nothing about marks it cannot carry
+			const profile = buildBriefPrompt({
+				schemaName: 'company_enrichment_v1',
+				language: 'en',
+				date: '2026-08-16',
+				subjectName: 'Acme',
+				findings: {},
+				transcript: '',
+				uncoveredParts: [],
+				unsearchedParts: [],
+				searchStopped: null,
+				existence: undefined,
+			})
+			expect(profile).not.toContain('outside_requested_size')
+			// AND a competitor scan, whose rows can be placed but never sized, is
+			// told about the place mark alone
+			const competitors = buildBriefPrompt({
+				schemaName: 'competitor_scan_v1',
+				language: 'en',
+				date: '2026-08-16',
+				subjectName: 'Acme',
+				findings: { competitors: [] },
+				transcript: '',
+				uncoveredParts: [],
+				unsearchedParts: [],
+				searchStopped: 'finished_looking',
+				existence: undefined,
+			})
+			expect(competitors).toContain('outside_requested_place')
+			expect(competitors).not.toContain('outside_requested_size')
+		})
+	})
 
 	describe('when part of the list could not be confirmed', () => {
 		it('should tell the writer which companies the run stands behind', () => {

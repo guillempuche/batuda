@@ -4699,6 +4699,14 @@ msgstr "Fora de la zona cercada"
 msgid "Outside the area searched:"
 msgstr "Fora de la zona cercada:"
 
+#: src/components/research/findings/prospect-scan-view.tsx
+msgid "Outside the size asked for"
+msgstr "Fora de la mida demanada"
+
+#: src/components/research/findings/prospect-scan-view.tsx
+msgid "Outside the size asked for:"
+msgstr "Fora de la mida demanada:"
+
 #: src/components/companies/next-action-card.tsx
 #: src/routes/_authed/companies/index.tsx
 #: src/routes/_authed/index.tsx
@@ -6565,6 +6573,10 @@ msgstr "Aquesta campanya és plena amb {ATTRIBUTES_PER_STACK_MAX} atributs actiu
 #: src/routes/_authed/companies/$slug.tsx
 msgid "This company can't be displayed"
 msgstr "Aquesta empresa no es pot mostrar"
+
+#: src/components/research/findings/prospect-scan-view.tsx
+msgid "This company states more or fewer employees than the search asked for."
+msgstr "Aquesta empresa declara més o menys empleats dels que demanava la cerca."
 
 #: src/components/research/findings/shared.tsx
 msgid "This company's name could not be read, so nothing checked the pages are its own"

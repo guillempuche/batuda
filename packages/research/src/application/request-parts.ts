@@ -201,6 +201,13 @@ export const RequestPartsSchema = Schema.Struct({
 	// list existed and are worth far more; asking for one more thing must not be
 	// able to lose them.
 	places: Schema.optionalKey(Schema.Array(Schema.String)),
+	// The size band the request confines its companies to, as the request wrote
+	// it. Optional and nullable for the reason `places` is optional: a bound the
+	// model leaves out, or writes as null for "no ceiling", must not cost the
+	// run its parts. The reader keeps a bound only when its digits stand in the
+	// request's own text, so a band the model inferred never becomes a mark.
+	minEmployees: Schema.optionalKey(Schema.NullOr(Schema.Number)),
+	maxEmployees: Schema.optionalKey(Schema.NullOr(Schema.Number)),
 })
 
 /**
@@ -228,11 +235,13 @@ export const requestPartsPrompt = (query: string): string =>
 		'',
 		'Separately, say what the request asks its companies BY. Answer "trade" where it asks for companies that do a kind of work — the parts above — and "other" where it asks for companies of any trade, picked out by something else: their size, their place, something they published or use, who they sell to, or an advertisement they placed. A request that names a kind of work and adds a size or a place still asks by trade.',
 		'',
+		'Separately, where the request confines its companies to a number of employees, give the fewest as minEmployees and the most as maxEmployees, each as a whole number copied from the request ("entre 5 y 250 empleados" gives 5 and 250; "10 o más" gives 10 and no ceiling). Leave a bound out where the request sets none; never infer one from the kind of company asked for.',
+		'',
 		'Separately again, name the place the request wants its companies to BE IN, in the words the request uses ("Ripollet (Barcelona)", "Texas", "Baltimore metro"). Only where the request confines its answer to a place: a company named in passing, a place it sells into or travels to, and the country a language happens to belong to are all somewhere a company is not required to be, and each of them is an empty answer. Where the request names several, give the widest one that contains them all. Answer with an empty string whenever the request asks for companies anywhere.',
 		'',
 		"Separately again, list EVERY place the request names its companies must be in, each in the request's own words and on its own — a request naming three towns gives three, and one naming a town and its province gives both. This is the same reading as the place above, written out rather than collapsed, so a place that is an empty answer there is left out here too. Return an empty list whenever the request asks for companies anywhere.",
 		'',
-		'Return {"parts": [{"label": "...", "terms": ["...", "..."]}], "kindsOfCompany": ["...", "..."], "askedBy": "trade" | "other", "place": "...", "places": ["...", "..."]} and nothing else.',
+		'Return {"parts": [{"label": "...", "terms": ["...", "..."]}], "kindsOfCompany": ["...", "..."], "askedBy": "trade" | "other", "minEmployees": <number or null>, "maxEmployees": <number or null>, "place": "...", "places": ["...", "..."]} and nothing else.',
 		'',
 		`Request:\n${query}`,
 	].join('\n')
@@ -390,6 +399,80 @@ export const readAskedBy = (raw: unknown): AskedBy | null => {
 	if (typeof answer !== 'string') return null
 	const word = answer.trim().toLowerCase()
 	return word === 'trade' || word === 'other' ? word : null
+}
+
+/** The size band a request confines its companies to; either bound may be absent. */
+export interface RequestSize {
+	readonly minEmployees?: number
+	readonly maxEmployees?: number
+}
+
+/**
+ * Whether the digits of a bound stand in the request's own text, as a whole
+ * number rather than inside a longer one: "entre 5 y 250" carries 5 and 250, and
+ * a request naming "2024" does not carry 20. A request writes a large number
+ * with its thousands grouped — "1.000", "1 000", "1,000" — so the digits may
+ * stand with one such separator between each group of three.
+ */
+const writtenInRequest = (bound: number, query: string): boolean => {
+	const digits = String(bound)
+	const separator = '[.,\\s\\u00a0]'
+	// An optional separator goes before each digit that starts a group of three
+	// counted from the right, so 1000 also matches "1.000".
+	const grouped = digits
+		.split('')
+		.map((digit, index) => {
+			const digitsFromEnd = digits.length - index
+			return digitsFromEnd % 3 === 0 && index > 0
+				? `${separator}?${digit}`
+				: digit
+		})
+		.join('')
+	// Not part of a longer grouped number either way: "250" is not written in
+	// "1.250", and "1" is not written in "1.000".
+	return new RegExp(
+		`(?<!\\p{Nd}${separator}?)${grouped}(?!${separator}\\p{Nd}{3}|\\p{Nd})`,
+		'u',
+	).test(query)
+}
+
+/**
+ * The size band the splitter read, kept only where the request wrote it.
+ *
+ * A bound is a whole number of zero or more whose digits stand in the request
+ * text; a floor above the ceiling reads as no band at all, since the two cannot
+ * both be what was asked. Read from the parse rather than from the text alone
+ * because the text alone cannot tell a headcount from a year or a postcode, and
+ * checked against the text because a model asked for a band will offer one.
+ */
+export const readRequestSize = (raw: unknown, query: string): RequestSize => {
+	if (raw === null || typeof raw !== 'object') return {}
+	const readBound = (
+		key: 'minEmployees' | 'maxEmployees',
+	): number | undefined => {
+		const value = (raw as Record<string, unknown>)[key]
+		const bound =
+			typeof value === 'number'
+				? value
+				: typeof value === 'string' && /^\s*\d+\s*$/.test(value)
+					? Number(value)
+					: undefined
+		if (bound === undefined || !Number.isSafeInteger(bound) || bound < 0)
+			return undefined
+		return writtenInRequest(bound, query) ? bound : undefined
+	}
+	const minEmployees = readBound('minEmployees')
+	const maxEmployees = readBound('maxEmployees')
+	if (
+		minEmployees !== undefined &&
+		maxEmployees !== undefined &&
+		minEmployees > maxEmployees
+	)
+		return {}
+	return {
+		...(minEmployees === undefined ? {} : { minEmployees }),
+		...(maxEmployees === undefined ? {} : { maxEmployees }),
+	}
 }
 
 /**

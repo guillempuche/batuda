@@ -40,6 +40,12 @@ export class ResearchRunContext extends Context.Service<
 		// what it was sent, and a paid call is the wrong place to find out that one
 		// did not.
 		readonly schemaName?: string | undefined
+		// What the run may spend on tools that cost money, in cents. Zero bars
+		// those tools the way a scan is barred: the model is told why and where
+		// to record the request instead, rather than handed a refusal after the
+		// vendor was asked. Absent reads as unbounded, for a caller that is not
+		// a run.
+		readonly paidBudgetCents?: number | undefined
 	}
 >()('research/ResearchRunContext') {}
 

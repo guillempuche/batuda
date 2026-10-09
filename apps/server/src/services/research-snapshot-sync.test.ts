@@ -5,6 +5,7 @@ import {
 	SNAPSHOT_CONTACT_FIELDS,
 } from '@batuda/research'
 
+import { splitCompanyChannelFields } from './channels'
 import { COMPANY_FIELDS, CONTACT_FIELDS } from './research-apply'
 
 describe('research snapshot projection', () => {
@@ -16,8 +17,16 @@ describe('research snapshot projection', () => {
 			// would only invite a proposal that silently does nothing. Only apps/server
 			// sees both the projection and the write allowlist, so this bridge fails if
 			// an edit to one is not matched in the other.
+			// A company's website is written as a channel rather than a column, and
+			// it is shown so a run can see when the company has none; it counts as
+			// writable when the split that takes channels off a proposal takes it.
 			for (const field of SNAPSHOT_COMPANY_FIELDS) {
-				expect(COMPANY_FIELDS.has(field)).toBe(true)
+				const asChannel = splitCompanyChannelFields({
+					[field]: 'https://example.test',
+				})
+				expect(COMPANY_FIELDS.has(field) || asChannel.channels.length > 0).toBe(
+					true,
+				)
 			}
 			for (const field of SNAPSHOT_CONTACT_FIELDS) {
 				expect(CONTACT_FIELDS.has(field)).toBe(true)

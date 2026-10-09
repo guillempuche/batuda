@@ -14,6 +14,7 @@ import {
 	readRequestParts,
 	readRequestPlace,
 	readRequestPlaces,
+	readRequestSize,
 	requestPartsDirective,
 	requestPartsPrompt,
 	searchedAndEmptyParts,
@@ -732,6 +733,108 @@ describe('searchedAndEmptyParts', () => {
 			// and one that never asked the question
 			// THEN there is no shortfall to report
 			expect(searchedAndEmptyParts([], [])).toEqual([])
+		})
+	})
+})
+
+describe('readRequestSize', () => {
+	const query =
+		'Busca fabricantes de prefabricados en la provincia de Barcelona, entre 5 y 250 empleados, fundados antes de 2024.'
+
+	describe('when the splitter reads a band the request wrote', () => {
+		it('should keep both bounds', () => {
+			// GIVEN a floor and a ceiling whose digits stand in the request
+			// WHEN read — THEN both are kept
+			expect(
+				readRequestSize({ minEmployees: 5, maxEmployees: 250 }, query),
+			).toEqual({ minEmployees: 5, maxEmployees: 250 })
+		})
+
+		it('should keep a floor alone when the request set no ceiling', () => {
+			// GIVEN "10 o más empleados" read as a floor and a null ceiling
+			// WHEN read — THEN only the floor is kept
+			expect(
+				readRequestSize(
+					{ minEmployees: 10, maxEmployees: null },
+					'Empresas de 10 o más empleados en Girona',
+				),
+			).toEqual({ minEmployees: 10 })
+		})
+
+		it('should find a bound the request wrote with its thousands grouped', () => {
+			// GIVEN "1.000", "1 000" and "1,000" in three requests, read as 1000
+			// WHEN read — THEN each carries the bound, grouped or not
+			expect(
+				readRequestSize({ minEmployees: 1000 }, 'más de 1.000 empleados'),
+			).toEqual({ minEmployees: 1000 })
+			expect(
+				readRequestSize({ minEmployees: 1000 }, 'more than 1 000 staff'),
+			).toEqual({ minEmployees: 1000 })
+			expect(
+				readRequestSize({ maxEmployees: 25000 }, 'up to 25,000 employees'),
+			).toEqual({ maxEmployees: 25000 })
+			// AND a year still does not carry a smaller number inside it, nor does
+			// a grouped number carry one of its groups
+			expect(readRequestSize({ minEmployees: 24 }, 'founded in 2024')).toEqual(
+				{},
+			)
+			expect(
+				readRequestSize({ minEmployees: 250 }, 'más de 1.250 empleados'),
+			).toEqual({})
+			expect(
+				readRequestSize({ minEmployees: 1 }, 'más de 1.000 empleados'),
+			).toEqual({})
+		})
+
+		it('should read a bound a lax vendor wrote as a string of digits', () => {
+			// GIVEN a provider that holds the model to no type
+			// WHEN read — THEN the digits are the number
+			expect(readRequestSize({ maxEmployees: '250' }, query)).toEqual({
+				maxEmployees: 250,
+			})
+		})
+	})
+
+	describe('when the band is not what the request wrote', () => {
+		it('should drop a bound whose digits are not in the request', () => {
+			// GIVEN a ceiling the model inferred from the kind of company
+			// WHEN read — THEN that bound goes and the written one stays
+			expect(
+				readRequestSize({ minEmployees: 5, maxEmployees: 500 }, query),
+			).toEqual({ minEmployees: 5 })
+		})
+
+		it('should not read a number that is part of a longer one', () => {
+			// GIVEN a bound of 20, which stands inside "2024" and nowhere else
+			// WHEN read — THEN it is not what the request wrote
+			expect(readRequestSize({ minEmployees: 20 }, query)).toEqual({})
+		})
+
+		it('should read no band when the floor is above the ceiling', () => {
+			// GIVEN the two bounds swapped
+			// WHEN read — THEN neither is trusted
+			expect(
+				readRequestSize({ minEmployees: 250, maxEmployees: 5 }, query),
+			).toEqual({})
+		})
+
+		it('should refuse a bound that is not a whole number of zero or more', () => {
+			// GIVEN a fraction, a negative number and a word
+			// WHEN read — THEN none is a bound
+			expect(readRequestSize({ minEmployees: 5.5 }, query)).toEqual({})
+			// AND a number too large to be written in digits is not a bound either,
+			// rather than a pattern that cannot be built
+			expect(readRequestSize({ minEmployees: 1e21 }, query)).toEqual({})
+			expect(readRequestSize({ minEmployees: -5 }, query)).toEqual({})
+			expect(readRequestSize({ maxEmployees: 'many' }, query)).toEqual({})
+		})
+
+		it('should read nothing from an answer with no band or no shape', () => {
+			// GIVEN answers that leave the band out, or are not an object
+			// WHEN read — THEN an empty band
+			expect(readRequestSize({ parts: [] }, query)).toEqual({})
+			expect(readRequestSize(null, query)).toEqual({})
+			expect(readRequestSize('5-250', query)).toEqual({})
 		})
 	})
 })

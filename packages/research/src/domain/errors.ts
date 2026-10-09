@@ -212,6 +212,18 @@ export const paidToolBarredResult = (tool: string) => ({
 })
 
 /**
+ * A tool that spends money, reached by a run given nothing to spend. Said apart
+ * from the scan's refusal above because the way out differs: here the run may
+ * well be about one company, and what is missing is a person's say-so on the
+ * money, which `pending_paid_actions` is the place to ask for.
+ */
+export const paidToolUnfundedResult = (tool: string) => ({
+	status: 'not_available_here' as const,
+	tool,
+	message: `${tool} is not available on this run, which was given no budget for tools that spend money. Record it under pending_paid_actions with the company it is for — and for discover_contacts, its web domain, written as null when the company has no website — and a person decides whether to pay for it.`,
+})
+
+/**
  * The register exists but our account has no credit left to ask it, so no lookup
  * in this run will be answered. Kept apart from `no_registry`, which says the
  * country has no register at all: this one is a fact about us, and a run that

@@ -313,6 +313,64 @@ describe('guardScalarFields', () => {
 		})
 	})
 
+	describe('when a registration number holds a name instead', () => {
+		it('should drop the legal name a run read off the same line as the number', () => {
+			// GIVEN the Esolvo case: the enrichment answered "tax id?" with the
+			// registered name from the legal notice, backed by a real quote
+			const findings = {
+				enrichment: {
+					tax_id: {
+						value: 'INGENIERÍA Y GESTIÓN De ESPACIOS INDUSTRIALES, SL',
+						source_id: 'https://egein.example/aviso-legal',
+						quote: 'INGENIERÍA Y GESTIÓN De ESPACIOS INDUSTRIALES, SL',
+						confidence: null,
+					},
+				},
+			}
+
+			// WHEN grounded against evidence that does contain the quote
+			const result = guardScalarFields(
+				findings,
+				'titular: ingeniería y gestión de espacios industriales, sl - cif b17000000',
+			)
+
+			// THEN it is dropped as the wrong kind of value
+			expect(
+				(result.findings as { enrichment: { tax_id: unknown } }).enrichment
+					.tax_id,
+			).toBeNull()
+			expect(result.droppedWrongKind).toBe(1)
+		})
+
+		it('should keep a number written the way a register writes it', () => {
+			// GIVEN a CIF with the country prefix, quoted from the legal notice
+			const findings = {
+				enrichment: {
+					tax_id: {
+						value: 'ESB17000000',
+						source_id: 'https://egein.example/aviso-legal',
+						quote: 'CIF ESB17000000',
+						confidence: null,
+					},
+				},
+			}
+
+			// WHEN grounded — THEN it stays
+			const result = guardScalarFields(
+				findings,
+				'titular: egein sl - cif esb17000000',
+			)
+			expect(
+				(
+					result.findings as {
+						enrichment: { tax_id: { value: string } }
+					}
+				).enrichment.tax_id.value,
+			).toBe('ESB17000000')
+			expect(result.droppedWrongKind).toBe(0)
+		})
+	})
+
 	describe('when a field carries no fetched source', () => {
 		it('should drop a bare value with no source_id', () => {
 			// GIVEN the Redwood/ITS shape: a value with provenance but no source_id

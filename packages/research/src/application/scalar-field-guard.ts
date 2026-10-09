@@ -28,6 +28,7 @@
 
 import { clipText } from '@batuda/domain'
 
+import { looksLikeRegistrationNumber } from '../domain/registration-number'
 import { LEGAL_SUFFIXES } from './entity-guard'
 import { isSourcedField } from './guard-shapes'
 import { writtenWithoutWordSpaces } from './term-match'
@@ -269,9 +270,14 @@ const isPlaceValue = (value: string): boolean =>
 	!listsPlacesInBrackets(value)
 
 // Fields whose value must be a particular kind of thing, beyond simply "not a
-// placeholder". A location is the clear case; other fields impose no such shape.
+// placeholder". A location has to name a place, and a registration number has
+// to be mostly digits: a run reading a legal notice meets the registered name
+// and the number on one line and writes the name into the number's field.
+// Proposed updates are not walked here; they meet the same number rule where
+// they are applied.
 const FIELD_RULES: Record<string, (value: string) => boolean> = {
 	location: isPlaceValue,
+	tax_id: looksLikeRegistrationNumber,
 }
 
 // Whether a value is an acceptable kind of thing for its field. A field with no

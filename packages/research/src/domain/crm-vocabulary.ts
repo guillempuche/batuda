@@ -13,6 +13,11 @@ export const SNAPSHOT_COMPANY_FIELDS = [
 	// Left out, the number could only ever be written by the first run to find it
 	// and never corrected by any run after.
 	'taxId',
+	// The company's own site. Not a column — it is applied as a channel — but
+	// shown here, because a run that cannot see the site is missing never
+	// proposes one, and every other finding hangs off the site. The snapshot
+	// carries the primary website channel under this name.
+	'website',
 	'industry',
 	'sizeRange',
 	'location',
