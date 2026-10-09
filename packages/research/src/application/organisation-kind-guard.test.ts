@@ -1162,12 +1162,16 @@ describe('when a removal is put to the judge a second time', () => {
 					: { verdicts: [] }
 			})
 
-		// WHEN the list is checked — THEN nothing is removed on one vote
+		// WHEN the list is checked — THEN nothing is removed on one vote, nothing
+		//   is counted as kept by a second vote nobody cast, and the rows are
+		//   remembered by nothing, so a later pass asks again
 		const result = await Effect.runPromise(
 			dropNonCompanies(list, 'prospects', judge),
 		)
 		expect(namesIn(result.findings)).toEqual(['Hormipresa', 'Perez'])
-		expect(result.secondKept).toBe(2)
+		expect(result.secondAsked).toBe(2)
+		expect(result.secondKept).toBe(0)
+		expect(result.learned.size).toBe(0)
 	})
 
 	it('should not ask a second time about a drop held over from an earlier pass', async () => {
@@ -1259,5 +1263,330 @@ describe('organisationKindGuardPrompt on a second asking', () => {
 			'This is a second reading of rows a first reading called "other"',
 		)
 		expect(second.replace(/\n\nThis is a second reading[^\n]*/, '')).toBe(first)
+	})
+})
+
+describe('when the run is out of time', () => {
+	const list = {
+		prospects: [
+			{
+				name: 'Hormipresa',
+				why_relevant: 'Markets prefabricated concrete elements',
+			},
+			{ name: 'Perez', why_relevant: 'Installs' },
+		],
+	}
+
+	it('should ask nothing and keep every row when time is already up', async () => {
+		// GIVEN a clock that says the margin has passed before the first batch
+		const judge = vi.fn(rules({ Hormipresa: 'other', Perez: 'company' }))
+		// WHEN the list is checked
+		const result = await Effect.runPromise(
+			dropNonCompanies(list, 'prospects', judge, new Map(), {
+				outOfTime: () => true,
+			}),
+		)
+		// THEN no question went out, nothing was removed, and the run is told why
+		expect(judge).not.toHaveBeenCalled()
+		expect(namesIn(result.findings)).toEqual(['Hormipresa', 'Perez'])
+		expect(result.stoppedForTime).toBe(true)
+		expect(result.ruled).toBe(0)
+	})
+
+	it('should keep a row the first vote removed when there is no time for the second', async () => {
+		// GIVEN a clock that runs out right after the first asking
+		let asked = 0
+		const judge = vi.fn(rules({ Hormipresa: 'other', Perez: 'company' }))
+		const outOfTime = () => asked++ > 0
+		// WHEN the list is checked
+		const result = await Effect.runPromise(
+			dropNonCompanies(list, 'prospects', judge, new Map(), { outOfTime }),
+		)
+		// THEN the first vote alone removed nothing; no second question went out,
+		//   so none is counted, and the row is remembered by nothing, so the next
+		//   pass asks about it afresh
+		expect(judge).toHaveBeenCalledTimes(1)
+		expect(namesIn(result.findings)).toEqual(['Hormipresa', 'Perez'])
+		expect(result.stoppedForTime).toBe(true)
+		expect(result.secondAsked).toBe(0)
+		expect(result.secondKept).toBe(0)
+		expect(result.learned.has('hormipresa')).toBe(false)
+		const pass2 = await Effect.runPromise(
+			dropNonCompanies(list, 'prospects', judge, result.learned),
+		)
+		expect(judge).toHaveBeenCalledTimes(3)
+		expect(namesIn(pass2.findings)).toEqual(['Perez'])
+	})
+})
+
+describe('when the judge answers the second asking in ways a list is not', () => {
+	const list = {
+		prospects: [
+			{
+				name: 'Hormipresa',
+				why_relevant: 'Markets prefabricated concrete elements',
+			},
+			{ name: 'Perez', why_relevant: 'Installs' },
+		],
+	}
+
+	it('should keep a row the second asking calls unsure, and keep the first reason on a confirmed drop', async () => {
+		// GIVEN a judge calling both rows "other" first, then one unsure and one
+		//   other with a reason of its own
+		let askings = 0
+		const judge: OrganisationKindGuardJudge = rows =>
+			Effect.sync(() => {
+				askings++
+				return {
+					verdicts: rows.map(row => ({
+						id: row.id,
+						kind:
+							askings === 1
+								? ('other' as const)
+								: row.name === 'Hormipresa'
+									? ('unsure' as const)
+									: ('other' as const),
+						reason: askings === 1 ? 'first reason' : 'second reason',
+					})),
+				}
+			})
+		// WHEN the list is checked
+		const result = await Effect.runPromise(
+			dropNonCompanies(list, 'prospects', judge),
+		)
+		// THEN the unsure row stays and the confirmed drop carries the first asking's words
+		expect(namesIn(result.findings)).toEqual(['Hormipresa'])
+		expect(result.dropped[0]?.reason).toBe('first reason')
+		expect(result.secondKept).toBe(1)
+	})
+
+	it('should count a row kept once however many verdicts the first asking gave it', async () => {
+		// GIVEN a first ruling that names the same row twice and a second that keeps it
+		let askings = 0
+		const judge: OrganisationKindGuardJudge = rows =>
+			Effect.sync(() => {
+				askings++
+				const first = rows[0]
+				if (first === undefined) return { verdicts: [] }
+				return askings === 1
+					? {
+							verdicts: [
+								{ id: first.id, kind: 'other' as const },
+								{ id: first.id, kind: 'other' as const },
+							],
+						}
+					: { verdicts: [{ id: first.id, kind: 'company' as const }] }
+			})
+		// WHEN the list is checked — THEN one row asked again, one kept
+		const result = await Effect.runPromise(
+			dropNonCompanies(list, 'prospects', judge),
+		)
+		expect(result.secondAsked).toBe(1)
+		expect(result.secondKept).toBe(1)
+	})
+
+	it('should ignore a second verdict naming a row that was not in its batch', async () => {
+		// GIVEN twenty-six rows all first called "other", so the second asking is
+		//   two batches, a first second-batch answer naming a row of the second
+		//   batch, and a clock that stops before that second batch
+		const many = {
+			prospects: Array.from({ length: 26 }, (_, at) => ({
+				name: `Firma ${String(at).padStart(2, '0')}`,
+				why_relevant: 'Listada',
+			})),
+		}
+		let askings = 0
+		let secondBatches = 0
+		const judge: OrganisationKindGuardJudge = (rows, asking) =>
+			Effect.sync(() => {
+				askings++
+				if (asking?.secondAsking !== true)
+					return {
+						verdicts: rows.map(row => ({ id: row.id, kind: 'other' as const })),
+					}
+				secondBatches++
+				// The first second batch confirms its own rows and also names r25,
+				// which sits in the batch the clock will stop.
+				return {
+					verdicts: [
+						...rows.map(row => ({ id: row.id, kind: 'other' as const })),
+						{ id: 'r25', kind: 'other' as const },
+					],
+				}
+			})
+		const outOfTime = () => secondBatches === 1
+		// WHEN the list is checked
+		const result = await Effect.runPromise(
+			dropNonCompanies(many, 'prospects', judge, new Map(), { outOfTime }),
+		)
+		// THEN the twenty-five rows of the batch that went out are dropped on two
+		//   votes, and the row the stray verdict named is kept with no answer
+		expect(secondBatches).toBe(1)
+		expect(result.dropped).toHaveLength(25)
+		expect(namesIn(result.findings)).toEqual(['Firma 25'])
+		expect(result.stoppedForTime).toBe(true)
+		expect(result.learned.has('firma 25')).toBe(false)
+	})
+})
+
+describe('when a row kept on the second vote comes back reworded', () => {
+	it('should ask about it afresh and drop it on two new votes', async () => {
+		// GIVEN a first pass that kept the row on the second vote
+		const first = {
+			prospects: [{ name: 'Hormipresa', why_relevant: 'Markets elements' }],
+		}
+		let askings = 0
+		const judge: OrganisationKindGuardJudge = rows =>
+			Effect.sync(() => {
+				askings++
+				// Pass 1: other, then company; pass 2: other, other.
+				const kind = askings === 2 ? ('company' as const) : ('other' as const)
+				return { verdicts: rows.map(row => ({ id: row.id, kind })) }
+			})
+		const pass1 = await Effect.runPromise(
+			dropNonCompanies(first, 'prospects', judge),
+		)
+		expect(namesIn(pass1.findings)).toEqual(['Hormipresa'])
+		expect(pass1.learned.get('hormipresa')?.kind).toBe('unsure')
+		// WHEN a later pass rewords it and the judge calls it other twice
+		const second = {
+			prospects: [{ name: 'Hormipresa', why_relevant: 'A quotes marketplace' }],
+		}
+		const pass2 = await Effect.runPromise(
+			dropNonCompanies(second, 'prospects', judge, pass1.learned),
+		)
+		// THEN it was asked twice more and goes, remembered as a drop
+		expect(askings).toBe(4)
+		expect(namesIn(pass2.findings)).toEqual([])
+		expect(pass2.learned.get('hormipresa')?.kind).toBe('other')
+	})
+})
+
+describe('when a hidden host and a drop meet', () => {
+	it('should record no host on the drop, since the judge saw none', async () => {
+		// GIVEN a row whose only site is a Facebook page, dropped on two votes
+		const list = {
+			prospects: [
+				{
+					name: 'Hormipresa',
+					why_relevant: 'x',
+					website: 'https://www.facebook.com/hormipresa',
+				},
+			],
+		}
+		const judge = rules({ Hormipresa: 'other' })
+		// WHEN checked with the host hidden — THEN the record says what was shown
+		const result = await Effect.runPromise(
+			dropNonCompanies(list, 'prospects', judge, new Map(), {
+				hideHost: host => host === 'facebook.com',
+			}),
+		)
+		expect(result.dropped[0]?.websiteHost).toBe('')
+	})
+
+	it('should ask again when the host stops being hidden between passes', async () => {
+		// GIVEN a row kept with its host hidden
+		const list = {
+			prospects: [
+				{
+					name: 'Hormipresa',
+					why_relevant: 'x',
+					website: 'https://facebook.com/h',
+				},
+			],
+		}
+		const judge = vi.fn(rules({ Hormipresa: 'company' }))
+		const pass1 = await Effect.runPromise(
+			dropNonCompanies(list, 'prospects', judge, new Map(), {
+				hideHost: host => host === 'facebook.com',
+			}),
+		)
+		// WHEN the next pass shows the host — THEN the row is a new question
+		await Effect.runPromise(
+			dropNonCompanies(list, 'prospects', judge, pass1.learned),
+		)
+		expect(judge).toHaveBeenCalledTimes(2)
+		expect(judge.mock.calls[1]?.[0]?.[0]?.websiteHost).toBe('facebook.com')
+	})
+})
+
+describe('when the second answer names the wrong rows, or not all of them', () => {
+	const list = {
+		prospects: [
+			{ name: 'Alpha SL', why_relevant: 'Listada' },
+			{ name: 'Beta SL', why_relevant: 'Listada' },
+		],
+	}
+
+	it('should withdraw the first vote of a row the second answer does not name', async () => {
+		// GIVEN both rows first called "other" and a second answer that names
+		//   only the first of them, and under a renumbered id for good measure
+		let askings = 0
+		const judge: OrganisationKindGuardJudge = rows =>
+			Effect.sync(() => {
+				askings++
+				const first = rows[0]
+				if (askings === 1)
+					return {
+						verdicts: rows.map(row => ({ id: row.id, kind: 'other' as const })),
+					}
+				return first === undefined
+					? { verdicts: [] }
+					: {
+							verdicts: [
+								{ id: first.id, kind: 'other' as const },
+								{ id: 'x9', kind: 'company' as const },
+							],
+						}
+			})
+		// WHEN the list is checked
+		const result = await Effect.runPromise(
+			dropNonCompanies(list, 'prospects', judge),
+		)
+		// THEN the named row goes on two votes; the unnamed row is kept, counted
+		//   as kept by nobody, and remembered by nothing
+		expect(namesIn(result.findings)).toEqual(['Beta SL'])
+		expect(result.secondAsked).toBe(2)
+		expect(result.secondKept).toBe(0)
+		expect(result.learned.has('beta sl')).toBe(false)
+	})
+})
+
+describe('when the first answer names a row from another batch', () => {
+	it('should land that verdict on nothing', async () => {
+		// GIVEN thirty rows, a first batch whose answer also names a row of the
+		//   second batch, a second first-batch that answers nothing, and a second
+		//   asking that confirms every drop it is asked about
+		const many = {
+			prospects: Array.from({ length: 30 }, (_, at) => ({
+				name: `Firma ${String(at).padStart(2, '0')}`,
+				why_relevant: 'Listada',
+			})),
+		}
+		let firstBatches = 0
+		const judge: OrganisationKindGuardJudge = (rows, asking) =>
+			Effect.sync(() => {
+				if (asking?.secondAsking === true)
+					return {
+						verdicts: rows.map(row => ({ id: row.id, kind: 'other' as const })),
+					}
+				firstBatches++
+				return firstBatches === 1
+					? {
+							verdicts: [
+								...rows.map(row => ({ id: row.id, kind: 'other' as const })),
+								{ id: 'r27', kind: 'other' as const },
+							],
+						}
+					: { verdicts: [] }
+			})
+		// WHEN the list is checked
+		const result = await Effect.runPromise(
+			dropNonCompanies(many, 'prospects', judge),
+		)
+		// THEN the stray verdict removed nothing: the row it named sits in the
+		//   batch that answered nothing, and stays with the rest of it
+		expect(result.dropped).toHaveLength(25)
+		expect(namesIn(result.findings)).toContain('Firma 27')
 	})
 })
