@@ -348,6 +348,14 @@ export interface OrganisationKindOptions {
 	 * the host, the judge reads the firm as the listing it was found on.
 	 */
 	readonly hideHost?: (host: string) => boolean
+	/**
+	 * Whether the run has no time left for another question. Read before each
+	 * batch, first asking and second alike: the batches run one after another
+	 * near the end of a window whose overrun destroys the run rather than
+	 * degrading it. Past it every row still unasked is kept, which is a list
+	 * not checked rather than a run lost.
+	 */
+	readonly outOfTime?: () => boolean
 }
 
 export interface OrganisationKindResult {
@@ -362,6 +370,8 @@ export interface OrganisationKindResult {
 	 */
 	readonly secondAsked: number
 	readonly secondKept: number
+	/** Whether the run's deadline stopped the asking before every batch went. */
+	readonly stoppedForTime: boolean
 	/** Rows put to the judge, as the scale the drops read against. */
 	readonly asked: number
 	/**
@@ -510,6 +520,7 @@ export const dropNonCompanies = <E, R>(
 			ruled: 0,
 			secondAsked: 0,
 			secondKept: 0,
+			stoppedForTime: false,
 			learned: new Map<string, RememberedKind>(),
 		}
 		if (listField === undefined) return nothing
@@ -573,13 +584,24 @@ export const dropNonCompanies = <E, R>(
 			})
 
 		const fresh: Array<OrganisationKindVerdict> = []
+		const outOfTime = options.outOfTime ?? (() => false)
+		let stoppedForTime = false
 		for (const batch of judgeBatches(toAsk, JUDGE_BATCH_ROWS)) {
+			if (outOfTime()) {
+				stoppedForTime = true
+				break
+			}
+			const inBatch = new Set(batch.map(row => row.id))
 			const ruling = yield* judge(batch)
 			// A judge that answers with something other than a list of verdicts is a
 			// judge that did not answer. Read as none rather than trusted, because
 			// reaching into it is how a failed call stops being a list that survives
-			// and becomes a run that dies.
-			if (Array.isArray(ruling.verdicts)) fresh.push(...ruling.verdicts)
+			// and becomes a run that dies. A verdict naming a row outside this batch
+			// is a renumbering slip and lands on nothing.
+			if (Array.isArray(ruling.verdicts))
+				fresh.push(
+					...ruling.verdicts.filter(verdict => inBatch.has(verdict.id)),
+				)
 		}
 
 		// Only the rows put to the judge this time. Built from `toAsk` rather than
@@ -592,32 +614,58 @@ export const dropNonCompanies = <E, R>(
 		// A removal takes two votes. The rows this pass first called "other" go
 		// back to the judge on their own, and one the second asking does not call
 		// "other" stays, remembered as unsure on these words so a later pass may
-		// still ask about it. A second asking that fails keeps every row, like a
-		// first one that fails.
+		// still ask about it. A row whose second question never went out — the
+		// clock stopped first, or the judge did not answer — has its first verdict
+		// withdrawn instead: it is kept this pass and remembered by nothing, so the
+		// next pass asks about it afresh, like a row the first asking never reached.
 		const secondRows = secondAskingRows(fresh, toAsk)
-		let secondKept = 0
-		if (secondRows.length > 0) {
-			// Cut into the same batches as the first asking, since a pass that
-			// dropped more rows than one question holds is still one question at
-			// a time to the judge.
-			const stillOther = new Set<string>()
-			for (const batch of judgeBatches(secondRows, JUDGE_BATCH_ROWS)) {
-				const secondRuling = yield* judge(batch, { secondAsking: true })
-				if (!Array.isArray(secondRuling.verdicts)) continue
-				for (const verdict of secondRuling.verdicts)
+		const askedAgain = new Set<string>()
+		const stillOther = new Set<string>()
+		const withdrawn = new Set<string>()
+		for (const batch of judgeBatches(secondRows, JUDGE_BATCH_ROWS)) {
+			const batchRowIds = batch.map(row => row.id)
+			if (stoppedForTime || outOfTime()) {
+				stoppedForTime = true
+				for (const id of batchRowIds) withdrawn.add(id)
+				continue
+			}
+			for (const id of batchRowIds) askedAgain.add(id)
+			const secondRuling = yield* judge(batch, { secondAsking: true })
+			// Only a verdict for a row of this batch is a vote. A row the answer
+			// does not name — an empty list, which is what a failed call is turned
+			// into, a renumbered answer, a list that stops short — got no second
+			// vote, and is withdrawn like one the clock stopped.
+			const answered = new Set<string>()
+			const inBatch = new Set(batchRowIds)
+			if (Array.isArray(secondRuling.verdicts))
+				for (const verdict of secondRuling.verdicts) {
+					if (!inBatch.has(verdict.id)) continue
+					answered.add(verdict.id)
 					if (verdict.kind === 'other') stillOther.add(verdict.id)
-			}
-
-			for (const [at, verdict] of fresh.entries()) {
-				if (verdict.kind !== 'other' || stillOther.has(verdict.id)) continue
-				fresh[at] = {
-					id: verdict.id,
-					kind: 'unsure',
-					reason: 'the second asking did not call it other',
 				}
-				secondKept++
-			}
+			for (const id of batchRowIds) if (!answered.has(id)) withdrawn.add(id)
 		}
+
+		const keptBySecondVote = new Set<string>()
+		const settled: Array<OrganisationKindVerdict> = []
+		for (const verdict of fresh) {
+			if (verdict.kind !== 'other' || stillOther.has(verdict.id)) {
+				settled.push(verdict)
+				continue
+			}
+			if (withdrawn.has(verdict.id)) continue
+			keptBySecondVote.add(verdict.id)
+			settled.push({
+				id: verdict.id,
+				kind: 'unsure',
+				reason: 'the second asking did not call it other',
+			})
+		}
+		// From here on `fresh` holds only the verdicts that stand; a withdrawn row
+		// has none, so it is kept and learned nothing about.
+		fresh.length = 0
+		fresh.push(...settled)
+		const secondKept = keptBySecondVote.size
 
 		// What this pass learned, for the caller to carry into the next one. Every
 		// answer is kept, not only the drops: a row ruled a company must not be
@@ -712,8 +760,9 @@ export const dropNonCompanies = <E, R>(
 			dropped,
 			asked: rows.length,
 			ruled,
-			secondAsked: secondRows.length,
+			secondAsked: askedAgain.size,
 			secondKept,
+			stoppedForTime,
 			learned,
 		}
 	})
