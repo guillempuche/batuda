@@ -1693,6 +1693,12 @@ export const buildExtractionPrompt = (args: {
 	/** Whether this run is a discovery scan, whose answer is a list of companies. */
 	readonly discoveryScan?: boolean
 	/**
+	 * Whether this run's scan rows carry a place of their own. A prospect row has a
+	 * `location`; a competitor row does not, so asking a competitor scan for a town
+	 * would name a field its answer has nowhere to put.
+	 */
+	readonly rowsCarryPlace?: boolean
+	/**
 	 * Whether this run's schema carries a field for marking a company the evidence
 	 * did not confirm. Only a schema that has one can be asked to fill it; asking
 	 * the rest would name a field their answer has nowhere to put.
@@ -1723,7 +1729,7 @@ export const buildExtractionPrompt = (args: {
 	if (args.discoveryScan) {
 		lines.push(DISCOVERY_BREADTH_DIRECTIVE, '')
 		lines.push(DISCOVERY_ORGANISATION_KIND_DIRECTIVE, '')
-		lines.push(DISCOVERY_TOWN_DIRECTIVE, '')
+		if (args.rowsCarryPlace) lines.push(DISCOVERY_TOWN_DIRECTIVE, '')
 		lines.push(
 			"Where the evidence names somebody as a company's own leader or employee — a titled person on its team page, a quoted founder, a signed author — put them in THAT company's `contacts`, with the job title written as the evidence writes it, in its own language (a page that says CEO is copied as CEO, not spelt out; 'Gerent' stays 'Gerent') and the page you read them on. Under the company they work for, never the one listed beside them, and never in a list of their own. A company whose pages name its staff and comes back with an empty `contacts` is an incomplete row.",
 			'',
@@ -3793,6 +3799,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 								fitVerdict: schemaName === 'company_enrichment_v1',
 								titleGloss: schemaName === 'company_enrichment_v1',
 								discoveryScan: isDiscoveryScan(schemaName),
+								rowsCarryPlace: schemaName === 'prospect_scan_v1',
 								marksUnconfirmed: schemaName === 'prospect_scan_v1',
 								attributes: runAttributes,
 							})

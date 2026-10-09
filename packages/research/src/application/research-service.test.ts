@@ -531,9 +531,18 @@ describe('buildExtractionPrompt', () => {
 		})
 
 		it('should ask a scan for breadth, as it already asks for every person', () => {
-			// GIVEN a discovery scan versus a run that profiles one company
+			// GIVEN a discovery scan versus a run that profiles one company, and a
+			// competitor scan, whose rows carry no place of their own
 			const scan = buildExtractionPrompt({
 				query: '',
+				citationInstruction: '',
+				evidenceBlock: '',
+				subjects: [],
+				discoveryScan: true,
+				rowsCarryPlace: true,
+			})
+			const competitors = buildExtractionPrompt({
+				query: 'Competidores de Acme',
 				citationInstruction: '',
 				evidenceBlock: '',
 				subjects: [],
@@ -558,6 +567,10 @@ describe('buildExtractionPrompt', () => {
 			// AND it is told to keep a company it could not find a website for, so
 			// asking for the site cannot quietly shorten the list
 			expect(scan).toContain('Never drop a company for want of a website')
+			// AND the competitor scan is pushed for breadth too, but never asked for
+			// a town its rows have nowhere to put
+			expect(competitors).toContain('List EVERY company')
+			expect(competitors).not.toContain('the town it is based in')
 			// AND a run that profiles one company is still asked for its people,
 			// each title in the page's own language with an English rendering
 			// beside it, while a scan's rows carry the title alone
