@@ -67,6 +67,40 @@ describe('looksLikeRegistrationNumber', () => {
 			expect(looksLikeRegistrationNumber(value)).toBe(false)
 		})
 
+		it.each([
+			['a telephone number with a plus', '+34 93 123 45 67'],
+			['a telephone number with its word', 'Tel. 931234567'],
+			['an ISO date', '2023-01-15'],
+			['a date with slashes', '15/01/2023'],
+			['a bank account', 'ES91 2100 0418 4502 0005 1332'],
+			['a bank account with its word', 'IBAN ES9121000418450200051332'],
+			['an email address', 'info12345@acme.example'],
+			['a street address', 'Calle Mayor 12, 08001 Barcelona'],
+			['a postcode line', 'CP 08001 Barcelona'],
+			['a street written short', 'C/ Anoia 12, 08700'],
+		])(
+			"should refuse %s, whose digits are not a register's",
+			(_label, value) => {
+				// GIVEN a line a page writes with digits in it that is not a register entry
+				// THEN its own shape refuses it before the counts are taken
+				expect(looksLikeRegistrationNumber(value)).toBe(false)
+			},
+		)
+
+		it('should accept exactly five digits and refuse four', () => {
+			// GIVEN the fewest digits a register writes, and one fewer
+			expect(looksLikeRegistrationNumber('12345')).toBe(true)
+			expect(looksLikeRegistrationNumber('1234')).toBe(false)
+		})
+
+		it('should accept three words of letters around the number and refuse four', () => {
+			// GIVEN a court of three words, and one of four
+			expect(looksLikeRegistrationNumber('Frankfurt am Main 12345')).toBe(true)
+			expect(looksLikeRegistrationNumber('Frankfurt am Main Oder 12345')).toBe(
+				false,
+			)
+		})
+
 		it('should refuse a value longer than any register writes', () => {
 			// GIVEN a real number followed by the whole legal notice line
 			const value = 'B12345678 inscrita en el Registro Mercantil de Barcelona'

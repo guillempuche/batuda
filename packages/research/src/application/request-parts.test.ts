@@ -829,11 +829,55 @@ describe('readRequestSize', () => {
 			expect(readRequestSize({ maxEmployees: 'many' }, query)).toEqual({})
 		})
 
+		it('should keep a floor of zero the request wrote, and not one read off another number', () => {
+			// GIVEN "de 0 a 50" and "hasta 50", each read as a floor of 0
+			// WHEN read — THEN only the 0 the request wrote is kept
+			expect(
+				readRequestSize({ minEmployees: 0 }, 'de 0 a 50 empleados'),
+			).toEqual({
+				minEmployees: 0,
+			})
+			expect(
+				readRequestSize({ minEmployees: 0 }, 'hasta 50 empleados'),
+			).toEqual({})
+		})
+
+		it('should keep a band whose floor and ceiling are the same number', () => {
+			// GIVEN "50 empleados" read as 50 to 50
+			expect(
+				readRequestSize({ minEmployees: 50, maxEmployees: 50 }, '50 empleados'),
+			).toEqual({ minEmployees: 50, maxEmployees: 50 })
+		})
+
+		it('should read a range written with a hyphen', () => {
+			// GIVEN "10-50 empleados"
+			expect(
+				readRequestSize(
+					{ minEmployees: 10, maxEmployees: 50 },
+					'10-50 empleados',
+				),
+			).toEqual({ minEmployees: 10, maxEmployees: 50 })
+		})
+
+		it('should read a grouped number as the whole number, never as its first group', () => {
+			// GIVEN "5,000 empleados" read as 5000, and wrongly as 5
+			// WHEN read — THEN only 5000 is kept
+			expect(
+				readRequestSize({ minEmployees: 5000 }, '5,000 empleados'),
+			).toEqual({
+				minEmployees: 5000,
+			})
+			expect(readRequestSize({ minEmployees: 5 }, '5,000 empleados')).toEqual(
+				{},
+			)
+		})
+
 		it('should read nothing from an answer with no band or no shape', () => {
 			// GIVEN answers that leave the band out, or are not an object
 			// WHEN read — THEN an empty band
 			expect(readRequestSize({ parts: [] }, query)).toEqual({})
 			expect(readRequestSize(null, query)).toEqual({})
+			expect(readRequestSize([], query)).toEqual({})
 			expect(readRequestSize('5-250', query)).toEqual({})
 		})
 	})
