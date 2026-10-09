@@ -97,6 +97,75 @@ describe('markRowsOutsideSize', () => {
 		})
 	})
 
+	describe('at the edges of the band', () => {
+		it('should mark one below the floor and not the floor itself', () => {
+			// GIVEN a floor of 5 and rows at 5 and 4
+			const findings = { prospects: [sized('At', 5), sized('Below', 4)] }
+			// WHEN marked — THEN only the one below carries the mark
+			const rows = prospects(
+				markRowsOutsideSize(findings, 'prospects', { minEmployees: 5 })
+					.findings,
+			)
+			expect(rows[0]?.[MARKS_FIELD]).toBeUndefined()
+			expect(rows[1]?.[MARKS_FIELD]).toEqual([OUTSIDE_REQUESTED_SIZE])
+		})
+
+		it('should hold a row to a ceiling when there is no floor', () => {
+			// GIVEN a ceiling and no floor
+			const findings = { prospects: [sized('Small', 3), sized('Large', 900)] }
+			// WHEN marked — THEN only the row above the ceiling is marked
+			const rows = prospects(
+				markRowsOutsideSize(findings, 'prospects', { maxEmployees: 10 })
+					.findings,
+			)
+			expect(rows[0]?.[MARKS_FIELD]).toBeUndefined()
+			expect(rows[1]?.[MARKS_FIELD]).toEqual([OUTSIDE_REQUESTED_SIZE])
+		})
+
+		it('should leave a headcount that is not a number alone', () => {
+			// GIVEN a value the shape allows but no page could state
+			const findings = {
+				prospects: [
+					{
+						name: 'Odd',
+						employee_estimate: { value: Number.NaN, source_id: 'x' },
+					},
+				],
+			}
+			// WHEN marked — THEN it is neither inside nor outside, so untouched
+			const result = markRowsOutsideSize(findings, 'prospects', {
+				maxEmployees: 250,
+			})
+			expect(result.findings).toBe(findings)
+		})
+	})
+
+	describe('when the marks field is not a list of words', () => {
+		it('should keep the words and drop the rest when it adds the mark', () => {
+			// GIVEN a row whose marks hold a number beside a word, and one whose
+			// marks are a bare string
+			const findings = {
+				prospects: [
+					{
+						...sized('Mixed', 900),
+						[MARKS_FIELD]: [1, 'existence_unconfirmed'],
+					},
+					{ ...sized('Bare', 900), [MARKS_FIELD]: 'outside_requested_size' },
+				],
+			}
+			// WHEN marked — THEN each ends with a clean list carrying the mark
+			const rows = prospects(
+				markRowsOutsideSize(findings, 'prospects', { maxEmployees: 250 })
+					.findings,
+			)
+			expect(rows[0]?.[MARKS_FIELD]).toEqual([
+				'existence_unconfirmed',
+				OUTSIDE_REQUESTED_SIZE,
+			])
+			expect(rows[1]?.[MARKS_FIELD]).toEqual([OUTSIDE_REQUESTED_SIZE])
+		})
+	})
+
 	describe('when there is nothing to hold a row to, or nothing to hold', () => {
 		it('should leave a row that states no headcount alone', () => {
 			// GIVEN rows with no headcount, a blanked one, and a bare value

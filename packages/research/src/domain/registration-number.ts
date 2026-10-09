@@ -76,11 +76,31 @@ const MOST_WORDS = 3
 /** A number longer than this has something else written beside it. */
 const MOST_CHARS = 40
 
+/**
+ * Digits that are not a register's: a page's own contact line, a date, a bank
+ * account, a street address. Each has a shape of its own that a register
+ * number never takes, so each is refused on that shape rather than counted.
+ */
+const NOT_A_REGISTER = [
+	// An email address.
+	/@/u,
+	// A telephone number: a leading plus, or a telephone word before it.
+	/^\+|\b(?:tel|tlf|tfno|phone|fax|m[oó]vil|mobile)\b/iu,
+	// A date, written either way round.
+	/\b\d{4}-\d{2}-\d{2}\b|\b\d{2}[/.]\d{2}[/.]\d{4}\b/u,
+	// A bank account: the word, or a country code and check digits ahead of a
+	// long run of digits in groups of four.
+	/\biban\b|\b[a-z]{2}\d{2}(?:[ ]?[a-z0-9]{4}){3,}/iu,
+	// A street or a postcode line.
+	/\b(?:calle|carrer|avenida|avinguda|av|avda|plaza|plaça|rue|avenue|street|st|road|straße|strasse|str|cp|c\.p)\b|^c\//iu,
+]
+
 export const looksLikeRegistrationNumber = (value: string): boolean => {
 	// Composed first, so an accented letter written as a base letter plus a
 	// mark is one letter and not a word break.
 	const trimmed = value.normalize('NFC').trim()
 	if (trimmed === '' || trimmed.length > MOST_CHARS) return false
+	if (NOT_A_REGISTER.some(shape => shape.test(trimmed))) return false
 	const digits = (trimmed.match(/\p{Nd}/gu) ?? []).length
 	const words = (trimmed.match(/\p{L}{2,}/gu) ?? []).filter(
 		word => !REGISTER_WORDS.has(word.toLowerCase()),
