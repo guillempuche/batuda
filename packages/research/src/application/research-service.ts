@@ -246,6 +246,7 @@ import {
 	SizeRescueSchema,
 	sizeRescuePrompt,
 } from './size-rescue'
+import { isSocialPlatformHost } from './social-sites'
 import { rescueSocialWebsites } from './social-website-rescue'
 import {
 	hostOf,
@@ -4109,11 +4110,15 @@ export class ResearchService extends Context.Service<ResearchService>()(
 											const check = yield* dropNonCompanies(
 												findings,
 												discoveryResultField(schemaName),
-												rows =>
+												(rows, asking) =>
 													extractLlm
 														.generateObject({
 															schema: OrganisationKindGuardVerdictsSchema,
-															prompt: organisationKindGuardPrompt(rows, asked),
+															prompt: organisationKindGuardPrompt(
+																rows,
+																asked,
+																asking,
+															),
 														})
 														.pipe(
 															Effect.map(response => ({
@@ -4141,6 +4146,10 @@ export class ResearchService extends Context.Service<ResearchService>()(
 															),
 														),
 												organisationKinds,
+												// A social page is not a firm's own site, and shown as one
+												// it reads as the platform. This check runs before the
+												// website check that would blank it.
+												{ hideHost: isSocialPlatformHost },
 											)
 											// What this pass learned is carried into the next one, so a
 											// gap round only pays for the rows it actually added.
@@ -4197,6 +4206,13 @@ export class ResearchService extends Context.Service<ResearchService>()(
 													// none ruled is a check that never ran at all.
 													'research.prospects.kind_asked': check.asked,
 													'research.prospects.kind_ruled': check.ruled,
+													// A second asking is what stands between one model's
+													// run-to-run movement and a removal, so how often it
+													// overturned the first is a number worth having.
+													'research.prospects.kind_second_asked':
+														check.secondAsked,
+													'research.prospects.kind_second_kept':
+														check.secondKept,
 												},
 											}
 										}),
