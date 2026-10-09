@@ -1778,12 +1778,12 @@ export const researchKindReask = (input: {
 		let askedBatches = 0
 		let failedBatches = 0
 		const extract = yield* ExtractLanguageModel
-		const judge: KindReaskJudge<never, never> = (rows, asked) => {
+		const judge: KindReaskJudge<never, never> = (rows, asked, asking) => {
 			askedBatches++
 			return extract
 				.generateObject({
 					schema: OrganisationKindGuardVerdictsSchema,
-					prompt: organisationKindGuardPrompt(rows, asked),
+					prompt: organisationKindGuardPrompt(rows, asked, asking),
 				})
 				.pipe(
 					Effect.map(response => ({ verdicts: response.value.verdicts })),

@@ -451,9 +451,10 @@ describe('dropNonCompanies', () => {
 			)
 
 			// THEN only the new row is paid for, while the row the first pass placed
-			//   is still dropped on the answer it already has
-			expect(judge).toHaveBeenCalledTimes(2)
-			expect(judge.mock.calls[1]?.[0]?.map(row => row.name)).toEqual([
+			//   is still dropped on the answer it already has. The first pass asked
+			//   twice, the list and then the row it dropped; the second asks once.
+			expect(judge).toHaveBeenCalledTimes(3)
+			expect(judge.mock.calls[2]?.[0]?.map(row => row.name)).toEqual([
 				'Habitissimo',
 			])
 			expect(namesIn(pass2.findings)).toEqual(['Perez', 'Habitissimo'])
@@ -508,7 +509,9 @@ describe('dropNonCompanies', () => {
 			//   to reach it again. Remembered under the wording instead, this row
 			//   shipped as an installer.
 			expect(namesIn(pass2.findings)).toEqual([])
-			expect(judge).toHaveBeenCalledTimes(1)
+			// (the first pass asked twice: once about the list, once more about
+			//   the row it dropped)
+			expect(judge).toHaveBeenCalledTimes(2)
 			expect(pass2.dropped).toHaveLength(1)
 		})
 
@@ -549,7 +552,7 @@ describe('dropNonCompanies', () => {
 			// THEN it is asked again and goes. A memory that held every answer as
 			//   firmly as a drop would keep a marketplace for the whole run on the
 			//   strength of one pass that could not tell.
-			expect(judge).toHaveBeenCalledTimes(2)
+			expect(judge).toHaveBeenCalledTimes(3)
 			expect(namesIn(pass2.findings)).toEqual([])
 			expect(pass2.dropped[0]?.reason).toBe('platform selling panels')
 		})
@@ -584,7 +587,7 @@ describe('dropNonCompanies', () => {
 			// THEN it is still the same organisation, so the answer still stands —
 			//   the fold is the one the de-duplication link uses, so the two checks
 			//   cannot disagree about whether two rows are one company
-			expect(judge).toHaveBeenCalledTimes(1)
+			expect(judge).toHaveBeenCalledTimes(2)
 			expect(namesIn(pass2.findings)).toEqual([])
 		})
 	})
@@ -663,7 +666,7 @@ describe('dropNonCompanies', () => {
 			//   three fields, so a record filed against the later two describes a
 			//   question nobody asked — and anything re-reading this removal then
 			//   calls a correct removal a mistake, or the reverse.
-			expect(judge).toHaveBeenCalledTimes(1)
+			expect(judge).toHaveBeenCalledTimes(2)
 			expect(pass2.dropped).toEqual([
 				{
 					name: 'TK Elevator France',
@@ -758,7 +761,7 @@ describe('dropNonCompanies', () => {
 			// THEN it is asked afresh, now with its host, and goes. Held on the older
 			//   answer it would keep the verdict reached without the one thing that
 			//   places it — and buying websites is what those rounds are for
-			expect(judge).toHaveBeenCalledTimes(2)
+			expect(judge).toHaveBeenCalledTimes(3)
 			expect(namesIn(pass2.findings)).toEqual([])
 		})
 	})
@@ -1065,5 +1068,196 @@ describe('organisationKindGuardPrompt', () => {
 			)
 			expect(prompt).toContain('[r0] "Perez"')
 		})
+	})
+})
+
+describe('when a removal is put to the judge a second time', () => {
+	const list = {
+		prospects: [
+			{
+				name: 'Hormipresa',
+				why_relevant: 'Markets prefabricated concrete elements',
+			},
+			{ name: 'Perez', why_relevant: 'Installs' },
+		],
+	}
+
+	it('should keep a row the second asking does not call other', async () => {
+		// GIVEN a judge that calls the maker "other" once and a company the second time
+		let askings = 0
+		const judge: OrganisationKindGuardJudge = rows =>
+			Effect.sync(() => {
+				askings++
+				return {
+					verdicts: rows.map(row => ({
+						id: row.id,
+						kind:
+							row.name === 'Hormipresa' && askings === 1
+								? ('other' as const)
+								: ('company' as const),
+						reason: 'selling to trade',
+					})),
+				}
+			})
+
+		// WHEN the list is checked
+		const result = await Effect.runPromise(
+			dropNonCompanies(list, 'prospects', judge),
+		)
+
+		// THEN the maker stays, the second asking was about it alone, and the
+		//   run is told how many removals the second vote overturned
+		expect(namesIn(result.findings)).toEqual(['Hormipresa', 'Perez'])
+		expect(result.dropped).toEqual([])
+		expect(result.secondAsked).toBe(1)
+		expect(result.secondKept).toBe(1)
+		// AND it is remembered as unsure on these words, so a later pass that
+		//   rewords it may still ask
+		const held = [...result.learned.values()].find(
+			answer => answer.kind === 'unsure',
+		)
+		expect(held?.describedAs).toBe('Markets prefabricated concrete elements')
+	})
+
+	it('should drop a row both askings call other', async () => {
+		// GIVEN a judge that calls the maker "other" every time
+		const judge = vi.fn(
+			rules({
+				Hormipresa: { kind: 'other', reason: 'supplier' },
+				Perez: 'company',
+			}),
+		)
+
+		// WHEN the list is checked
+		const result = await Effect.runPromise(
+			dropNonCompanies(list, 'prospects', judge),
+		)
+
+		// THEN two votes were cast and the row goes; the second asking was
+		//   told it was one, so it is a fresh question and not the first again
+		expect(judge).toHaveBeenCalledTimes(2)
+		expect(judge.mock.calls[1]?.[0]?.map(row => row.name)).toEqual([
+			'Hormipresa',
+		])
+		expect(judge.mock.calls[0]?.[1]).toBeUndefined()
+		expect(judge.mock.calls[1]?.[1]).toEqual({ secondAsking: true })
+		expect(namesIn(result.findings)).toEqual(['Perez'])
+		expect(result.secondAsked).toBe(1)
+		expect(result.secondKept).toBe(0)
+	})
+
+	it('should keep the row when the second asking answers nothing', async () => {
+		// GIVEN a judge whose second answer carries no verdicts, like a failed call
+		let askings = 0
+		const judge: OrganisationKindGuardJudge = rows =>
+			Effect.sync(() => {
+				askings++
+				return askings === 1
+					? {
+							verdicts: rows.map(row => ({
+								id: row.id,
+								kind: 'other' as const,
+							})),
+						}
+					: { verdicts: [] }
+			})
+
+		// WHEN the list is checked — THEN nothing is removed on one vote
+		const result = await Effect.runPromise(
+			dropNonCompanies(list, 'prospects', judge),
+		)
+		expect(namesIn(result.findings)).toEqual(['Hormipresa', 'Perez'])
+		expect(result.secondKept).toBe(2)
+	})
+
+	it('should not ask a second time about a drop held over from an earlier pass', async () => {
+		// GIVEN a first pass that dropped the maker on two votes
+		const judge = vi.fn(rules({ Hormipresa: 'other', Perez: 'company' }))
+		const pass1 = await Effect.runPromise(
+			dropNonCompanies(list, 'prospects', judge),
+		)
+		expect(judge).toHaveBeenCalledTimes(2)
+
+		// WHEN the same list is checked again with what was learned
+		const pass2 = await Effect.runPromise(
+			dropNonCompanies(list, 'prospects', judge, pass1.learned),
+		)
+
+		// THEN nothing is asked at all: the drop stands and no row is fresh
+		expect(judge).toHaveBeenCalledTimes(2)
+		expect(namesIn(pass2.findings)).toEqual(['Perez'])
+		expect(pass2.secondAsked).toBe(0)
+	})
+})
+
+describe('when a row gave a site the caller hides from the judge', () => {
+	it('should show the judge no host for it, and hold the answer on that reading', async () => {
+		// GIVEN a maker whose only site is a Facebook page
+		const list = {
+			prospects: [
+				{
+					name: 'Hormipresa',
+					why_relevant: 'Markets prefabricated concrete elements',
+					website: 'https://www.facebook.com/hormipresa',
+				},
+			],
+		}
+		const judge = vi.fn(rules({ Hormipresa: 'company' }))
+		const hideSocial = { hideHost: (host: string) => host === 'facebook.com' }
+
+		// WHEN the list is checked with that host hidden
+		const pass1 = await Effect.runPromise(
+			dropNonCompanies(list, 'prospects', judge, new Map(), hideSocial),
+		)
+
+		// THEN the judge was shown the row with no host
+		expect(judge.mock.calls[0]?.[0]?.[0]?.websiteHost).toBe('')
+		// AND a second pass over the same row is not asked again: the memory
+		//   holds the answer on the same hidden reading
+		await Effect.runPromise(
+			dropNonCompanies(list, 'prospects', judge, pass1.learned, hideSocial),
+		)
+		expect(judge).toHaveBeenCalledTimes(1)
+	})
+
+	it('should still show a host the caller does not hide', async () => {
+		// GIVEN the same row and a caller hiding nothing
+		const list = {
+			prospects: [
+				{
+					name: 'Hormipresa',
+					why_relevant: 'x',
+					website: 'https://hormipresa.com/',
+				},
+			],
+		}
+		const judge = vi.fn(rules({ Hormipresa: 'company' }))
+		await Effect.runPromise(
+			dropNonCompanies(list, 'prospects', judge, new Map(), {
+				hideHost: host => host === 'facebook.com',
+			}),
+		)
+		// THEN the host reaches the judge as before
+		expect(judge.mock.calls[0]?.[0]?.[0]?.websiteHost).toBe('hormipresa.com')
+	})
+})
+
+describe('organisationKindGuardPrompt on a second asking', () => {
+	it('should say it is a second reading, and say nothing of it on the first', () => {
+		// GIVEN one row
+		const rows = [
+			{ id: 'r0', name: 'Hormipresa', describedAs: 'Makes', websiteHost: '' },
+		]
+		// WHEN the question is written for each asking
+		const first = organisationKindGuardPrompt(rows)
+		const second = organisationKindGuardPrompt(rows, undefined, {
+			secondAsking: true,
+		})
+		// THEN only the second carries the line, and the rest is the same question
+		expect(first).not.toContain('second reading')
+		expect(second).toContain(
+			'This is a second reading of rows a first reading called "other"',
+		)
+		expect(second.replace(/\n\nThis is a second reading[^\n]*/, '')).toBe(first)
 	})
 })
