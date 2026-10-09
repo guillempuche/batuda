@@ -48,7 +48,7 @@ export interface ProspectCriteriaResult {
 // A prospect's stated headcount, if it gave one that reads as a real number. The
 // field pairs the number with the source that backs it, so the number is one level
 // in; a value the guard chain already blanked to null reads as "not stated".
-const statedEmployees = (
+export const statedEmployees = (
 	prospect: Record<string, unknown>,
 ): number | undefined => {
 	const field = prospect['employee_estimate']
@@ -70,6 +70,14 @@ const statedCountries = (
 		)
 		.filter((code): code is string => code !== undefined)
 }
+
+/** Whether a stated headcount falls outside the band the criteria set. */
+export const outsideSizeBand = (
+	employees: number,
+	criteria: Pick<ProspectCriteria, 'minEmployees' | 'maxEmployees'>,
+): boolean =>
+	(criteria.minEmployees !== undefined && employees < criteria.minEmployees) ||
+	(criteria.maxEmployees !== undefined && employees > criteria.maxEmployees)
 
 export const filterProspectsByCriteria = (
 	findings: unknown,
@@ -93,18 +101,8 @@ export const filterProspectsByCriteria = (
 	const conflicts = (prospect: unknown): boolean => {
 		if (!isPlainObject(prospect)) return false
 		const employees = statedEmployees(prospect)
-		if (employees !== undefined) {
-			if (
-				criteria.minEmployees !== undefined &&
-				employees < criteria.minEmployees
-			)
-				return true
-			if (
-				criteria.maxEmployees !== undefined &&
-				employees > criteria.maxEmployees
-			)
-				return true
-		}
+		if (employees !== undefined && outsideSizeBand(employees, criteria))
+			return true
 		// A company trades from more than one country, and the CRM models it that
 		// way — so ruling one out takes every country it named missing the request,
 		// not just the first. A firm registered abroad with a plant in the country

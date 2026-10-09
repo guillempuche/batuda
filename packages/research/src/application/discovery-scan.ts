@@ -154,7 +154,7 @@ export const isDiscoveryScanThin = (
 // It says "too few" rather than "none" because the retry also fires on a handful
 // of results, and the first pass's results are kept alongside whatever it adds.
 export const REFINE_HINT =
-	'The previous search returned too few relevant results. Refine your approach: search business directories, industry association member lists, and sector-specific registries for companies that match the criteria; combine specific location and industry keywords; and ignore social-media posts, forums, and glossary pages. Do not use placeholder site: filters. Keep every qualifier the request made — size, place, and niche: widen the wording, never the criteria. A "top N" or "largest" ranking is not a shortcut past them; it lists the biggest firms in the sector, which is rarely what was asked.'
+	'The previous search returned too few relevant results. Refine your approach: search for the firms themselves — a result that is a firm\'s own site is a candidate already, so open it — and read business directories, industry association member lists and sector-specific registries for the names they list and the sites they link; combine specific location and industry keywords; and ignore social-media posts, forums, and glossary pages. Do not use placeholder site: filters. Keep every qualifier the request made — size, place, and niche: widen the wording, never the criteria. A "top N" or "largest" ranking is not a shortcut past them; it lists the biggest firms in the sector, which is rarely what was asked.'
 
 /**
  * What a discovery scan that found nothing reports in place of findings. The

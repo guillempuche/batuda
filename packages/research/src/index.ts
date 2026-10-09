@@ -235,6 +235,7 @@ export {
 	RESPONSE_CUT_OFF,
 	SubjectUnavailable,
 } from './domain/errors'
+export { looksLikeRegistrationNumber } from './domain/registration-number'
 export type {
 	BudgetSnapshot,
 	CompanyReport,

@@ -1760,6 +1760,103 @@ describe('a run that spends its budget', () => {
 	})
 })
 
+describe('the paid tools when the run was given no money for them', () => {
+	// The handlers reached directly, as for a scan: the answer is the handler's
+	// own, before any vendor or the budget is asked.
+	const handleUnfunded = async (
+		tool: 'registry_lookup' | 'discover_contacts',
+		params: Record<string, unknown>,
+	) => {
+		let vendorCalled = false
+		const ports = Layer.mergeAll(
+			StubSearchProvider,
+			StubScrapeProvider,
+			Layer.succeed(RegistryRouter)(
+				RegistryRouter.of({
+					lookup: () => {
+						vendorCalled = true
+						return Effect.succeed(
+							new RegistryRecord({
+								legalName: 'Acme SL',
+								sourceUrl: 'https://registry.example/acme',
+								units: 1,
+							}),
+						)
+					},
+				}),
+			),
+		)
+		const infra = Layer.mergeAll(
+			stubBudget,
+			Layer.succeed(ResearchRunContext)({
+				researchId: 'test-run',
+				schemaName: 'company_enrichment_v1',
+				paidBudgetCents: 0,
+			}),
+			Layer.succeed(ContactDiscovery)({
+				discover: () => {
+					vendorCalled = true
+					return Effect.succeed({
+						status: 'no_reliable_contact' as const,
+						researchId: 'test-run',
+					})
+				},
+			}),
+		)
+		const results: unknown[] = []
+		await Effect.runPromise(
+			Effect.gen(function* () {
+				const toolkit = yield* researchToolkit
+				const stream = yield* toolkit.handle(tool, params as never)
+				yield* Stream.runForEach(stream, part =>
+					Effect.sync(() => results.push(part)),
+				)
+			}).pipe(
+				Effect.provide(
+					researchToolkitLayer.pipe(
+						Layer.provide(Layer.mergeAll(ports, infra)),
+					),
+				),
+			),
+		)
+		return { vendorCalled, results: JSON.stringify(results) }
+	}
+
+	describe('when an enrichment run with no paid budget calls the register', () => {
+		it('should refuse before the vendor, saying it is the money that is missing', async () => {
+			// GIVEN a run about one company, which the register is for, given no
+			// budget for tools that spend
+			const { vendorCalled, results } = await handleUnfunded(
+				'registry_lookup',
+				{
+					country: 'ES',
+					query: 'Acme SL',
+					tax_id: null,
+				},
+			)
+			// THEN nothing was bought, and the model is told why and where the
+			// request belongs — not that a scan may not call it
+			expect(vendorCalled).toBe(false)
+			expect(results).toContain('no budget')
+			expect(results).toContain('pending_paid_actions')
+			expect(results).not.toContain('list-of-companies search')
+		})
+	})
+
+	describe('when the same run calls contact discovery', () => {
+		it('should refuse the same way', async () => {
+			// GIVEN the other tool that spends
+			const { vendorCalled, results } = await handleUnfunded(
+				'discover_contacts',
+				{ company_name: 'Acme SL', domain: 'acme.example', country: 'ES' },
+			)
+			// THEN the same answer
+			expect(vendorCalled).toBe(false)
+			expect(results).toContain('no budget')
+		})
+	})
+})
+
 describe('the paid tools when the run is a discovery scan', () => {
 	// The handlers reached directly, so the answer is the handler's own and not
 	// the provider's narrowing — which is the whole point of the check.

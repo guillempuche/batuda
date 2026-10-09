@@ -6,6 +6,7 @@ import {
 	isCandidateReason,
 	MARKS_FIELD,
 	OUTSIDE_REQUESTED_PLACE,
+	OUTSIDE_REQUESTED_SIZE,
 } from './row-marks'
 
 /** The parts of a scan's row that say whether the run stands behind it. */
@@ -47,7 +48,12 @@ export interface ProspectHoldBack {
 	 * a failure to reach one, and one answer for both tells a reader neither.
 	 */
 	readonly outsidePlace: boolean
-	/** Either of the two, for a caller that only asks whether anything is wrong. */
+	/**
+	 * The company states more or fewer employees than the request wrote. A
+	 * finding like the place, and kept apart from it for the same reason.
+	 */
+	readonly outsideSize: boolean
+	/** Any of the three, for a caller that only asks whether anything is wrong. */
 	readonly holdsBack: boolean
 	/** The run's own sentence, absent when it offered none a reader could act on. */
 	readonly spokenReason: string | undefined
@@ -76,10 +82,12 @@ export const prospectHoldBack = (
 	const reason = prospect[EXISTENCE_REASON_FIELD]
 	const couldNotConfirm = spokenReason !== undefined || nameOnly || unconfirmed
 	const outsidePlace = marks?.includes(OUTSIDE_REQUESTED_PLACE) ?? false
+	const outsideSize = marks?.includes(OUTSIDE_REQUESTED_SIZE) ?? false
 	return {
 		couldNotConfirm,
 		outsidePlace,
-		holdsBack: couldNotConfirm || outsidePlace,
+		outsideSize,
+		holdsBack: couldNotConfirm || outsidePlace || outsideSize,
 		spokenReason,
 		missing: unconfirmed && isCandidateReason(reason) ? reason : undefined,
 		nameOnly,

@@ -4699,6 +4699,14 @@ msgstr "Outside the area searched"
 msgid "Outside the area searched:"
 msgstr "Outside the area searched:"
 
+#: src/components/research/findings/prospect-scan-view.tsx
+msgid "Outside the size asked for"
+msgstr "Outside the size asked for"
+
+#: src/components/research/findings/prospect-scan-view.tsx
+msgid "Outside the size asked for:"
+msgstr "Outside the size asked for:"
+
 #: src/components/companies/next-action-card.tsx
 #: src/routes/_authed/companies/index.tsx
 #: src/routes/_authed/index.tsx
@@ -6565,6 +6573,10 @@ msgstr "This campaign is full at {ATTRIBUTES_PER_STACK_MAX} active attributes. R
 #: src/routes/_authed/companies/$slug.tsx
 msgid "This company can't be displayed"
 msgstr "This company can't be displayed"
+
+#: src/components/research/findings/prospect-scan-view.tsx
+msgid "This company states more or fewer employees than the search asked for."
+msgstr "This company states more or fewer employees than the search asked for."
 
 #: src/components/research/findings/shared.tsx
 msgid "This company's name could not be read, so nothing checked the pages are its own"

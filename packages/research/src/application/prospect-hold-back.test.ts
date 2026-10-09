@@ -2,7 +2,11 @@ import { describe, expect, it } from 'vitest'
 
 import { NAME_ONLY_EVIDENCE } from './name-only-guard'
 import { prospectHoldBack } from './prospect-hold-back'
-import { EXISTENCE_UNCONFIRMED, OUTSIDE_REQUESTED_PLACE } from './row-marks'
+import {
+	EXISTENCE_UNCONFIRMED,
+	OUTSIDE_REQUESTED_PLACE,
+	OUTSIDE_REQUESTED_SIZE,
+} from './row-marks'
 
 describe('prospectHoldBack', () => {
 	describe('when the run stands behind the company', () => {
@@ -14,6 +18,7 @@ describe('prospectHoldBack', () => {
 			expect(held).toEqual({
 				couldNotConfirm: false,
 				outsidePlace: false,
+				outsideSize: false,
 				holdsBack: false,
 				spokenReason: undefined,
 				missing: undefined,
@@ -113,6 +118,19 @@ describe('prospectHoldBack', () => {
 		})
 	})
 
+	describe('when the company states a size outside the band the request wrote', () => {
+		it('should hold it back as the wrong size, not as unconfirmed or misplaced', () => {
+			// GIVEN a row the run marked as outside the requested size
+			const held = prospectHoldBack({ marks: [OUTSIDE_REQUESTED_SIZE] })
+
+			// THEN it is its own finding, told apart from the other two
+			expect(held.outsideSize).toBe(true)
+			expect(held.outsidePlace).toBe(false)
+			expect(held.couldNotConfirm).toBe(false)
+			expect(held.holdsBack).toBe(true)
+		})
+	})
+
 	describe('when that mark arrives behind another one', () => {
 		it('should still find it', () => {
 			// GIVEN a row marked twice: it can be two things at once, and neither
@@ -140,6 +158,7 @@ describe('prospectHoldBack', () => {
 			expect(held).toEqual({
 				couldNotConfirm: true,
 				outsidePlace: true,
+				outsideSize: false,
 				holdsBack: true,
 				spokenReason: 'no register entry',
 				missing: undefined,

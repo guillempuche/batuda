@@ -72,6 +72,7 @@ import {
 } from './judged-rows'
 import {
 	MARKS_FIELD,
+	marksOn,
 	OUTSIDE_PLACE_REASON_FIELD,
 	OUTSIDE_REQUESTED_PLACE,
 } from './row-marks'
@@ -336,13 +337,6 @@ export interface PlaceGuardResult {
 	readonly unclear: number
 	/** The answers this pass bought, for the caller to hand back on the next one. */
 	readonly learned: ReadonlyMap<string, RememberedPlace>
-}
-
-/** The mark list a row already carries, ignoring anything that is not a word. */
-const marksOn = (row: Record<string, unknown>): ReadonlyArray<string> => {
-	const held = row[MARKS_FIELD]
-	if (!Array.isArray(held)) return []
-	return held.filter((mark): mark is string => typeof mark === 'string')
 }
 
 /**

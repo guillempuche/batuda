@@ -29,6 +29,15 @@ export const MARKS_FIELD = 'marks'
 export const OUTSIDE_REQUESTED_PLACE = 'outside_requested_place'
 
 /**
+ * The company states more or fewer employees than the request asked for.
+ *
+ * A mark rather than a removal: the request wrote the band in its own words
+ * and nobody passed it as a filter, so the row is shown with the finding
+ * beside it instead of silently gone. A size passed as a filter still removes.
+ */
+export const OUTSIDE_REQUESTED_SIZE = 'outside_requested_size'
+
+/**
  * Where the run's own words about that go. Its own field, because a mark is a
  * word and the reason is a sentence the run wrote; absent when the run had no
  * words to offer, so the surface can say it in the reader's language instead.
@@ -80,6 +89,20 @@ export const EXISTENCE_REASONS = {
 	/** The check could not run — a search provider that was down or errored. */
 	checker_unavailable: true,
 } as const
+
+/**
+ * The marks a row carries, ignoring anything in the field that is not a word.
+ *
+ * Stored findings are read back as `unknown`, so the field may hold anything;
+ * every guard that reads or adds a mark goes through this one reading.
+ */
+export const marksOn = (
+	row: Record<string, unknown>,
+): ReadonlyArray<string> => {
+	const held = row[MARKS_FIELD]
+	if (!Array.isArray(held)) return []
+	return held.filter((mark): mark is string => typeof mark === 'string')
+}
 
 /** Why a company is only a candidate. */
 export type CandidateReason = keyof typeof EXISTENCE_REASONS

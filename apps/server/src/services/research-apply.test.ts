@@ -366,6 +366,36 @@ describe('checkCompanyFieldValues', () => {
 		})
 	})
 
+	describe('when a registration number holds a legal name', () => {
+		it('should refuse it and say what the field wants', () => {
+			// GIVEN a proposal that read the registered name off the legal notice
+			// into the number's field
+			const reason = checkFieldValues('companies', {
+				taxId: 'INGENIERÍA Y GESTIÓN De ESPACIOS INDUSTRIALES, SL',
+			})
+
+			// THEN it is refused, naming the field and what it wants
+			expect(reason).toContain('taxId')
+			expect(reason).toContain('registration number')
+		})
+
+		it('should accept a number a register writes', () => {
+			// GIVEN a French SIREN with its court, as a legal notice prints it
+			const reason = checkFieldValues('companies', {
+				taxId: 'RCS Paris B 552 100 554',
+			})
+
+			// THEN there is nothing to refuse
+			expect(reason).toBeNull()
+		})
+
+		it('should let the number be cleared', () => {
+			// GIVEN a proposal clearing the number — null is how a column is emptied
+			// THEN it is not held to the shape
+			expect(checkFieldValues('companies', { taxId: null })).toBeNull()
+		})
+	})
+
 	describe('when the model invents a status outside the vocabulary', () => {
 		it('should reject it and name both the field and the value', () => {
 			// GIVEN a status from an older vocabulary the app no longer has

@@ -33,6 +33,7 @@ import {
 	BudgetExceeded,
 	noRegistryResult,
 	paidToolBarredResult,
+	paidToolUnfundedResult,
 	registryUnavailableResult,
 } from '../domain/errors'
 import { ScrapedPage } from '../domain/types'
@@ -362,6 +363,7 @@ export const researchToolkitLayer = researchToolkit.toLayer(
 			entityTargets,
 			entityName,
 			schemaName,
+			paidBudgetCents,
 		} = yield* ResearchRunContext
 
 		// A scan is not offered the paid tools, and this is where that is true
@@ -371,6 +373,11 @@ export const researchToolkitLayer = researchToolkit.toLayer(
 		// which is every time it does.
 		const paidToolBarred =
 			schemaName !== undefined && isDiscoveryScan(schemaName)
+		// A run given no money for them is told the same way, before any vendor
+		// is asked: the budget would refuse the charge, but only after the model
+		// had spent a round deciding to call, and with a sentence about money
+		// rather than one about where the request belongs.
+		const paidToolUnfunded = paidBudgetCents === 0
 
 		// Each tool below reports a failure in three steps, in this order: log an
 		// unexpected one, turn an expected stop into the sentence the model should
@@ -540,6 +547,7 @@ export const researchToolkitLayer = researchToolkit.toLayer(
 			registry_lookup: params =>
 				Effect.gen(function* () {
 					if (paidToolBarred) return paidToolBarredResult('registry_lookup')
+					if (paidToolUnfunded) return paidToolUnfundedResult('registry_lookup')
 					const country = params.country.toUpperCase()
 					// Find out whether there is a register to ask before paying to ask
 					// it. Charging first meant a country Batuda has no register for
@@ -605,6 +613,8 @@ export const researchToolkitLayer = researchToolkit.toLayer(
 			discover_contacts: params =>
 				Effect.gen(function* () {
 					if (paidToolBarred) return paidToolBarredResult('discover_contacts')
+					if (paidToolUnfunded)
+						return paidToolUnfundedResult('discover_contacts')
 					return yield* contactDiscovery.discover({
 						companyName: params.company_name,
 						domain: params.domain,

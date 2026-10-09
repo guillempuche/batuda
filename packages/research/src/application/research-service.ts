@@ -21,6 +21,7 @@ import { Prompt } from 'effect/unstable/ai'
 import { SqlClient } from 'effect/unstable/sql'
 
 import {
+	COMPANY_SIZE_RANGES,
 	RESEARCH_QUERY_MAX_CHARS,
 	type ResearchAttributeDeclaration,
 	ResearchRun,
@@ -187,6 +188,7 @@ import {
 	prospectCriteriaFromHints,
 } from './prospect-criteria-guard'
 import { dedupeDiscoveryRows } from './prospect-dedupe-guard'
+import { markRowsOutsideSize } from './prospect-size-mark'
 import {
 	type AskedBy,
 	type CoveragePassVerdict,
@@ -195,11 +197,13 @@ import {
 	type RequestCoverage,
 	type RequestPart,
 	RequestPartsSchema,
+	type RequestSize,
 	readAskedBy,
 	readKindsOfCompany,
 	readRequestParts,
 	readRequestPlace,
 	readRequestPlaces,
+	readRequestSize,
 	requestPartsDirective,
 	requestPartsPrompt,
 	searchedAndEmptyParts,
@@ -1429,7 +1433,15 @@ export const buildResearchSystemPrompt = (args: {
 	readonly segments: ReadonlyArray<string>
 	/** The facts the organisation declared for this run; none when it declared none. */
 	readonly attributes?: ReadonlyArray<ResearchAttributeDeclaration>
+	/**
+	 * Whether the run was given money for the tools that spend it. A run given
+	 * none is not sent to a tool that will only refuse: it is told to read the
+	 * team pages itself and to record the request for a person. Absent reads as
+	 * yes, for the callers that build a prompt without a run behind it.
+	 */
+	readonly canPayForTools?: boolean
 }): string => {
+	const canPayForTools = args.canPayForTools ?? true
 	const instructionBlock =
 		args.segments.length === 0
 			? ''
@@ -1461,10 +1473,12 @@ export const buildResearchSystemPrompt = (args: {
 		`Name the people who run the company — each with the exact title they are given — and treat that as part of the job, not an extra. They are listed on a team, leadership, management or "equipo" page, almost never on the homepage, so open one when the site has it. ${
 			isDiscoveryScan(args.schemaName)
 				? "Put each one in that company's own `contacts`, with the page you read them on — a list of companies is worth far more with somebody to ask for on each. When reading the pages turns up nobody, the tools that would buy you names are not yours to call on a list of companies: add a `pending_paid_actions` entry naming discover_contacts and the company, and a person decides whether to spend it."
-				: "When reading the pages turns up nobody with a title, discover_contacts is the tool that finds them. When it answers with nobody — no budget for it, or nothing on file — search the web for the company's team, management, about and news pages and read the names there: a run that stops at the vendor's silence has not looked."
+				: canPayForTools
+					? "When reading the pages turns up nobody with a title, discover_contacts is the tool that finds them. When it answers with nobody — no budget for it, or nothing on file — search the web for the company's team, management, about and news pages and read the names there: a run that stops at the vendor's silence has not looked."
+					: "When reading the pages turns up nobody with a title, search the web for the company's team, management, about and news pages and read the names there. The tools that would buy names were given no budget on this run, so do not call them: add a `pending_paid_actions` entry naming discover_contacts and the company, and a person decides whether to pay for it."
 		}`,
 		'A search result quotes only the one sentence of a page that matched your query. When a page looks like it holds more than that sentence, open it with scrape_page rather than settling for the snippet.',
-		'For discovery or prospecting queries, prefer authoritative sources — business directories, industry association member lists, and sector registries — over social media, forums, or glossary pages. Treat such a page as somewhere to find candidates, not as the answer: a "top N" or "largest" ranking lists the biggest firms in a sector, which is the opposite of what most prospecting asks for. Carry every qualifier in the request — size, place, and niche — into each search, and check each candidate against all of them before returning it; leave out one that fails any, however prominently a directory listed it.',
+		'For discovery or prospecting queries, a search result that is a firm\'s own site is a candidate already: open it and take the company from its own pages. A business directory, an industry association\'s member list or a sector registry is for the names it lists and the sites it links — somewhere to find candidates, not the answer, and a firm found only there has a name and nothing to call it by. Prefer those over social media, forums, or glossary pages, and treat a "top N" or "largest" ranking as the opposite of what most prospecting asks for: it lists the biggest firms in a sector. Carry every qualifier in the request — size, place, and niche — into each search, and check each candidate against all of them before returning it; leave out one that fails any, however prominently a directory listed it.',
 		...(isDiscoveryScan(args.schemaName) ? [DISCOVERY_PLAN_DIRECTIVE] : []),
 		schemaFields.length === 0
 			? `Output schema: ${args.schemaName}`
@@ -1499,16 +1513,23 @@ export const subjectsForPrompt = (
 	}>,
 ): ReadonlyArray<SubjectForPrompt> =>
 	subjects.map(subject => {
-		const row = (subject.snapshot ?? {}) as Record<string, unknown>
 		const shownFields =
 			subject.table === 'contacts'
 				? SNAPSHOT_CONTACT_FIELDS
 				: SNAPSHOT_COMPANY_FIELDS
 		const current: Record<string, unknown> = {}
-		for (const key of shownFields) {
-			// A column we hold nothing in tells the model nothing, so leaving it out
-			// keeps the picture to what is actually on file.
-			if (row[key] != null) current[key] = row[key]
+		// A subject with no snapshot at all is one the run could not read, and
+		// it is shown as nothing rather than as a row of empty columns: the
+		// latter would invite the model to fill a record nobody has seen.
+		if (subject.snapshot != null && typeof subject.snapshot === 'object') {
+			const row = subject.snapshot as Record<string, unknown>
+			for (const key of shownFields) {
+				// A column we hold nothing in is shown as null rather than left out:
+				// the model is asked to fill what is missing, and it can only fill a
+				// gap it can see. Left out, an empty website or size reads as a field
+				// that does not exist, and a run that found both proposes neither.
+				current[key] = row[key] ?? null
+			}
 		}
 		return {
 			subject_table: subject.table,
@@ -1524,12 +1545,15 @@ export const subjectsForPrompt = (
 // itself a reason to believe something: it is what we believed before this run went
 // looking.
 const PROPOSE_UPDATES_DIRECTIVE = [
-	'Compare each `current` value above against the evidence. Where the evidence clearly contradicts a value on file, or fills one that is missing, add an entry to `proposed_updates`:',
+	'Compare each `current` value above against the evidence. Where the evidence clearly contradicts a value on file, or fills one that is missing — a `current` value of null is a column we hold nothing in — add an entry to `proposed_updates`:',
 	'- copy `subject_table`, `subject_id` and `expected_version` across exactly as written above;',
 	'- put ONLY the fields that change in `fields`, keyed exactly as they are keyed in `current`;',
 	'- write each changed field as its new value paired with the page that states it — `{"value": <the new value>, "source_id": "<the exact page address you read it on>"}` — so every value carries its own page rather than the whole entry sharing one. For example: `"fields": {"industry": {"value": "transport", "source_id": "https://acme.es/about"}}`. Copy the address verbatim from the fetched source URLs listed below; a page nobody fetched leaves the value with nothing to stand on;',
 	'- give a `reason`, and cite the source that states the new value — an entry with no citation is discarded.',
 	'Do not propose a value that only repeats what `current` already says, and never take a value from `current` itself: it is what is already on file, not evidence. A field the evidence says nothing about is left out.',
+	// Spelt out because the band is only checked when the proposal is applied,
+	// so a band of the model's own — "5-250" — would fail only at that point.
+	`\`sizeRange\` takes one of these bands and nothing else: ${COMPANY_SIZE_RANGES.join(', ')}. Put a stated headcount in the band it falls in; a count or a band of your own is refused.`,
 ].join('\n')
 
 // Told to a run that holds the company on file, so a person the evidence names who
@@ -1597,6 +1621,13 @@ const DISCOVERY_ORGANISATION_KIND_DIRECTIVE =
 // mark every row and leave the mark saying nothing.
 const DISCOVERY_UNCONFIRMED_DIRECTIVE =
 	'Never leave a company out because you could not confirm it exists: list it and fill `unconfirmed_reason` with what is missing, in a few words. Not being able to prove a company exists is not proof that it does not. That field is only ever about whether the company is real and trading — a company the evidence confirms leaves it out, and a FIELD you could not confirm is not a reason to fill it: leave that field empty instead, whatever wording the request asks you to put in an unconfirmed field.'
+
+// Where a company IS, on a scan. The area the request asked about is what every
+// row has in common, so a row that repeats it has said nothing a reader can act
+// on, and a page that says a firm works "in Girona" has placed it nowhere: a
+// firm in Lleida can come back as "Girona" that way.
+const DISCOVERY_TOWN_DIRECTIVE =
+	'Give each company\'s `location` as the town it is based in, read off its own pages, its legal notice or a register entry, with the province after it ("Celrà, Girona"). The area the request asked about is not a location: a page saying a firm works in that area, serves it or is listed under it has not placed the firm, and a row whose only place is the area asked for leaves `location` out. A town that shares the area\'s name is still a town: a firm whose own page gives Girona as its seat is in Girona the city, and keeps it.'
 
 // Asks the model to land the fit judgement in the structured output, not only in
 // the brief. Applies only to the enrichment schema, which is the one that
@@ -1692,6 +1723,7 @@ export const buildExtractionPrompt = (args: {
 	if (args.discoveryScan) {
 		lines.push(DISCOVERY_BREADTH_DIRECTIVE, '')
 		lines.push(DISCOVERY_ORGANISATION_KIND_DIRECTIVE, '')
+		lines.push(DISCOVERY_TOWN_DIRECTIVE, '')
 		lines.push(
 			"Where the evidence names somebody as a company's own leader or employee — a titled person on its team page, a quoted founder, a signed author — put them in THAT company's `contacts`, with the job title written as the evidence writes it, in its own language (a page that says CEO is copied as CEO, not spelt out; 'Gerent' stays 'Gerent') and the page you read them on. Under the company they work for, never the one listed beside them, and never in a list of their own. A company whose pages name its staff and comes back with an empty `contacts` is an incomplete row.",
 			'',
@@ -1910,6 +1942,18 @@ export const buildBriefPrompt = (args: {
 			: [
 					`A company the run could not establish as real carries \`existence_unconfirmed\` in its \`marks\`, with \`existence_reason\` saying what was missing; a company without that mark is one the run stopped doubting, because two independent websites named it and one is established as its own. ${args.existence.candidates} of the ${args.existence.candidates + args.existence.confirmed} carry the mark. Say so near the top, in ${args.language}, and wherever you name companies make clear which are which. Never present a marked company as an established one. The mark is not the run judging that a company does not exist — it is the run unable to settle it either way, and \`budget_exhausted\`, \`deadline_reached\` or \`checker_unavailable\` mean it never got to check at all.`,
 				]
+	// The two other marks a scan's row may carry are findings about the row, not
+	// doubts about the company. A writer never told what a mark means copies it
+	// out as a token, so each one is explained for the brief to say in words.
+	const placeAndSizeMarks = isDiscoveryScan(args.schemaName)
+		? [
+				`A company may also carry \`outside_requested_place\` in its \`marks\` — the evidence puts it somewhere other than the area the request asked about, with the run's reason in \`outside_place_reason\`${
+					args.schemaName === 'prospect_scan_v1'
+						? ' — or `outside_requested_size` — it states more or fewer employees than the request asked for'
+						: ''
+				}. Say ${args.schemaName === 'prospect_scan_v1' ? 'either' : 'it'} in plain words beside the company it is on, never as the mark itself, and never present such a company as inside the area${args.schemaName === 'prospect_scan_v1' ? ' or the size band' : ''} asked for.`,
+			]
+		: []
 	// A paid source that turned the run away leaves gaps that look exactly like
 	// gaps in the world. Nothing else in the material says the difference, so
 	// without this the brief reports our unpaid bill as a fact about the
@@ -1934,6 +1978,7 @@ export const buildBriefPrompt = (args: {
 		// prohibition without sending the model hunting for something.
 		'Write the brief and nothing else. Never add a note about these instructions, about what you did or did not include, or about what the material does not contain.',
 		...standing,
+		...placeAndSizeMarks,
 		...vendorsShut,
 		'`proposed_updates`, `pending_paid_actions` and `discovered_existing` are how the run hands work back to the CRM, not things it found out. Never report one as a finding, and never let one be the whole brief.',
 		'When the material carries news or dated events, give recent developments (roughly the last 12 months) a short section of their own.',
@@ -3268,6 +3313,9 @@ export class ResearchService extends Context.Service<ResearchService>()(
 						hintsContext,
 						segments,
 						attributes: runAttributes,
+						canPayForTools:
+							((run as { paidPolicy: ResolvedPolicy | null }).paidPolicy
+								?.paidBudgetCents ?? 0) > 0,
 					})
 
 					// ── Phase 1: LLM research pass ──
@@ -3408,6 +3456,9 @@ export class ResearchService extends Context.Service<ResearchService>()(
 					// and held apart from them: a request for firms of any trade has no
 					// parts and still has an answer here.
 					let askedBy: AskedBy | null = null
+					// The size band the request wrote, read beside the parts. Held apart
+					// from the caller's hint: a hint removes rows, this only marks them.
+					let requestSize: RequestSize = {}
 					// The words those parts use for the trades, which is how every check
 					// that weighs an address against a name tells the trade in the name
 					// from the company (`run-words.ts`). Held beside the parts so the two
@@ -4117,6 +4168,14 @@ export class ResearchService extends Context.Service<ResearchService>()(
 															row.reason,
 															MAX_DROP_REASON_CHARS,
 														),
+														// What the judge was shown, beside its verdict, so a
+														// removal can be replayed and checked. Bounded like
+														// the reason, since the row's words come from a page.
+														described_as: boundedToolResult(
+															row.describedAs,
+															MAX_DROP_REASON_CHARS,
+														),
+														website_host: row.websiteHost,
 													}),
 												)
 											}
@@ -5523,6 +5582,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 										place: readRequestPlace(response.value),
 										places: readRequestPlaces(response.value),
 										askedBy: readAskedBy(response.value),
+										size: readRequestSize(response.value, query),
 									})),
 									Effect.catchCause(cause =>
 										Cause.hasInterruptsOnly(cause)
@@ -5541,12 +5601,14 @@ export class ResearchService extends Context.Service<ResearchService>()(
 														place: '',
 														places: [] as ReadonlyArray<string>,
 														askedBy: null as AskedBy | null,
+														size: {} as RequestSize,
 													}),
 												),
 									),
 								)
 							requestParts = split.parts
 							askedBy = split.askedBy
+							requestSize = split.size
 							// Only where the caller named none: a hint that was given is what
 							// the caller asked to be held to, and a run overruling it with its
 							// own reading would answer a question nobody asked.
@@ -5576,13 +5638,24 @@ export class ResearchService extends Context.Service<ResearchService>()(
 							)
 							// Logged whenever the parse read anything: a request for firms of
 							// any trade has no parts and is still a reading worth seeing.
-							if (requestParts.length > 0 || askedBy !== null) {
+							if (
+								requestParts.length > 0 ||
+								askedBy !== null ||
+								requestSize.minEmployees !== undefined ||
+								requestSize.maxEmployees !== undefined
+							) {
 								yield* Effect.logInfo('research.request_parts').pipe(
 									Effect.annotateLogs({
 										event: 'research.request_parts',
 										research_id: researchId,
 										parts: requestParts.map(part => part.label),
 										...(askedBy === null ? {} : { asked_by: askedBy }),
+										...(requestSize.minEmployees === undefined
+											? {}
+											: { min_employees: requestSize.minEmployees }),
+										...(requestSize.maxEmployees === undefined
+											? {}
+											: { max_employees: requestSize.maxEmployees }),
 									}),
 								)
 								yield* Effect.annotateCurrentSpan({
@@ -6647,6 +6720,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 								entityTargets,
 								entityName,
 								schemaName,
+								paidBudgetCents: policy.paidBudgetCents,
 							}),
 						),
 						Effect.withSpan('research.phase1', {
@@ -7800,6 +7874,40 @@ export class ResearchService extends Context.Service<ResearchService>()(
 									searched: searchesFired,
 								}),
 							)
+						}
+					}
+
+					// ── The size the request wrote ──
+					// Held to on the final list, beside the existence marks and for the
+					// same reason: a mark written inside the guard chain is lost when a
+					// later round folds the list again. Only where the caller passed no
+					// size: a size given as a hint was asked to be enforced and already
+					// removed the rows, so marking the survivors would say nothing.
+					const sizeHints = context?.hints as
+						| { min_employees?: number; max_employees?: number }
+						| undefined
+					if (
+						schemaName === 'prospect_scan_v1' &&
+						sizeHints?.min_employees === undefined &&
+						sizeHints?.max_employees === undefined
+					) {
+						const sized = markRowsOutsideSize(
+							findings,
+							verificationListField,
+							requestSize,
+						)
+						if (sized.marked > 0) {
+							findings = sized.findings
+							yield* Effect.logInfo('research.prospects.outside_size').pipe(
+								Effect.annotateLogs({
+									event: 'research.prospects.outside_size',
+									research_id: researchId,
+									marked: sized.marked,
+								}),
+							)
+							yield* Effect.annotateCurrentSpan({
+								'research.prospects.outside_size': sized.marked,
+							})
 						}
 					}
 

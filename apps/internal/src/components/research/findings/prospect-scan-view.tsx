@@ -169,12 +169,14 @@ const unwordedDoubt = (nameOnly: boolean): MessageDescriptor =>
 function ProspectRow({ prospect }: { readonly prospect: ProspectEntry }) {
 	const doubtId = useId()
 	const placeId = useId()
+	const sizeId = useId()
 	const { t, i18n } = useLingui()
 	// What the run held back about this company. The same answer gates the
 	// vouching step below, so it is read from one place rather than two.
 	const {
 		couldNotConfirm,
 		outsidePlace,
+		outsideSize,
 		holdsBack,
 		spokenReason,
 		missing,
@@ -196,6 +198,11 @@ function ProspectRow({ prospect }: { readonly prospect: ProspectEntry }) {
 				{outsidePlace ? (
 					<CandidatePill data-testid='prospect-outside-place'>
 						<Trans>Outside the area searched</Trans>
+					</CandidatePill>
+				) : null}
+				{outsideSize ? (
+					<CandidatePill data-testid='prospect-outside-size'>
+						<Trans>Outside the size asked for</Trans>
 					</CandidatePill>
 				) : null}
 				{site !== undefined && site !== '' ? (
@@ -229,6 +236,16 @@ function ProspectRow({ prospect }: { readonly prospect: ProspectEntry }) {
 					{outsideReason !== undefined && outsideReason !== ''
 						? outsideReason
 						: t`The evidence places this company outside the area the search asked about.`}
+				</Reason>
+			) : null}
+			{/* Said like the place, but the run writes no reason for the size, so
+			    the sentence is always ours, in the reader's language. */}
+			{outsideSize ? (
+				<Reason id={sizeId}>
+					<ReasonLabel>
+						<Trans>Outside the size asked for:</Trans>
+					</ReasonLabel>{' '}
+					{t`This company states more or fewer employees than the search asked for.`}
 				</Reason>
 			) : null}
 			<FieldsTable>
@@ -286,12 +303,16 @@ function ProspectRow({ prospect }: { readonly prospect: ProspectEntry }) {
 			<AddAsLeadButton
 				prospect={prospect}
 				heldBack={holdsBack}
-				// Both reasons, not the first of them. A row can carry the doubt and
-				// the place at once, and the place is the half likelier to stop
-				// somebody adding the company — read out only one, and that is the
-				// half they never hear.
+				// Every reason, not the first of them. A row can carry the doubt, the
+				// place and the size at once, and the place is the one likelier to
+				// stop somebody adding the company — read out only one, and that is
+				// the one they never hear.
 				describedBy={
-					[couldNotConfirm ? doubtId : '', outsidePlace ? placeId : '']
+					[
+						couldNotConfirm ? doubtId : '',
+						outsidePlace ? placeId : '',
+						outsideSize ? sizeId : '',
+					]
 						.filter(Boolean)
 						.join(' ') || undefined
 				}

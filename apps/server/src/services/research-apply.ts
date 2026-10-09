@@ -17,6 +17,7 @@ import {
 } from '@batuda/domain'
 import { declaredByKey, listActiveAttributes } from '@batuda/instructions'
 import { recordFacts } from '@batuda/observability'
+import { looksLikeRegistrationNumber } from '@batuda/research'
 
 export {
 	type ProvenanceEntry,
@@ -71,7 +72,7 @@ import {
 // A company's mailbox, number, website and handles are not here because they are
 // no longer columns. They are still proposed by those names — what a reviewer
 // reads is "email: info@…" — and are written as channels instead; see
-// COMPANY_CHANNEL_PROPOSAL_FIELDS below.
+// `splitCompanyChannelFields` in ./channels, which takes them off a proposal.
 export const COMPANY_FIELDS = new Set([
 	'name',
 	'status',
@@ -192,6 +193,14 @@ const COMPANY_FIELD_SHAPES: ReadonlyArray<{
 		field: 'country',
 		ok: value => Schema.is(CompanyCountry)(value.toUpperCase()),
 		wanted: 'a two-letter country code',
+	},
+	// A run reading a legal notice writes the registered name into the number's
+	// field; the research package refuses the same shape on a scan's row, and
+	// this is the same rule at the door a proposal comes through.
+	{
+		field: 'taxId',
+		ok: looksLikeRegistrationNumber,
+		wanted: 'a registration number, mostly digits with at most a short prefix',
 	},
 ]
 

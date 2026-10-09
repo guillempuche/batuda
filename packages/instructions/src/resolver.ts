@@ -166,8 +166,10 @@ export interface ResolvedInstructions {
 	readonly templateNames: ReadonlyArray<string>
 	readonly source: StackSource
 	// The stack the templates came from; null when only override templates or
-	// nothing applied.
+	// nothing applied. Its name beside the id, for a reply that tells a person
+	// which stack shaped the run.
 	readonly stackId: string | null
+	readonly stackName: string | null
 	// The org stack whose declared attributes a run fills — the named stack
 	// when the org owns it, else the org default. A member's personal stack
 	// changes the prompt, never which attributes the campaign records.
@@ -183,6 +185,7 @@ export interface ResolvedInstructions {
 // keys the client returns.
 interface StackRow {
 	readonly id: string
+	readonly name: string
 	readonly ownerUserId: string | null
 	readonly composition: StackComposition
 	readonly researchFillsAttributes: boolean
@@ -239,7 +242,7 @@ const readOrgDefaultStack = (
 ): Effect.Effect<StackRow | undefined, SqlError.SqlError> =>
 	Effect.map(
 		sql<StackRow>`
-			SELECT id, owner_user_id, composition, research_fills_attributes
+			SELECT id, name, owner_user_id, composition, research_fills_attributes
 			FROM instruction_stacks
 			WHERE organization_id = ${organizationId}
 				AND agent = ${agent}
@@ -277,7 +280,7 @@ export const resolveInstructions = (
 			// ad-hoc override templates append after the stack, all deduped.
 			source = 'stack'
 			const rows = yield* sql<StackRow>`
-				SELECT id, owner_user_id, composition, research_fills_attributes
+				SELECT id, name, owner_user_id, composition, research_fills_attributes
 				FROM instruction_stacks WHERE id = ${stackId}
 			`
 			const stack = rows[0]
@@ -303,7 +306,7 @@ export const resolveInstructions = (
 		} else {
 			// Default resolution: the actor's own default stack, else the org's.
 			const stacks = yield* sql<StackRow>`
-				SELECT id, owner_user_id, composition, research_fills_attributes
+				SELECT id, name, owner_user_id, composition, research_fills_attributes
 				FROM instruction_stacks
 				WHERE organization_id = ${args.organizationId}
 					AND agent = ${args.agent}
@@ -344,6 +347,7 @@ export const resolveInstructions = (
 				: []
 		const attributeFields = {
 			stackId: chosenStack?.id ?? null,
+			stackName: chosenStack?.name ?? null,
 			attributeStackId: attributeStack?.id ?? null,
 			attributes,
 			attributeFingerprint: fingerprintAttributes(attributes),
