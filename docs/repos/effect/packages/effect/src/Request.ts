@@ -7,6 +7,7 @@
  * `RequestResolver`, which performs backend-specific loading and completes each
  * pending request entry with a success, failure, cause, exit, or effect.
  *
+ * @stability stable
  * @since 2.0.0
  */
 import type * as Cause from "./Cause.ts"
@@ -29,7 +30,7 @@ const TypeId = "~effect/Request"
  *
  * **Example** (Defining typed requests)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import type { Request } from "effect"
  *
  * // Define a request that fetches a user by ID
@@ -42,8 +43,10 @@ const TypeId = "~effect/Request"
  * interface GetAllUsers extends Request.Request<ReadonlyArray<string>, Error> {
  *   readonly _tag: "GetAllUsers"
  * }
+ *
  * ```
  *
+ * @stability stable
  * @category models
  * @since 2.0.0
  */
@@ -64,7 +67,8 @@ export interface Request<out A, out E = never, out R = never> extends Variance<A
  * @see {@link Services} for extracting a request's service requirements
  * @see {@link Result} for the exit type produced by completing a request
  *
- * @category models
+ * @stability stable
+ * @category utility types
  * @since 4.0.0
  */
 export type Any = Request<any, any, any>
@@ -77,6 +81,7 @@ export type Any = Request<any, any, any>
  * This marker preserves the success, error, and service requirement types for
  * Effect's type-level machinery. Users normally get it by extending `Request`.
  *
+ * @stability stable
  * @category models
  * @since 2.0.0
  */
@@ -99,7 +104,7 @@ export interface Variance<out A, out E, out R> {
  *
  * **Example** (Using generated request constructors)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { Request } from "effect"
  *
  * interface GetUser extends Request.Request<string, Error> {
@@ -109,9 +114,13 @@ export interface Variance<out A, out E, out R> {
  *
  * // Constructor type is used internally by Request.of() and Request.tagged()
  * const GetUser = Request.tagged<GetUser>("GetUser")
- * const userRequest = GetUser({ id: 123 })
+ * const request = GetUser({ id: 123 })
+ *
+ * request._tag // => "GetUser"
+ * request.id // => 123
  * ```
  *
+ * @stability stable
  * @category models
  * @since 2.0.0
  */
@@ -124,7 +133,7 @@ export interface Constructor<R extends Request<any, any, any>, T extends keyof R
  *
  * **Example** (Extracting a request error type)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import type { Request } from "effect"
  *
  * interface GetUser extends Request.Request<string, Error> {
@@ -133,8 +142,10 @@ export interface Constructor<R extends Request<any, any, any>, T extends keyof R
  *
  * // Extract the error type from a Request using the utility
  * type UserError = Request.Error<GetUser> // Error
+ *
  * ```
  *
+ * @stability stable
  * @category utility types
  * @since 2.0.0
  */
@@ -145,7 +156,7 @@ export type Error<T extends Request<any, any, any>> = [T] extends [Request<infer
  *
  * **Example** (Extracting a request success type)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import type { Request } from "effect"
  *
  * interface GetUser extends Request.Request<string, Error> {
@@ -155,8 +166,10 @@ export type Error<T extends Request<any, any, any>> = [T] extends [Request<infer
  *
  * // Extract the success type from a Request using the utility
  * type UserSuccess = Request.Success<GetUser> // string
+ *
  * ```
  *
+ * @stability stable
  * @category utility types
  * @since 2.0.0
  */
@@ -166,6 +179,7 @@ export type Success<T extends Request<any, any, any>> = [T] extends [Request<inf
 /**
  * A utility type to extract the requirements type from a `Request`.
  *
+ * @stability stable
  * @category utility types
  * @since 4.0.0
  */
@@ -177,7 +191,7 @@ export type Services<T extends Request<any, any, any>> = [T] extends [Request<in
  *
  * **Example** (Extracting a request result type)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import type { Request } from "effect"
  *
  * interface GetUser extends Request.Request<string, Error> {
@@ -187,8 +201,10 @@ export type Services<T extends Request<any, any, any>> = [T] extends [Request<in
  *
  * // Extract the result type from a Request using the utility
  * type UserResult = Request.Result<GetUser> // Exit.Exit<string, Error>
+ *
  * ```
  *
+ * @stability stable
  * @category utility types
  * @since 2.0.0
  */
@@ -214,6 +230,7 @@ const requestVariance = Equal.byReferenceUnsafe({
  * `Request.TaggedClass`. Most users should use those constructors instead of
  * interacting with the prototype directly.
  *
+ * @stability stable
  * @category prototypes
  * @since 4.0.0
  */
@@ -227,7 +244,7 @@ export const RequestPrototype: Request<any, any, any> = {
  *
  * **Example** (Checking request values)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { Request } from "effect"
  *
  * declare const User: unique symbol
@@ -242,10 +259,11 @@ export const RequestPrototype: Request<any, any, any> = {
  * const GetUser = Request.tagged<GetUser>("GetUser")
  *
  * const request = GetUser({ id: "123" })
- * console.log(Request.isRequest(request)) // true
- * console.log(Request.isRequest("not a request")) // false
+ * Request.isRequest(request) // => true
+ * Request.isRequest("not a request") // => false
  * ```
  *
+ * @stability stable
  * @category guards
  * @since 2.0.0
  */
@@ -256,7 +274,7 @@ export const isRequest = (u: unknown): u is Request<unknown, unknown, unknown> =
  *
  * **Example** (Creating untagged request constructors)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { Request } from "effect"
  *
  * declare const UserProfile: unique symbol
@@ -275,8 +293,12 @@ export const isRequest = (u: unknown): u is Request<unknown, unknown, unknown> =
  *   id: "user-123",
  *   includeSettings: true
  * })
+ *
+ * request.id // => "user-123"
+ * request.includeSettings // => true
  * ```
  *
+ * @stability stable
  * @category constructors
  * @since 2.0.0
  */
@@ -289,7 +311,7 @@ export const of = <R extends Request<any, any, any>>(): Constructor<R> => (args)
  *
  * **Example** (Creating tagged request constructors)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { Request } from "effect"
  *
  * declare const User: unique symbol
@@ -318,10 +340,10 @@ export const of = <R extends Request<any, any, any>>(): Constructor<R> => (args)
  * const postRequest = GetPost({ id: "post-456" })
  *
  * // _tag is automatically set
- * console.log(userRequest._tag) // "GetUser"
- * console.log(postRequest._tag) // "GetPost"
+ * Array.of(userRequest._tag, postRequest._tag) // => ["GetUser", "GetPost"]
  * ```
  *
+ * @stability stable
  * @category constructors
  * @since 2.0.0
  */
@@ -342,7 +364,7 @@ export const tagged = <R extends Request<any, any, any> & { _tag: string }>(
  *
  * **Example** (Defining request classes)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { Request } from "effect"
  *
  * class GetUser extends Request.Class<{ id: number }, string, Error> {
@@ -352,9 +374,10 @@ export const tagged = <R extends Request<any, any, any> & { _tag: string }>(
  * }
  *
  * const getUserRequest = new GetUser(123)
- * console.log(getUserRequest.id) // 123
+ * getUserRequest.id // => 123
  * ```
  *
+ * @stability stable
  * @category constructors
  * @since 2.0.0
  */
@@ -381,7 +404,7 @@ export const Class: new<A extends Record<string, any>, Success, Error = never, C
  *
  * **Example** (Defining tagged request classes)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { Request } from "effect"
  *
  * class GetUserById
@@ -389,10 +412,12 @@ export const Class: new<A extends Record<string, any>, Success, Error = never, C
  * {}
  *
  * const request = new GetUserById({ id: 123 })
- * console.log(request._tag) // "GetUserById"
- * console.log(request.id) // 123
+ *
+ * request._tag // => "GetUserById"
+ * request.id // => 123
  * ```
  *
+ * @stability stable
  * @category constructors
  * @since 2.0.0
  */
@@ -420,6 +445,7 @@ export const TaggedClass = <Tag extends string>(
  * @see {@link fail} for completing an entry with a typed failure
  * @see {@link failCause} for completing an entry with a failure `Cause`
  *
+ * @stability stable
  * @category completion
  * @since 2.0.0
  */
@@ -454,6 +480,7 @@ export const complete: {
  * @see {@link fail} for completing an entry with a typed failure
  * @see {@link failCause} for completing an entry with a failure `Cause`
  *
+ * @stability stable
  * @category completion
  * @since 2.0.0
  */
@@ -482,6 +509,7 @@ export const completeEffect: {
  * @see {@link completeEffect} for completing an entry from an effect result
  * @see {@link succeed} for completing an entry successfully
  *
+ * @stability stable
  * @category completion
  * @since 2.0.0
  */
@@ -506,6 +534,7 @@ export const fail: {
  * @see {@link completeEffect} for completing an entry from an effect result
  * @see {@link succeed} for completing an entry successfully
  *
+ * @stability stable
  * @category completion
  * @since 2.0.0
  */
@@ -531,6 +560,7 @@ export const failCause: {
  * @see {@link fail} for completing an entry with a typed failure
  * @see {@link failCause} for completing an entry with a failure `Cause`
  *
+ * @stability stable
  * @category completion
  * @since 2.0.0
  */
@@ -552,7 +582,8 @@ export const succeed: {
  * an `uninterruptible` flag used by batching and caching internals, and the
  * `completeUnsafe` callback used by resolvers to supply the final `Exit`.
  *
- * @category entry
+ * @stability stable
+ * @category models
  * @since 2.0.0
  */
 export interface Entry<out R> {
@@ -578,7 +609,8 @@ export interface Entry<out R> {
  * most application code receives entries from a `RequestResolver` instead of
  * constructing them directly.
  *
- * @category entry
+ * @stability stable
+ * @category constructors
  * @since 2.0.0
  */
 export const makeEntry = <R>(options: {

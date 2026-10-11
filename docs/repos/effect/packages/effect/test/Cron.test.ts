@@ -218,6 +218,62 @@ describe("Cron", () => {
     )
   })
 
+  it("format preserves compact cron syntax", () => {
+    strictEqual(
+      Cron.format(Cron.parseUnsafe("23 0-20/2 * * 0", "Europe/Berlin")),
+      "23 0-20/2 * * 0"
+    )
+  })
+
+  it("format can include the default seconds field", () => {
+    strictEqual(
+      Cron.format(Cron.parseUnsafe("23 0-20/2 * * 0"), { includeSeconds: true }),
+      "0 23 0-20/2 * * 0"
+    )
+  })
+
+  it("format compacts multiple runs within a field", () => {
+    strictEqual(
+      Cron.format(Cron.make({
+        minutes: [0, 1, 2, 10, 20, 30],
+        hours: [],
+        days: [],
+        months: [],
+        weekdays: []
+      })),
+      "0-2,10-30/10 * * * *"
+    )
+  })
+
+  it("format preserves non-uniform values", () => {
+    strictEqual(
+      Cron.format(Cron.make({
+        minutes: [1, 5, 11],
+        hours: [],
+        days: [],
+        months: [],
+        weekdays: []
+      })),
+      "1,5,11 * * * *"
+    )
+  })
+
+  it("format handles default, non-default, and unrestricted seconds", () => {
+    const format = (seconds?: Iterable<number>) =>
+      Cron.format(Cron.make({
+        seconds,
+        minutes: [],
+        hours: [],
+        days: [],
+        months: [],
+        weekdays: []
+      }))
+
+    strictEqual(format(), "* * * * *")
+    strictEqual(format([15, 30]), "15,30 * * * * *")
+    strictEqual(format([]), "* * * * * *")
+  })
+
   it("make supports requiring both days and weekdays", () => {
     const utc = DateTime.zoneMakeNamedUnsafe("UTC")
     const values = {
@@ -702,6 +758,24 @@ describe("Cron", () => {
     deepStrictEqual(next().pipe(DateTime.formatIsoZoned), c.pipe(DateTime.formatIsoZoned))
     deepStrictEqual(next().pipe(DateTime.formatIsoZoned), d.pipe(DateTime.formatIsoZoned))
     deepStrictEqual(next().pipe(DateTime.formatIsoZoned), e.pipe(DateTime.formatIsoZoned))
+  })
+
+  it("next skips the repeated hour when starting in the second DST fold hour", () => {
+    const cron = Cron.parseUnsafe("30 * * * *", "Europe/Berlin")
+    // Ambiguous times run only once, so both occurrences of 02:30 must be skipped.
+    deepStrictEqual(
+      next(cron, new Date("2024-10-27T02:15:00+01:00")),
+      new Date("2024-10-27T03:30:00+01:00")
+    )
+  })
+
+  it("next skips the repeated interval when starting in a three-hour fold", () => {
+    const cron = Cron.parseUnsafe("* * * * * *", "Antarctica/Casey")
+    // Casey rolls back from +11:00 to +08:00, repeating 00:00 through 02:59:59.
+    deepStrictEqual(
+      next(cron, new Date("2023-03-09T00:00:00+08:00")),
+      new Date("2023-03-09T03:00:00+08:00")
+    )
   })
 
   it("handles utc timezone", () => {

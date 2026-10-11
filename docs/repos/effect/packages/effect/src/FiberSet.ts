@@ -6,10 +6,10 @@
  * closes. This module includes scoped runtime constructors plus helpers for
  * adding, clearing, running, counting, joining, and waiting for managed fibers.
  *
+ * @stability stable
  * @since 2.0.0
  */
 import * as Cause from "./Cause.ts"
-import type { Context } from "./Context.ts"
 import * as Deferred from "./Deferred.ts"
 import * as Effect from "./Effect.ts"
 import * as Exit from "./Exit.ts"
@@ -18,6 +18,7 @@ import * as Filter from "./Filter.ts"
 import { constVoid, dual } from "./Function.ts"
 import type * as Inspectable from "./Inspectable.ts"
 import { PipeInspectableProto } from "./internal/core.ts"
+import * as internalEffect from "./internal/effect.ts"
 import * as Iterable from "./Iterable.ts"
 import type { Pipeable } from "./Pipeable.ts"
 import * as Predicate from "./Predicate.ts"
@@ -31,7 +32,7 @@ const TypeId = "~effect/FiberSet"
  *
  * **Example** (Managing fibers in a set)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { Effect, FiberSet } from "effect"
  *
  * const program = Effect.gen(function*() {
@@ -43,9 +44,14 @@ const TypeId = "~effect/FiberSet"
  *
  *   // Wait for all fibers to complete
  *   yield* FiberSet.awaitEmpty(set)
+ *   return yield* FiberSet.size(set)
  * })
+ *
+ * const actual = await Effect.runPromise(Effect.scoped(program))
+ * actual // => 0
  * ```
  *
+ * @stability stable
  * @category models
  * @since 2.0.0
  */
@@ -67,18 +73,21 @@ export interface FiberSet<out A = unknown, out E = unknown>
  *
  * **Example** (Checking if a value is a FiberSet)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { Effect, FiberSet } from "effect"
  *
- * Effect.gen(function*() {
+ * const program = Effect.gen(function*() {
  *   const set = yield* FiberSet.make()
  *
- *   console.log(FiberSet.isFiberSet(set)) // true
- *   console.log(FiberSet.isFiberSet({})) // false
+ *   return [FiberSet.isFiberSet(set), FiberSet.isFiberSet({})]
  * })
+ *
+ * const actual = await Effect.runPromise(Effect.scoped(program))
+ * actual // => [true, false]
  * ```
  *
- * @category refinements
+ * @stability stable
+ * @category guards
  * @since 2.0.0
  */
 export const isFiberSet = (u: unknown): u is FiberSet<unknown, unknown> => Predicate.hasProperty(u, TypeId)
@@ -94,7 +103,7 @@ const Proto = {
   ...PipeInspectableProto,
   toJSON(this: FiberSet<unknown, unknown>) {
     return {
-      _id: "FiberMap",
+      _id: "FiberSet",
       state: this.state
     }
   }
@@ -122,22 +131,27 @@ const makeUnsafe = <A, E>(
  *
  * **Example** (Creating a scoped FiberSet)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { Effect, FiberSet } from "effect"
  *
- * Effect.gen(function*() {
+ * const program = Effect.gen(function*() {
  *   const set = yield* FiberSet.make()
  *
  *   // run some effects and add the fibers to the set
  *   yield* FiberSet.run(set, Effect.never)
  *   yield* FiberSet.run(set, Effect.never)
  *
- *   yield* Effect.sleep(1000)
+ *   yield* Effect.yieldNow
+ *   return yield* FiberSet.size(set)
  * }).pipe(
  *   Effect.scoped // The fibers will be interrupted when the scope is closed
  * )
+ *
+ * const actual = await Effect.runPromise(program)
+ * actual // => 2
  * ```
  *
+ * @stability stable
  * @category constructors
  * @since 2.0.0
  */
@@ -166,7 +180,7 @@ export const make = <A = unknown, E = unknown>(): Effect.Effect<FiberSet<A, E>, 
  *
  * **Example** (Creating a scoped runtime)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { Effect, Fiber, FiberSet } from "effect"
  *
  * const program = Effect.gen(function*() {
@@ -176,13 +190,14 @@ export const make = <A = unknown, E = unknown>(): Effect.Effect<FiberSet<A, E>, 
  *   const fiber1 = runFork(Effect.succeed("hello"))
  *   const fiber2 = runFork(Effect.succeed("world"))
  *
- *   const result1 = yield* Fiber.await(fiber1)
- *   const result2 = yield* Fiber.await(fiber2)
- *
- *   console.log(result1, result2) // "hello" "world"
+ *   return [yield* Fiber.join(fiber1), yield* Fiber.join(fiber2)]
  * })
+ *
+ * const actual = await Effect.runPromise(Effect.scoped(program))
+ * actual // => ["hello", "world"]
  * ```
  *
+ * @stability stable
  * @category constructors
  * @since 2.0.0
  */
@@ -216,7 +231,7 @@ export const makeRuntime = <R = never, A = unknown, E = unknown>(): Effect.Effec
  *
  * **Example** (Creating a promise runtime)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { Effect, FiberSet } from "effect"
  *
  * const program = Effect.gen(function*() {
@@ -226,13 +241,14 @@ export const makeRuntime = <R = never, A = unknown, E = unknown>(): Effect.Effec
  *   const promise1 = runPromise(Effect.succeed("hello"))
  *   const promise2 = runPromise(Effect.succeed("world"))
  *
- *   const result1 = yield* Effect.promise(() => promise1)
- *   const result2 = yield* Effect.promise(() => promise2)
- *
- *   console.log(result1, result2) // "hello" "world"
+ *   return [yield* Effect.promise(() => promise1), yield* Effect.promise(() => promise2)]
  * })
+ *
+ * const actual = await Effect.runPromise(Effect.scoped(program))
+ * actual // => ["hello", "world"]
  * ```
  *
+ * @stability stable
  * @category constructors
  * @since 3.13.0
  */
@@ -272,21 +288,25 @@ const isInternalInterruption = Filter.toPredicate(Filter.compose(
  *
  * **Example** (Adding a fiber unsafely)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { Effect, FiberSet } from "effect"
  *
  * const program = Effect.gen(function*() {
  *   const set = yield* FiberSet.make()
- *   const fiber = yield* Effect.forkChild(Effect.succeed("hello"))
+ *   const fiber = yield* Effect.forkChild(Effect.never)
  *
  *   // Unsafe add - doesn't return an Effect
  *   FiberSet.addUnsafe(set, fiber)
  *
  *   // The fiber is now managed by the set
- *   console.log(yield* FiberSet.size(set)) // 1
+ *   return yield* FiberSet.size(set)
  * })
+ *
+ * const actual = await Effect.runPromise(Effect.scoped(program))
+ * actual // => 1
  * ```
  *
+ * @stability stable
  * @category combinators
  * @since 4.0.0
  */
@@ -341,21 +361,25 @@ export const addUnsafe: {
  *
  * **Example** (Adding a fiber)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { Effect, FiberSet } from "effect"
  *
  * const program = Effect.gen(function*() {
  *   const set = yield* FiberSet.make()
- *   const fiber = yield* Effect.forkChild(Effect.succeed("hello"))
+ *   const fiber = yield* Effect.forkChild(Effect.never)
  *
  *   // Add the fiber to the set
  *   yield* FiberSet.add(set, fiber)
  *
  *   // The fiber is now managed by the set
- *   console.log(yield* FiberSet.size(set)) // 1
+ *   return yield* FiberSet.size(set)
  * })
+ *
+ * const actual = await Effect.runPromise(Effect.scoped(program))
+ * actual // => 1
  * ```
  *
+ * @stability stable
  * @category combinators
  * @since 2.0.0
  */
@@ -389,7 +413,7 @@ export const add: {
  *
  * **Example** (Clearing all fibers)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { Effect, FiberSet } from "effect"
  *
  * const program = Effect.gen(function*() {
@@ -399,15 +423,19 @@ export const add: {
  *   yield* FiberSet.run(set, Effect.never)
  *   yield* FiberSet.run(set, Effect.never)
  *
- *   console.log(yield* FiberSet.size(set)) // 2
+ *   const sizeBefore = yield* FiberSet.size(set)
  *
  *   // Clear all fibers
  *   yield* FiberSet.clear(set)
  *
- *   console.log(yield* FiberSet.size(set)) // 0
+ *   return [sizeBefore, yield* FiberSet.size(set)]
  * })
+ *
+ * const actual = await Effect.runPromise(Effect.scoped(program))
+ * actual // => [2, 0]
  * ```
  *
+ * @stability stable
  * @category combinators
  * @since 2.0.0
  */
@@ -430,12 +458,13 @@ const constInterruptedFiber = (function() {
 })()
 
 /**
- * Forks an Effect and add the forked fiber to the FiberSet.
- * When the fiber completes, it will be removed from the FiberSet.
+ * Forks an Effect and adds the fiber to the FiberSet. The fiber is removed
+ * when it completes. Set `startImmediately: false` to defer startup. By default,
+ * the effect starts immediately.
  *
  * **Example** (Forking effects into a set)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { Effect, Fiber, FiberSet } from "effect"
  *
  * const program = Effect.gen(function*() {
@@ -446,13 +475,14 @@ const constInterruptedFiber = (function() {
  *   const fiber2 = yield* FiberSet.run(set, Effect.succeed("world"))
  *
  *   // Get results
- *   const result1 = yield* Fiber.await(fiber1)
- *   const result2 = yield* Fiber.await(fiber2)
- *
- *   console.log(result1, result2) // "hello" "world"
+ *   return [yield* Fiber.join(fiber1), yield* Fiber.join(fiber2)]
  * })
+ *
+ * const actual = await Effect.runPromise(Effect.scoped(program))
+ * actual // => ["hello", "world"]
  * ```
  *
+ * @stability stable
  * @category combinators
  * @since 2.0.0
  */
@@ -487,6 +517,7 @@ const runImpl = <A, E, R, XE extends E, XA extends A>(
   self: FiberSet<A, E>,
   effect: Effect.Effect<XA, XE, R>,
   options?: {
+    readonly startImmediately?: boolean | undefined
     readonly propagateInterruption?: boolean | undefined
   }
 ): Effect.Effect<Fiber.Fiber<XA, XE>, never, R> =>
@@ -494,7 +525,12 @@ const runImpl = <A, E, R, XE extends E, XA extends A>(
     if (self.state._tag === "Closed") {
       return Effect.sync(constInterruptedFiber)
     }
-    const fiber = Effect.runForkWith(parent.context as Context<R>)(effect)
+    const fiber: Fiber.Fiber<XA, XE> = internalEffect.forkUnsafe(
+      parent,
+      effect,
+      options?.startImmediately ?? true,
+      true
+    )
     addUnsafe(self, fiber, options)
     return Effect.succeed(fiber)
   })
@@ -504,27 +540,31 @@ const runImpl = <A, E, R, XE extends E, XA extends A>(
  *
  * **Example** (Capturing a runtime)
  *
- * ```ts
- * import { Context, Effect, FiberSet } from "effect"
+ * ```ts import.meta.vitest
+ * import { Context, Effect, Fiber, FiberSet } from "effect"
  *
- * interface Users {
- *   readonly _: unique symbol
- * }
- * const Users = Context.Service<Users, {
- *   getAll: Effect.Effect<Array<unknown>>
- * }>("Users")
+ * class Users extends Context.Service<Users, {
+ *   readonly getAll: Effect.Effect<Array<unknown>>
+ * }>()("Users") {}
  *
- * Effect.gen(function*() {
+ * const program = Effect.gen(function*() {
  *   const set = yield* FiberSet.make()
  *   const run = yield* FiberSet.runtime(set)<Users>()
  *
  *   // run some effects and add the fibers to the set
- *   run(Effect.andThen(Users, (_) => _.getAll))
+ *   const fiber = run(Effect.andThen(Users, (_) => _.getAll))
+ *   return (yield* Fiber.join(fiber)).length
  * }).pipe(
  *   Effect.scoped // The fibers will be interrupted when the scope is closed
  * )
+ *
+ * const actual = await Effect.runPromise(Effect.provideService(program, Users, {
+ *   getAll: Effect.succeed([])
+ * }))
+ * actual // => 0
  * ```
  *
+ * @stability stable
  * @category combinators
  * @since 2.0.0
  */
@@ -554,7 +594,7 @@ export const runtime: <A, E>(
           return constInterruptedFiber()
         }
         const fiber = runFork(effect, options)
-        addUnsafe(self, fiber)
+        addUnsafe(self, fiber, options)
         return fiber
       }
     }
@@ -575,7 +615,7 @@ export const runtime: <A, E>(
  *
  * **Example** (Running effects as promises)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { Effect, FiberSet } from "effect"
  *
  * const program = Effect.gen(function*() {
@@ -586,15 +626,16 @@ export const runtime: <A, E>(
  *   const promise1 = runPromise(Effect.succeed("hello"))
  *   const promise2 = runPromise(Effect.succeed("world"))
  *
- *   const result1 = yield* Effect.promise(() => promise1)
- *   const result2 = yield* Effect.promise(() => promise2)
- *
- *   console.log(result1, result2) // "hello" "world"
+ *   return [yield* Effect.promise(() => promise1), yield* Effect.promise(() => promise2)]
  * })
+ *
+ * const actual = await Effect.runPromise(Effect.scoped(program))
+ * actual // => ["hello", "world"]
  * ```
  *
  * @see {@link runtime} for a runner that returns the forked `Fiber`
  *
+ * @stability stable
  * @category combinators
  * @since 3.13.0
  */
@@ -634,22 +675,26 @@ export const runtimePromise = <A, E>(self: FiberSet<A, E>): <R = never>() => Eff
  *
  * **Example** (Checking the set size)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { Effect, FiberSet } from "effect"
  *
  * const program = Effect.gen(function*() {
  *   const set = yield* FiberSet.make()
  *
- *   console.log(yield* FiberSet.size(set)) // 0
+ *   const sizeBefore = yield* FiberSet.size(set)
  *
  *   // Add some fibers
  *   yield* FiberSet.run(set, Effect.never)
  *   yield* FiberSet.run(set, Effect.never)
  *
- *   console.log(yield* FiberSet.size(set)) // 2
+ *   return [sizeBefore, yield* FiberSet.size(set)]
  * })
+ *
+ * const actual = await Effect.runPromise(Effect.scoped(program))
+ * actual // => [0, 2]
  * ```
  *
+ * @stability stable
  * @category combinators
  * @since 2.0.0
  */
@@ -662,18 +707,22 @@ export const size = <A, E>(self: FiberSet<A, E>): Effect.Effect<number> =>
  *
  * **Example** (Joining failing fibers)
  *
- * ```ts
- * import { Effect, FiberSet } from "effect"
+ * ```ts import.meta.vitest
+ * import { Effect, Exit, FiberSet } from "effect"
  *
- * Effect.gen(function*() {
+ * const program = Effect.gen(function*() {
  *   const set = yield* FiberSet.make()
  *   yield* FiberSet.add(set, Effect.runFork(Effect.fail("error")))
  *
  *   // parent fiber will fail with "error"
  *   yield* FiberSet.join(set)
  * })
+ *
+ * const actual = await Effect.runPromise(Effect.exit(Effect.scoped(program)))
+ * actual // => Exit.fail("error")
  * ```
  *
+ * @stability stable
  * @category combinators
  * @since 2.0.0
  */
@@ -685,23 +734,26 @@ export const join = <A, E>(self: FiberSet<A, E>): Effect.Effect<void, E> =>
  *
  * **Example** (Waiting for an empty set)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { Effect, FiberSet } from "effect"
  *
  * const program = Effect.gen(function*() {
  *   const set = yield* FiberSet.make()
  *
- *   // Add some fibers that will complete
- *   yield* FiberSet.run(set, Effect.sleep(100))
- *   yield* FiberSet.run(set, Effect.sleep(200))
+ *   yield* FiberSet.run(set, Effect.yieldNow)
+ *   yield* FiberSet.run(set, Effect.yieldNow)
  *
  *   // Wait for all fibers to complete
  *   yield* FiberSet.awaitEmpty(set)
  *
- *   console.log(yield* FiberSet.size(set)) // 0
+ *   return yield* FiberSet.size(set)
  * })
+ *
+ * const actual = await Effect.runPromise(Effect.scoped(program))
+ * actual // => 0
  * ```
  *
+ * @stability stable
  * @category combinators
  * @since 3.13.0
  */

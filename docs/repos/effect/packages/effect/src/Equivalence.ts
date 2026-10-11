@@ -7,6 +7,7 @@
  * helpers for tuples, arrays, structs, records, dates, and values compared
  * through a derived field.
  *
+ * @stability stable
  * @since 2.0.0
  */
 import { dual } from "./Function.ts"
@@ -27,18 +28,18 @@ import * as Reducer from "./Reducer.ts"
  *
  * **Example** (Defining simple number equivalence)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import type { Equivalence } from "effect"
  *
  * const numberEq: Equivalence.Equivalence<number> = (a, b) => a === b
  *
- * console.log(numberEq(1, 1)) // true
- * console.log(numberEq(1, 2)) // false
+ * numberEq(1, 1) // => true
+ * numberEq(1, 2) // => false
  * ```
  *
  * **Example** (Defining custom object equivalence)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import type { Equivalence } from "effect"
  *
  * interface Point {
@@ -49,12 +50,13 @@ import * as Reducer from "./Reducer.ts"
  * const pointEq: Equivalence.Equivalence<Point> = (a, b) =>
  *   a.x === b.x && a.y === b.y
  *
- * console.log(pointEq({ x: 1, y: 2 }, { x: 1, y: 2 })) // true
+ * pointEq({ x: 1, y: 2 }, { x: 1, y: 2 }) // => true
  * ```
  *
  * @see {@link make}
  * @see {@link strictEqual}
- * @category type class
+ * @stability stable
+ * @category models
  * @since 2.0.0
  */
 export type Equivalence<in A> = (self: A, that: A) => boolean
@@ -73,7 +75,7 @@ export type Equivalence<in A> = (self: A, that: A) => boolean
  *
  * **Example** (Type-level usage)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import type { Equivalence, HKT } from "effect"
  *
  * // Used internally for type-level computations
@@ -89,7 +91,8 @@ export type Equivalence<in A> = (self: A, that: A) => boolean
  *
  * @see {@link Equivalence}
  * @see {@link TypeLambda}
- * @category type lambdas
+ * @stability stable
+ * @category utility types
  * @since 2.0.0
  */
 export interface EquivalenceTypeLambda extends TypeLambda {
@@ -113,34 +116,35 @@ export interface EquivalenceTypeLambda extends TypeLambda {
  *
  * **Example** (Case-insensitive string equivalence)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { Equivalence } from "effect"
  *
  * const caseInsensitive = Equivalence.make<string>((a, b) =>
  *   a.toLowerCase() === b.toLowerCase()
  * )
  *
- * console.log(caseInsensitive("Hello", "HELLO")) // true
- * console.log(caseInsensitive("foo", "bar")) // false
+ * caseInsensitive("Hello", "HELLO") // => true
+ * caseInsensitive("foo", "bar") // => false
  *
  * // Same reference optimization
  * const str = "test"
- * console.log(caseInsensitive(str, str)) // true (fast path)
+ * caseInsensitive(str, str) // => true
  * ```
  *
  * **Example** (Comparing numbers with tolerance)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { Equivalence } from "effect"
  *
  * const tolerance = Equivalence.make<number>((a, b) => Math.abs(a - b) < 0.0001)
  *
- * console.log(tolerance(1.0, 1.001)) // false
- * console.log(tolerance(1.0, 1.00001)) // true
+ * tolerance(1.0, 1.001) // => false
+ * tolerance(1.0, 1.00001) // => true
  * ```
  *
  * @see {@link strictEqual}
  * @see {@link mapInput}
+ * @stability stable
  * @category constructors
  * @since 2.0.0
  */
@@ -169,30 +173,31 @@ const isStrictEquivalent = (x: unknown, y: unknown) => x === y
  *
  * **Example** (Comparing primitive types)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { Equivalence } from "effect"
  *
  * const strictEq = Equivalence.strictEqual<number>()
  *
- * console.log(strictEq(1, 1)) // true
- * console.log(strictEq(1, 2)) // false
- * console.log(strictEq(NaN, NaN)) // false (NaN !== NaN)
+ * strictEq(1, 1) // => true
+ * strictEq(1, 2) // => false
+ * strictEq(NaN, NaN) // => false
  * ```
  *
  * **Example** (Comparing objects by reference)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { Equivalence } from "effect"
  *
  * const obj = { value: 42 }
  * const strictObjEq = Equivalence.strictEqual<typeof obj>()
  *
- * console.log(strictObjEq(obj, obj)) // true
- * console.log(strictObjEq(obj, { value: 42 })) // false (different references)
+ * strictObjEq(obj, obj) // => true
+ * strictObjEq(obj, { value: 42 }) // => false
  * ```
  *
  * @see {@link make}
  * @see `Equal` for structural equality
+ * @stability stable
  * @category constructors
  * @since 4.0.0
  */
@@ -207,13 +212,14 @@ export const strictEqual: <A>() => Equivalence<A> = () => isStrictEquivalent
  *
  * **Example** (Comparing strings)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { Equivalence } from "effect"
  *
- * console.log(Equivalence.String("hello", "hello")) // true
- * console.log(Equivalence.String("hello", "world")) // false
+ * Equivalence.String("hello", "hello") // => true
+ * Equivalence.String("hello", "world") // => false
  * ```
  *
+ * @stability stable
  * @category instances
  * @since 4.0.0
  */
@@ -228,14 +234,15 @@ export const String: Equivalence<string> = isStrictEquivalent
  *
  * **Example** (Comparing numbers)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { Equivalence } from "effect"
  *
- * console.log(Equivalence.Number(1, 1)) // true
- * console.log(Equivalence.Number(1, 2)) // false
- * console.log(Equivalence.Number(NaN, NaN)) // true
+ * Equivalence.Number(1, 1) // => true
+ * Equivalence.Number(1, 2) // => false
+ * Equivalence.Number(NaN, NaN) // => true
  * ```
  *
+ * @stability stable
  * @category instances
  * @since 4.0.0
  */
@@ -252,13 +259,14 @@ export const Number: Equivalence<number> = make((self, that) =>
  *
  * **Example** (Comparing booleans)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { Equivalence } from "effect"
  *
- * console.log(Equivalence.Boolean(true, true)) // true
- * console.log(Equivalence.Boolean(true, false)) // false
+ * Equivalence.Boolean(true, true) // => true
+ * Equivalence.Boolean(true, false) // => false
  * ```
  *
+ * @stability stable
  * @category instances
  * @since 4.0.0
  */
@@ -273,13 +281,14 @@ export const Boolean: Equivalence<boolean> = isStrictEquivalent
  *
  * **Example** (Comparing bigints)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { Equivalence } from "effect"
  *
- * console.log(Equivalence.BigInt(1n, 1n)) // true
- * console.log(Equivalence.BigInt(1n, 2n)) // false
+ * Equivalence.BigInt(1n, 1n) // => true
+ * Equivalence.BigInt(1n, 2n) // => false
  * ```
  *
+ * @stability stable
  * @category instances
  * @since 4.0.0
  */
@@ -301,7 +310,7 @@ export const BigInt: Equivalence<bigint> = isStrictEquivalent
  *
  * **Example** (Combining name and age equivalences)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { Equivalence } from "effect"
  *
  * interface Person {
@@ -325,12 +334,13 @@ export const BigInt: Equivalence<bigint> = isStrictEquivalent
  * const person2 = { name: "Alice", age: 30 }
  * const person3 = { name: "Alice", age: 31 }
  *
- * console.log(personEquivalence(person1, person2)) // true
- * console.log(personEquivalence(person1, person3)) // false (different age)
+ * personEquivalence(person1, person2) // => true
+ * personEquivalence(person1, person3) // => false
  * ```
  *
  * @see {@link combineAll}
  * @see {@link mapInput}
+ * @stability stable
  * @category combining
  * @since 2.0.0
  */
@@ -356,7 +366,7 @@ export const combine: {
  *
  * **Example** (Combining multiple field equivalences)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { Equivalence } from "effect"
  *
  * interface Point3D {
@@ -384,22 +394,23 @@ export const combine: {
  * const point2 = { x: 1, y: 2, z: 3 }
  * const point3 = { x: 1, y: 2, z: 4 }
  *
- * console.log(point3DEq(point1, point2)) // true
- * console.log(point3DEq(point1, point3)) // false (different z)
+ * point3DEq(point1, point2) // => true
+ * point3DEq(point1, point3) // => false
  * ```
  *
  * **Example** (Handling empty collections)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { Equivalence } from "effect"
  *
  * // Empty collection always returns true
  * const alwaysEq = Equivalence.combineAll([])
- * console.log(alwaysEq("anything", "else")) // true
+ * alwaysEq("anything", "else") // => true
  * ```
  *
  * @see {@link combine}
  * @see {@link mapInput}
+ * @stability stable
  * @category combining
  * @since 2.0.0
  */
@@ -431,7 +442,7 @@ export const combineAll = <A>(collection: Iterable<Equivalence<A>>): Equivalence
  *
  * **Example** (Deriving equivalence from an object property)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { Equivalence } from "effect"
  *
  * interface User {
@@ -450,13 +461,13 @@ export const combineAll = <A>(collection: Iterable<Equivalence<A>>): Equivalence
  * const user2 = { id: 1, name: "Alice Smith", email: "alice.smith@example.com" }
  * const user3 = { id: 2, name: "Bob", email: "bob@example.com" }
  *
- * console.log(userByIdEq(user1, user2)) // true (same ID)
- * console.log(userByIdEq(user1, user3)) // false (different ID)
+ * userByIdEq(user1, user2) // => true
+ * userByIdEq(user1, user3) // => false
  * ```
  *
  * **Example** (Case-insensitive string equivalence)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { Equivalence } from "effect"
  *
  * const caseInsensitiveEq = Equivalence.mapInput(
@@ -464,12 +475,13 @@ export const combineAll = <A>(collection: Iterable<Equivalence<A>>): Equivalence
  *   (s: string) => s.toLowerCase()
  * )
  *
- * console.log(caseInsensitiveEq("Hello", "HELLO")) // true
- * console.log(caseInsensitiveEq("Hello", "World")) // false
+ * caseInsensitiveEq("Hello", "HELLO") // => true
+ * caseInsensitiveEq("Hello", "World") // => false
  * ```
  *
  * @see {@link combine}
  * @see {@link Struct}
+ * @stability stable
  * @category mapping
  * @since 2.0.0
  */
@@ -499,7 +511,7 @@ export const mapInput: {
  *
  * **Example** (Comparing homogeneous tuples)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { Equivalence } from "effect"
  *
  * const stringTupleEq = Equivalence.Tuple([
@@ -512,13 +524,13 @@ export const mapInput: {
  * const tuple2 = ["hello", "world", "test"] as const
  * const tuple3 = ["hello", "world", "different"] as const
  *
- * console.log(stringTupleEq(tuple1, tuple2)) // true
- * console.log(stringTupleEq(tuple1, tuple3)) // false (different third element)
+ * stringTupleEq(tuple1, tuple2) // => true
+ * stringTupleEq(tuple1, tuple3) // => false
  * ```
  *
  * **Example** (Comparing tuples with custom equivalences)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { Equivalence } from "effect"
  *
  * const caseInsensitive = Equivalence.mapInput(
@@ -532,11 +544,10 @@ export const mapInput: {
  *   caseInsensitive
  * ])
  *
- * console.log(
- *   customTupleEq(["Hello", "World", "Test"], ["HELLO", "WORLD", "TEST"])
- * ) // true
+ * customTupleEq(["Hello", "World", "Test"], ["HELLO", "WORLD", "TEST"]) // => true
  * ```
  *
+ * @stability stable
  * @category combinators
  * @since 4.0.0
  */
@@ -588,19 +599,19 @@ export {
    *
    * **Example** (Comparing number arrays)
    *
-   * ```ts
+   * ```ts import.meta.vitest
    * import { Equivalence } from "effect"
    *
    * const numberArrayEq = Equivalence.Array(Equivalence.strictEqual<number>())
    *
-   * console.log(numberArrayEq([1, 2, 3], [1, 2, 3])) // true
-   * console.log(numberArrayEq([1, 2, 3], [1, 2, 4])) // false
-   * console.log(numberArrayEq([1, 2], [1, 2, 3])) // false (different length)
+   * numberArrayEq([1, 2, 3], [1, 2, 3]) // => true
+   * numberArrayEq([1, 2, 3], [1, 2, 4]) // => false
+   * numberArrayEq([1, 2], [1, 2, 3]) // => false
    * ```
    *
    * **Example** (Case-insensitive string array)
    *
-   * ```ts
+   * ```ts import.meta.vitest
    * import { Equivalence } from "effect"
    *
    * const caseInsensitive = Equivalence.mapInput(
@@ -609,13 +620,14 @@ export {
    * )
    * const stringArrayEq = Equivalence.Array(caseInsensitive)
    *
-   * console.log(stringArrayEq(["Hello", "World"], ["HELLO", "WORLD"])) // true
-   * console.log(stringArrayEq(["Hello"], ["Hi"])) // false
-   * console.log(stringArrayEq([], [])) // true (empty arrays)
+   * stringArrayEq(["Hello", "World"], ["HELLO", "WORLD"]) // => true
+   * stringArrayEq(["Hello"], ["Hi"]) // => false
+   * stringArrayEq([], []) // => true
    * ```
    *
    * @see {@link Tuple}
    * @see {@link Record}
+   * @stability stable
    * @category combinators
    * @since 4.0.0
    */
@@ -640,7 +652,7 @@ export {
  *
  * **Example** (Comparing structs with different equivalences per field)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { Equivalence } from "effect"
  *
  * interface Person {
@@ -664,13 +676,13 @@ export {
  * const person2 = { name: "ALICE", age: 30, email: "ALICE@EXAMPLE.COM" }
  * const person3 = { name: "Alice", age: 31, email: "alice@example.com" }
  *
- * console.log(personEq(person1, person2)) // true (case-insensitive match)
- * console.log(personEq(person1, person3)) // false (different age)
+ * personEq(person1, person2) // => true
+ * personEq(person1, person3) // => false
  * ```
  *
  * **Example** (Comparing specific fields)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { Equivalence } from "effect"
  *
  * const nameAgeEq = Equivalence.Struct({
@@ -681,12 +693,13 @@ export {
  * // Only compares name and age, ignores other properties
  * const obj1 = { name: "Alice", age: 30, extra: "ignored" }
  * const obj2 = { name: "Alice", age: 30, extra: "different" }
- * console.log(nameAgeEq(obj1, obj2)) // true
+ * nameAgeEq(obj1, obj2) // => true
  * ```
  *
  * @see {@link Record}
  * @see {@link mapInput}
  * @see {@link combine}
+ * @stability stable
  * @category combinators
  * @since 4.0.0
  */
@@ -721,7 +734,7 @@ export function Struct<R extends Record<string, Equivalence<any>>>(
  *
  * **Example** (Defining records with string values)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { Equivalence } from "effect"
  *
  * const stringRecordEq = Equivalence.Record(Equivalence.strictEqual<string>())
@@ -731,14 +744,14 @@ export function Struct<R extends Record<string, Equivalence<any>>>(
  * const record3 = { a: "hello", b: "different" }
  * const record4 = { a: "hello" } // missing key 'b'
  *
- * console.log(stringRecordEq(record1, record2)) // true
- * console.log(stringRecordEq(record1, record3)) // false
- * console.log(stringRecordEq(record1, record4)) // false (different keys)
+ * stringRecordEq(record1, record2) // => true
+ * stringRecordEq(record1, record3) // => false
+ * stringRecordEq(record1, record4) // => false
  * ```
  *
  * **Example** (Defining records with number values)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { Equivalence } from "effect"
  *
  * const numberRecordEq = Equivalence.Record(Equivalence.strictEqual<number>())
@@ -747,10 +760,11 @@ export function Struct<R extends Record<string, Equivalence<any>>>(
  * const scores2 = { alice: 100, bob: 85 }
  * const scores3 = { alice: 100, bob: 90 }
  *
- * console.log(numberRecordEq(scores1, scores2)) // true
- * console.log(numberRecordEq(scores1, scores3)) // false
+ * numberRecordEq(scores1, scores2) // => true
+ * numberRecordEq(scores1, scores3) // => false
  * ```
  *
+ * @stability stable
  * @category combinators
  * @since 4.0.0
  */
@@ -787,7 +801,7 @@ export function Record<A>(value: Equivalence<A>): Equivalence<Record<PropertyKey
  *
  * **Example** (Creating a Reducer)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { Equivalence } from "effect"
  *
  * const reducer = Equivalence.makeReducer<number>()
@@ -798,13 +812,14 @@ export function Record<A>(value: Equivalence<A>): Equivalence<Record<PropertyKey
  *
  * const combined = reducer.combineAll(equivalences)
  * // Combined equivalence requires both conditions to be true
- * console.log(combined(1, 1)) // true (strict equal)
- * console.log(combined(1, 1.5)) // false (strict equal fails)
+ * combined(1, 1) // => true
+ * combined(1, 1.5) // => false
  * ```
  *
  * @see {@link combine} Combine two equivalences
  * @see {@link combineAll} Combine multiple equivalences
  * @see {@link Reducer} Reducer type for collection operations
+ * @stability stable
  * @category constructors
  * @since 4.0.0
  */
@@ -831,7 +846,7 @@ export function makeReducer<A>() {
  *
  * **Example** (Comparing Date values)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { Equivalence } from "effect"
  *
  * const d1 = new Date("2020-01-01T00:00:00.000Z")
@@ -840,27 +855,28 @@ export function makeReducer<A>() {
  * const invalidDate1 = new Date("foo")
  * const invalidDate2 = new Date("bar")
  *
- * console.log(Equivalence.Date(d1, d2)) // true
- * console.log(Equivalence.Date(d1, d3)) // false
- * console.log(Equivalence.Date(invalidDate1, invalidDate2)) // true
- * console.log(Equivalence.Date(invalidDate1, d1)) // false
+ * Equivalence.Date(d1, d2) // => true
+ * Equivalence.Date(d1, d3) // => false
+ * Equivalence.Date(invalidDate1, invalidDate2) // => true
+ * Equivalence.Date(invalidDate1, d1) // => false
  * ```
  *
  * **Example** (Comparing reference and value equality)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { Equivalence } from "effect"
  *
  * const d1 = new Date(0)
  * const d2 = new Date(0)
  *
- * console.log(d1 === d2) // false (different references)
- * console.log(Equivalence.Date(d1, d2)) // true (same time value)
+ * d1 === d2 // => false
+ * Equivalence.Date(d1, d2) // => true
  * ```
  *
  * @see {@link Number} for the numeric equivalence applied to each `Date#getTime()` result
  * @see {@link mapInput} for deriving an equivalence by mapping inputs before comparison
  * @see {@link strictEqual} for reference equality when two values must be the same object
+ * @stability stable
  * @category instances
  * @since 2.0.0
  */

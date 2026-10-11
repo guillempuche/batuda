@@ -1,13 +1,17 @@
 import { type Cause, Context, Effect, Latch, Layer, MutableRef, Option, Queue, Schedule, Schema, Stream } from "effect"
-import type { Envelope } from "effect/unstable/cluster"
-import { ClusterSchema, Entity } from "effect/unstable/cluster"
-import { MemoryTransaction } from "effect/unstable/cluster/MessageStorage"
-import type { RpcGroup } from "effect/unstable/rpc"
-import { Rpc, RpcSchema } from "effect/unstable/rpc"
+import type { Envelope } from "effect/cluster"
+import { ClusterSchema, Entity } from "effect/cluster"
+import { MemoryTransaction } from "effect/cluster/MessageStorage"
+import type { RpcGroup } from "effect/rpc"
+import { Rpc, RpcSchema } from "effect/rpc"
 
 export class User extends Schema.Class<User>("User")({
   id: Schema.Number,
   name: Schema.String
+}) {}
+
+export class BoomError extends Schema.TaggedError<BoomError>()("BoomError", {
+  cause: Schema.Unknown
 }) {}
 
 export class StreamWithKey extends Rpc.make("StreamWithKey", {
@@ -26,6 +30,7 @@ export const TestEntity = Entity.make("TestEntity", [
     payload: { id: Schema.Number }
   }).annotate(ClusterSchema.Persisted, false),
   Rpc.make("Never"),
+  Rpc.make("Fail", { error: BoomError }),
   Rpc.make("NeverFork"),
   Rpc.make("NeverVolatile").annotate(ClusterSchema.Persisted, false),
   Rpc.make("RequestWithKey", {
@@ -38,10 +43,21 @@ export const TestEntity = Entity.make("TestEntity", [
     payload: { ids: Schema.Array(Schema.Number) },
     stream: true
   }),
+  Rpc.make("GetAllUsersVolatile", {
+    success: User,
+    payload: { ids: Schema.Array(Schema.Number) },
+    stream: true
+  }).annotate(ClusterSchema.Persisted, false),
   Rpc.make("WithTransaction", {
     success: Schema.Boolean,
     payload: { id: Schema.Number }
-  }).annotate(ClusterSchema.Dynamic, Context.add(ClusterSchema.WithTransaction, true))
+  }).annotate(ClusterSchema.Dynamic, Context.add(ClusterSchema.WithTransaction, true)),
+  Rpc.make("FailWithTransaction", {
+    error: BoomError,
+    payload: { id: Schema.Number },
+    primaryKey: ({ id }) => String(id)
+  }).annotate(ClusterSchema.Dynamic, Context.add(ClusterSchema.WithTransaction, true)),
+  Rpc.make("NeverWithTransaction").annotate(ClusterSchema.Dynamic, Context.add(ClusterSchema.WithTransaction, true))
 ]).annotateRpcs(ClusterSchema.Persisted, true)
 
 export class TestEntityState extends Context.Service<TestEntityState>()("TestEntityState", {
@@ -105,6 +121,7 @@ export const TestEntityNoState = TestEntity.toLayer(
           return new User({ id: envelope.payload.id, name: `User ${envelope.payload.id}` })
         }),
       Never: never,
+      Fail: () => Effect.fail(new BoomError({ cause: new Error("boom") })),
       NeverFork: (envelope) => Rpc.fork(never(envelope)),
       NeverVolatile: never,
       RequestWithKey: (envelope) => {
@@ -126,7 +143,21 @@ export const TestEntityNoState = TestEntity.toLayer(
           Stream.rechunk(1)
         )
       },
-      WithTransaction: () => MemoryTransaction
+      GetAllUsersVolatile: (envelope) =>
+        Stream.fromIterable(envelope.payload.ids.map((id) => new User({ id, name: `User ${id}` }))).pipe(
+          Stream.rechunk(1)
+        ),
+      WithTransaction: (envelope) =>
+        Effect.suspend(() => {
+          Queue.offerUnsafe(state.envelopes, envelope)
+          return MemoryTransaction
+        }),
+      FailWithTransaction: (envelope) =>
+        Effect.suspend(() => {
+          Queue.offerUnsafe(state.envelopes, envelope)
+          return Effect.fail(new BoomError({ cause: "boom" }))
+        }),
+      NeverWithTransaction: never
     })
   }),
   { defectRetryPolicy: Schedule.forever }

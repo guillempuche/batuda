@@ -8,6 +8,7 @@
  * to compose transformations, validations, and effectful operations while
  * keeping the original value as the starting point of the pipeline.
  *
+ * @stability stable
  * @since 2.0.0
  */
 
@@ -26,17 +27,19 @@
  *
  * **Example** (Chaining operations with pipe)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { Effect } from "effect"
  *
  * // The Pipeable interface allows Effect values to be chained using the pipe method
  * const program = Effect.succeed(1).pipe(
  *   Effect.map((x) => x + 1),
- *   Effect.flatMap((x) => Effect.succeed(x * 2)),
- *   Effect.tap((x) => Effect.log(`Result: ${x}`))
+ *   Effect.flatMap((x) => Effect.succeed(x * 2))
  * )
+ *
+ * Effect.runSync(program) // => 4
  * ```
  *
+ * @stability stable
  * @category models
  * @since 2.0.0
  */
@@ -539,7 +542,7 @@ export interface Pipeable {
  *
  * **Example** (Implementing a pipe method)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { Pipeable } from "effect"
  *
  * class NumberBox {
@@ -554,9 +557,10 @@ export interface Pipeable {
  *   (n) => n + 2,
  *   (n) => n * 3
  * )
- * console.log(result) // 21
+ * result // => 21
  * ```
  *
+ * @stability stable
  * @category combinators
  * @since 2.0.0
  */
@@ -600,6 +604,7 @@ export const pipeArguments = <A>(self: A, args: IArguments): unknown => {
  * Use when classes or object prototypes can reuse this value when they need the
  * standard pipe implementation backed by `pipeArguments`.
  *
+ * @stability stable
  * @category prototypes
  * @since 3.15.0
  */
@@ -618,6 +623,7 @@ export const Prototype: Pipeable = {
  * Use when you need to define a class that supports Effect-style method
  * chaining through `.pipe(...)`.
  *
+ * @stability stable
  * @category constructors
  * @since 3.15.0
  */
@@ -639,6 +645,7 @@ export const Class: new() => Pipeable = (function() {
  * @see {@link Class} for the base constructor
  * @see {@link Mixin} for wrapping an existing class constructor
  *
+ * @stability stable
  * @category models
  * @since 3.15.0
  */
@@ -662,6 +669,7 @@ export interface PipeableConstructor {
  *
  * @see {@link Prototype} for a reusable prototype object
  * @see {@link Class} for a base constructor to extend
+ * @stability stable
  * @category constructors
  * @since 4.0.0
  */

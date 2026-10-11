@@ -7,6 +7,7 @@
  * for queued tasks, and references for tuning or disabling automatic scheduler
  * yields.
  *
+ * @stability stable
  * @since 2.0.0
  */
 import * as Context from "./Context.ts"
@@ -26,7 +27,8 @@ import type * as Fiber from "./Fiber.ts"
  * priorities, and decides when fibers should yield control after consuming
  * their operation budget.
  *
- * @category models
+ * @stability stable
+ * @category services
  * @since 2.0.0
  */
 export interface Scheduler {
@@ -51,6 +53,7 @@ export interface Scheduler {
  * already scheduled tasks. Lower priority numbers run first, and equal
  * priorities run in FIFO order.
  *
+ * @stability stable
  * @category models
  * @since 4.0.0
  */
@@ -72,24 +75,46 @@ export interface SchedulerDispatcher {
  * The default value creates a `MixedScheduler`. Provide this service to
  * customize execution mode, task dispatching, or yield behavior.
  *
- * @category references
+ * @stability stable
+ * @category services
  * @since 2.0.0
  */
 export const Scheduler: Context.Reference<Scheduler> = Context.Reference<Scheduler>("effect/Scheduler", {
+  fiberCached: true,
   defaultValue: () => new MixedScheduler()
 })
 
-const setImmediate = "setImmediate" in globalThis
-  ? (f: () => void) => {
+const setMicrotask = (f: () => void) => {
+  let cancelled = false
+  Promise.resolve().then(() => {
+    if (!cancelled) f()
+  })
+  return (): void => {
+    cancelled = true
+  }
+}
+
+const setTimer: (f: () => void) => () => void = "setImmediate" in globalThis
+  ? (f) => {
     // @ts-ignore
     const timer = globalThis.setImmediate(f)
     // @ts-ignore
     return (): void => globalThis.clearImmediate(timer)
   }
-  : (f: () => void) => {
+  : (f) => {
     const timer = setTimeout(f, 0)
     return (): void => clearTimeout(timer)
   }
+
+// Some runtimes (e.g. Cloudflare Workers) throw when a timer is set in global
+// scope. Fall back to a microtask so effects can still yield at module load.
+const setImmediate = (f: () => void) => {
+  try {
+    return setTimer(f)
+  } catch {
+    return setMicrotask(f)
+  }
+}
 
 class PriorityBuckets {
   buckets: Array<[priority: number, tasks: Array<() => void>]> = []
@@ -135,7 +160,8 @@ class PriorityBuckets {
  * operation counts to decide when fibers should yield, and is the default
  * scheduler implementation.
  *
- * @category schedulers
+ * @stability stable
+ * @category models
  * @since 2.0.0
  */
 export class MixedScheduler implements Scheduler {
@@ -144,10 +170,10 @@ export class MixedScheduler implements Scheduler {
 
   constructor(
     executionMode: "sync" | "async" = "async",
-    setImmediateFn: (f: () => void) => () => void = setImmediate
+    setImmediateFn?: (f: () => void) => () => void
   ) {
     this.executionMode = executionMode
-    this.setImmediate = setImmediateFn
+    this.setImmediate = setImmediateFn ?? (executionMode === "sync" ? setMicrotask : setImmediate)
   }
 
   /**
@@ -161,7 +187,7 @@ export class MixedScheduler implements Scheduler {
    * @since 2.0.0
    */
   shouldYield(fiber: Fiber.Fiber<unknown, unknown>) {
-    return fiber.currentOpCount >= fiber.maxOpsBeforeYield
+    return fiber.currentOpCount >= fiber.cache.maxOpsBeforeYield
   }
 
   /**
@@ -252,10 +278,12 @@ class MixedSchedulerDispatcher implements SchedulerDispatcher {
  *
  * @see {@link PreventSchedulerYield} for bypassing scheduler yield checks entirely rather than tuning the operation budget
  *
- * @category references
+ * @stability stable
+ * @category services
  * @since 4.0.0
  */
 export const MaxOpsBeforeYield = Context.Reference<number>("effect/Scheduler/MaxOpsBeforeYield", {
+  fiberCached: true,
   defaultValue: () => 2048
 })
 
@@ -277,9 +305,11 @@ export const MaxOpsBeforeYield = Context.Reference<number>("effect/Scheduler/Max
  * @see {@link MaxOpsBeforeYield} for tuning yield frequency without disabling yield checks
  * @see {@link Scheduler} for providing custom scheduler yield behavior
  *
- * @category references
+ * @stability stable
+ * @category services
  * @since 4.0.0
  */
 export const PreventSchedulerYield = Context.Reference<boolean>("effect/Scheduler/PreventSchedulerYield", {
+  fiberCached: true,
   defaultValue: () => false
 })

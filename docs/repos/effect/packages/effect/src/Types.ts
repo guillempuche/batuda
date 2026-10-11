@@ -6,16 +6,18 @@
  * object shapes, tagged unions, reason-tagged errors, mutability, exactness,
  * required keys, concurrency settings, and variance markers.
  *
+ * @stability stable
  * @since 4.0.0
  */
 
 /**
- * @category tuples
+ * @category utility types
  * @since 2.0.0
  */
 type TupleOf_<T, N extends number, R extends Array<unknown>> = `${N}` extends `-${number}` ? never
-  : R["length"] extends N ? R
-  : TupleOf_<T, N, [T, ...R]>
+  : `${N}` extends `${bigint}` ? R["length"] extends N ? R
+    : TupleOf_<T, N, [T, ...R]>
+  : Array<T>
 
 /**
  * Constructs a tuple type with exactly `N` elements of type `T`.
@@ -27,13 +29,14 @@ type TupleOf_<T, N extends number, R extends Array<unknown>> = `${N}` extends `-
  *
  * **Details**
  *
- * - If `N` is a literal number, produces a tuple of that exact length.
+ * - If `N` is a non-negative integer literal, produces a tuple of that exact length.
  * - If `N` is the general `number` type (non-literal), degrades to `Array<T>`.
+ * - Positive non-integer literals degrade to `Array<T>`.
  * - Negative numbers produce `never`.
  *
  * **Example** (Checking fixed-length tuples)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import type { Types } from "effect"
  *
  * // Exactly 3 numbers
@@ -48,7 +51,8 @@ type TupleOf_<T, N extends number, R extends Array<unknown>> = `${N}` extends `-
  *
  * @see {@link TupleOfAtLeast}
  *
- * @category tuples
+ * @stability stable
+ * @category utility types
  * @since 3.3.0
  */
 export type TupleOf<N extends number, T> = N extends N ? number extends N ? Array<T> : TupleOf_<T, N, []> : never
@@ -68,7 +72,7 @@ export type TupleOf<N extends number, T> = N extends N ? number extends N ? Arra
  *
  * **Example** (Checking minimum-length tuples)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import type { Types } from "effect"
  *
  * // At least 2 strings
@@ -81,7 +85,8 @@ export type TupleOf<N extends number, T> = N extends N ? number extends N ? Arra
  *
  * @see {@link TupleOf}
  *
- * @category tuples
+ * @stability stable
+ * @category utility types
  * @since 3.3.0
  */
 export type TupleOfAtLeast<N extends number, T> = [...TupleOf<N, T>, ...Array<T>]
@@ -99,7 +104,7 @@ export type TupleOfAtLeast<N extends number, T> = [...TupleOf<N, T>, ...Array<T>
  *
  * **Example** (Extracting tags)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import type { Types } from "effect"
  *
  * type MyError =
@@ -109,12 +114,15 @@ export type TupleOfAtLeast<N extends number, T> = [...TupleOf<N, T>, ...Array<T>
  *
  * type Result = Types.Tags<MyError>
  * // "NotFound" | "Timeout"
+ *
+ * const witness: Result = "NotFound"
  * ```
  *
  * @see {@link ExtractTag}
  * @see {@link ExcludeTag}
  *
- * @category types
+ * @stability stable
+ * @category utility types
  * @since 2.0.0
  */
 export type Tags<E> = E extends { readonly _tag: string } ? E["_tag"] : never
@@ -133,7 +141,7 @@ export type Tags<E> = E extends { readonly _tag: string } ? E["_tag"] : never
  *
  * **Example** (Removing a variant)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import type { Types } from "effect"
  *
  * type MyError =
@@ -143,12 +151,15 @@ export type Tags<E> = E extends { readonly _tag: string } ? E["_tag"] : never
  *
  * type WithoutTimeout = Types.ExcludeTag<MyError, "Timeout">
  * // { readonly _tag: "NotFound"; readonly id: string } | string
+ *
+ * const witness: WithoutTimeout = { _tag: "NotFound", id: "1" }
  * ```
  *
  * @see {@link ExtractTag}
  * @see {@link Tags}
  *
- * @category types
+ * @stability stable
+ * @category utility types
  * @since 2.0.0
  */
 export type ExcludeTag<E, K extends string> = Exclude<E, { readonly _tag: K }>
@@ -167,7 +178,7 @@ export type ExcludeTag<E, K extends string> = Exclude<E, { readonly _tag: K }>
  *
  * **Example** (Extracting a variant)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import type { Types } from "effect"
  *
  * type MyError =
@@ -176,12 +187,15 @@ export type ExcludeTag<E, K extends string> = Exclude<E, { readonly _tag: K }>
  *
  * type TimeoutError = Types.ExtractTag<MyError, "Timeout">
  * // { readonly _tag: "Timeout"; readonly ms: number }
+ *
+ * const witness: TimeoutError = { _tag: "Timeout", ms: 100 }
  * ```
  *
  * @see {@link ExcludeTag}
  * @see {@link Tags}
  *
- * @category types
+ * @stability stable
+ * @category utility types
  * @since 2.0.0
  */
 export type ExtractTag<E, K extends string> = E extends { readonly _tag: infer T } ? K extends T ? E : never : never
@@ -203,17 +217,20 @@ export type ExtractTag<E, K extends string> = E extends { readonly _tag: infer T
  *
  * **Example** (Converting a union to an intersection)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import type { Types } from "effect"
  *
  * type Union = { a: string } | { b: number }
  * type Result = Types.UnionToIntersection<Union>
  * // { a: string } & { b: number }
+ *
+ * const witness: Result = { a: "value", b: 1 }
  * ```
  *
  * @see {@link IsUnion}
  *
- * @category types
+ * @stability stable
+ * @category utility types
  * @since 2.0.0
  */
 export type UnionToIntersection<T> = (T extends any ? (x: T) => any : never) extends (x: infer R) => any ? R
@@ -233,18 +250,21 @@ export type UnionToIntersection<T> = (T extends any ? (x: T) => any : never) ext
  *
  * **Example** (Simplifying an intersection)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import type { Types } from "effect"
  *
  * // Without Simplify: IDE shows { a: number } & { b: string }
  * // With Simplify: IDE shows { a: number; b: string }
  * type Clean = Types.Simplify<{ a: number } & { b: string }>
+ *
+ * const witness: Clean = { a: 1, b: "value" }
  * ```
  *
  * @see {@link MergeLeft}
  * @see {@link MergeRight}
  *
- * @category types
+ * @stability stable
+ * @category utility types
  * @since 2.0.0
  */
 export type Simplify<A> = {
@@ -266,7 +286,7 @@ export type Simplify<A> = {
  *
  * **Example** (Checking type equality)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import type { Types } from "effect"
  *
  * type Yes = Types.Equals<{ a: number }, { a: number }> // true
@@ -276,7 +296,8 @@ export type Simplify<A> = {
  *
  * @see {@link EqualsWith}
  *
- * @category models
+ * @stability stable
+ * @category utility types
  * @since 2.0.0
  */
 export type Equals<X, Y> = (<T>() => T extends X ? 1 : 2) extends <
@@ -297,7 +318,7 @@ export type Equals<X, Y> = (<T>() => T extends X ? 1 : 2) extends <
  *
  * **Example** (Choosing a conditional type based on equality)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import type { Types } from "effect"
  *
  * type R1 = Types.EqualsWith<string, string, "same", "diff"> // "same"
@@ -306,7 +327,8 @@ export type Equals<X, Y> = (<T>() => T extends X ? 1 : 2) extends <
  *
  * @see {@link Equals}
  *
- * @category models
+ * @stability stable
+ * @category utility types
  * @since 3.15.0
  */
 export type EqualsWith<A, B, Y, N> = (<T>() => T extends A ? 1 : 2) extends (<T>() => T extends B ? 1 : 2) ? Y : N
@@ -326,14 +348,15 @@ export type EqualsWith<A, B, Y, N> = (<T>() => T extends A ? 1 : 2) extends (<T>
  *
  * **Example** (Checking key presence)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import type { Types } from "effect"
  *
  * type Yes = Types.Has<{ a: number; b: string }, "a" | "c"> // true
  * type No = Types.Has<{ a: number }, "b" | "c"> // false
  * ```
  *
- * @category models
+ * @stability stable
+ * @category utility types
  * @since 2.0.0
  */
 export type Has<A, Key extends string> = (Key extends infer K ? K extends keyof A ? true : never : never) extends never
@@ -354,7 +377,7 @@ export type Has<A, Key extends string> = (Key extends infer K ? K extends keyof 
  *
  * **Example** (Merging with left bias)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import type { Types } from "effect"
  *
  * type Result = Types.MergeLeft<
@@ -362,12 +385,15 @@ export type Has<A, Key extends string> = (Key extends infer K ? K extends keyof 
  *   { a: string; c: boolean }
  * >
  * // { a: number; b: number; c: boolean }
+ *
+ * const witness: Result = { a: 1, b: 2, c: true }
  * ```
  *
  * @see {@link MergeRight}
  * @see {@link Simplify}
  *
- * @category models
+ * @stability stable
+ * @category utility types
  * @since 2.0.0
  */
 export type MergeLeft<Source, Target> = MergeRight<Target, Source>
@@ -386,7 +412,7 @@ export type MergeLeft<Source, Target> = MergeRight<Target, Source>
  *
  * **Example** (Right-biased merge)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import type { Types } from "effect"
  *
  * type Result = Types.MergeRight<
@@ -394,12 +420,15 @@ export type MergeLeft<Source, Target> = MergeRight<Target, Source>
  *   { a: string; c: boolean }
  * >
  * // { a: string; b: number; c: boolean }
+ *
+ * const witness: Result = { a: "value", b: 2, c: true }
  * ```
  *
  * @see {@link MergeLeft}
  * @see {@link Simplify}
  *
- * @category models
+ * @stability stable
+ * @category utility types
  * @since 2.0.0
  */
 export type MergeRight<Target, Source> = Simplify<
@@ -424,7 +453,7 @@ export type MergeRight<Target, Source> = Simplify<
  *
  * **Example** (Setting concurrency values)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import type { Types } from "effect"
  *
  * const sequential: Types.Concurrency = 1
@@ -432,6 +461,7 @@ export type MergeRight<Target, Source> = Simplify<
  * const unbounded: Types.Concurrency = "unbounded"
  * ```
  *
+ * @stability stable
  * @category models
  * @since 2.0.0
  */
@@ -451,7 +481,7 @@ export type Concurrency = number | "unbounded"
  *
  * **Example** (Converting shallowly to mutable types)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import type { Types } from "effect"
  *
  * type Obj = Types.Mutable<{
@@ -466,50 +496,71 @@ export type Concurrency = number | "unbounded"
  *
  * type Tup = Types.Mutable<readonly [string, number]>
  * // [string, number]
+ *
+ * const tuple: Tup = ["value", 1]
+ * tuple[1] = 2
  * ```
  *
  * @see {@link DeepMutable}
  *
- * @category types
+ * @stability stable
+ * @category utility types
  * @since 2.0.0
  */
 export type Mutable<T> = {
   -readonly [P in keyof T]: T[P]
 }
 
+type DeepMutableIsOpaque<T> = Extract<keyof T, symbol> extends never
+  ? Extract<T[keyof T], Function> extends never ? false : true
+  : true
+
 /**
- * Recursively removes `readonly` from all properties, including nested
- * objects, arrays, `Map`, and `Set`.
+ * Recursively removes `readonly` from plain objects, arrays, tuples, `Map`,
+ * and `Set` while preserving opaque objects.
  *
  * **When to use**
  *
- * Use when you need a fully mutable version of a deeply readonly type.
+ * Use when you need a fully mutable version of deeply readonly structural
+ * data.
  *
  * **Details**
  *
- * Recursion stops at primitives (`string`, `number`, `boolean`, `bigint`,
- * `symbol`) and functions.
+ * Recursion stops at primitives, functions, objects with methods, and objects
+ * with symbol-keyed properties. This preserves built-in objects and Effect
+ * data types while still transforming their surrounding arrays and records.
  *
  * **Example** (Converting deeply to mutable types)
  *
- * ```ts
- * import type { Types } from "effect"
+ * ```ts import.meta.vitest
+ * import { DateTime, type Types } from "effect"
  *
  * type Deep = Types.DeepMutable<{
  *   readonly a: string
  *   readonly b: ReadonlyArray<{ readonly c: number }>
+ *   readonly createdAt: DateTime.DateTime
  * }>
- * // { a: string; b: Array<{ c: number }> }
+ * // { a: string; b: Array<{ c: number }>; createdAt: DateTime.DateTime }
+ *
+ * const witness: Deep = {
+ *   a: "value",
+ *   b: [{ c: 1 }],
+ *   createdAt: DateTime.makeUnsafe(0)
+ * }
+ * witness.b[0].c = 2
  * ```
  *
  * @see {@link Mutable}
  *
- * @category types
+ * @stability stable
+ * @category utility types
  * @since 3.1.0
  */
 export type DeepMutable<T> = T extends ReadonlyMap<infer K, infer V> ? Map<DeepMutable<K>, DeepMutable<V>>
   : T extends ReadonlySet<infer V> ? Set<DeepMutable<V>>
+  : T extends ReadonlyArray<unknown> ? { -readonly [K in keyof T]: DeepMutable<T[K]> }
   : T extends string | number | boolean | bigint | symbol | Function ? T
+  : DeepMutableIsOpaque<T> extends true ? T
   : { -readonly [K in keyof T]: DeepMutable<T[K]> }
 
 /**
@@ -527,16 +578,19 @@ export type DeepMutable<T> = T extends ReadonlyMap<infer K, infer V> ? Map<DeepM
  *
  * **Example** (Controlling inference)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import type { Types } from "effect"
  *
- * declare function withDefault<T>(value: T, fallback: Types.NoInfer<T>): T
+ * function withDefault<T>(value: T, _fallback: Types.NoInfer<T>): T {
+ *   return value
+ * }
  *
  * // T is inferred as "a" | "b" from the first argument only
  * const result = withDefault<"a" | "b">("a", "b")
  * ```
  *
- * @category models
+ * @stability stable
+ * @category utility types
  * @since 2.0.0
  */
 export type NoInfer<A> = [A][A extends any ? 0 : never]
@@ -557,20 +611,23 @@ export type NoInfer<A> = [A][A extends any ? 0 : never]
  *
  * **Example** (Defining an invariant phantom type)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import type { Types } from "effect"
  *
  * interface Container<T> {
  *   readonly _phantom: Types.Invariant<T>
  *   readonly value: T
  * }
+ *
+ * const container: Container<number> = { _phantom: (value) => value, value: 1 }
  * ```
  *
  * @see {@link Invariant.Type}
  * @see {@link Covariant}
  * @see {@link Contravariant}
  *
- * @category models
+ * @stability stable
+ * @category utility types
  * @since 2.0.0
  */
 export type Invariant<A> = (_: A) => A
@@ -582,6 +639,7 @@ export type Invariant<A> = (_: A) => A
  *
  * Use when referring to type-level helpers nested under `Invariant`.
  *
+ * @stability stable
  * @since 3.9.0
  */
 export declare namespace Invariant {
@@ -594,16 +652,18 @@ export declare namespace Invariant {
    *
    * **Example** (Extracting the inner type)
    *
-   * ```ts
+   * ```ts import.meta.vitest
    * import type { Types } from "effect"
    *
    * type Inner = Types.Invariant.Type<Types.Invariant<number>>
    * // number
+   *
+   * const witness: Inner = 1
    * ```
    *
    * @see {@link Invariant}
    *
-   * @category models
+   * @category utility types
    * @since 3.9.0
    */
   export type Type<A> = A extends Invariant<infer U> ? U : never
@@ -625,20 +685,23 @@ export declare namespace Invariant {
  *
  * **Example** (Defining a covariant phantom type)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import type { Types } from "effect"
  *
  * interface Producer<T> {
  *   readonly _phantom: Types.Covariant<T>
  *   readonly get: () => T
  * }
+ *
+ * const producer: Producer<string> = { _phantom: () => "value", get: () => "value" }
  * ```
  *
  * @see {@link Covariant.Type}
  * @see {@link Contravariant}
  * @see {@link Invariant}
  *
- * @category models
+ * @stability stable
+ * @category utility types
  * @since 2.0.0
  */
 export type Covariant<A> = (_: never) => A
@@ -650,6 +713,7 @@ export type Covariant<A> = (_: never) => A
  *
  * Use when referring to type-level helpers nested under `Covariant`.
  *
+ * @stability stable
  * @since 3.9.0
  */
 export declare namespace Covariant {
@@ -662,16 +726,18 @@ export declare namespace Covariant {
    *
    * **Example** (Extracting the inner type)
    *
-   * ```ts
+   * ```ts import.meta.vitest
    * import type { Types } from "effect"
    *
    * type Inner = Types.Covariant.Type<Types.Covariant<string>>
    * // string
+   *
+   * const witness: Inner = "value"
    * ```
    *
    * @see {@link Covariant}
    *
-   * @category models
+   * @category utility types
    * @since 3.9.0
    */
   export type Type<A> = A extends Covariant<infer U> ? U : never
@@ -693,12 +759,17 @@ export declare namespace Covariant {
  *
  * **Example** (Defining a contravariant phantom type)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import type { Types } from "effect"
  *
  * interface Consumer<T> {
  *   readonly _phantom: Types.Contravariant<T>
  *   readonly accept: (value: T) => void
+ * }
+ *
+ * const consumer: Consumer<string> = {
+ *   _phantom: () => {},
+ *   accept: (_value) => {}
  * }
  * ```
  *
@@ -706,7 +777,8 @@ export declare namespace Covariant {
  * @see {@link Covariant}
  * @see {@link Invariant}
  *
- * @category models
+ * @stability stable
+ * @category utility types
  * @since 2.0.0
  */
 export type Contravariant<A> = (_: A) => void
@@ -718,6 +790,7 @@ export type Contravariant<A> = (_: A) => void
  *
  * Use when referring to type-level helpers nested under `Contravariant`.
  *
+ * @stability stable
  * @since 3.9.0
  */
 export declare namespace Contravariant {
@@ -730,16 +803,18 @@ export declare namespace Contravariant {
    *
    * **Example** (Extracting the inner type)
    *
-   * ```ts
+   * ```ts import.meta.vitest
    * import type { Types } from "effect"
    *
    * type Inner = Types.Contravariant.Type<Types.Contravariant<string>>
    * // string
+   *
+   * const witness: Inner = "value"
    * ```
    *
    * @see {@link Contravariant}
    *
-   * @category models
+   * @category utility types
    * @since 3.9.0
    */
   export type Type<A> = A extends Contravariant<infer U> ? U : never
@@ -753,7 +828,8 @@ export declare namespace Contravariant {
  *
  * Use to erase an empty object type from an API result or parameter position.
  *
- * @category types
+ * @stability stable
+ * @category utility types
  * @since 3.19.20
  */
 export type VoidIfEmpty<S> = keyof S extends never ? void : S
@@ -771,14 +847,17 @@ export type VoidIfEmpty<S> = keyof S extends never ? void : S
  *
  * **Example** (Filtering out functions)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import type { Types } from "effect"
  *
  * type Result = Types.NotFunction<string | (() => void) | number>
  * // string | number
+ *
+ * const witness: Result = "value"
  * ```
  *
- * @category types
+ * @stability stable
+ * @category utility types
  * @since 2.0.0
  */
 export type NotFunction<T> = T extends Function ? never : T
@@ -796,7 +875,7 @@ export type NotFunction<T> = T extends Function ? never : T
  *
  * **Example** (Preventing extra properties)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import type { Types } from "effect"
  *
  * type Expected = { a: number; b: string }
@@ -804,9 +883,12 @@ export type NotFunction<T> = T extends Function ? never : T
  *
  * type Result = Types.NoExcessProperties<Expected, Input>
  * // { a: number; b: string; readonly c: never }
+ *
+ * const accepted: Types.NoExcessProperties<Expected, Expected> = { a: 1, b: "value" }
  * ```
  *
- * @category types
+ * @stability stable
+ * @category utility types
  * @since 3.9.0
  */
 export type NoExcessProperties<T, U> = T & Readonly<Record<Exclude<keyof U, keyof T>, never>>
@@ -826,7 +908,8 @@ export type NoExcessProperties<T, U> = T & Readonly<Record<Exclude<keyof U, keyo
  *
  * @see {@link unhandled}
  *
- * @category types
+ * @stability stable
+ * @category utility types
  * @since 4.0.0
  */
 export interface unassigned {
@@ -848,7 +931,8 @@ export interface unassigned {
  *
  * @see {@link unassigned}
  *
- * @category types
+ * @stability stable
+ * @category utility types
  * @since 4.0.0
  */
 export interface unhandled {
@@ -871,7 +955,7 @@ export interface unhandled {
  *
  * **Example** (Detecting union types)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import type { Types } from "effect"
  *
  * type Yes = Types.IsUnion<"a" | "b"> // true
@@ -880,7 +964,8 @@ export interface unhandled {
  *
  * @see {@link UnionToIntersection}
  *
- * @category types
+ * @stability stable
+ * @category utility types
  * @since 4.0.0
  */
 export type IsUnion<T> = [T] extends [UnionToIntersection<T>] ? false : true
@@ -899,7 +984,7 @@ export type IsUnion<T> = [T] extends [UnionToIntersection<T>] ? false : true
  *
  * **Example** (Extracting reason types)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import type { Types } from "effect"
  *
  * type RateLimitError = { readonly _tag: "RateLimitError"; readonly retryAfter: number }
@@ -908,13 +993,16 @@ export type IsUnion<T> = [T] extends [UnionToIntersection<T>] ? false : true
  *
  * type Reasons = Types.ReasonOf<ApiError>
  * // RateLimitError | QuotaError
+ *
+ * const witness: Reasons = { _tag: "QuotaError", limit: 10 }
  * ```
  *
  * @see {@link ReasonTags}
  * @see {@link ExtractReason}
  * @see {@link ExcludeReason}
  *
- * @category types
+ * @stability stable
+ * @category utility types
  * @since 4.0.0
  */
 export type ReasonOf<E> = E extends { readonly reason: infer R } ? R : never
@@ -934,7 +1022,7 @@ export type ReasonOf<E> = E extends { readonly reason: infer R } ? R : never
  *
  * **Example** (Getting reason tags)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import type { Types } from "effect"
  *
  * type RateLimitError = { readonly _tag: "RateLimitError"; readonly retryAfter: number }
@@ -943,12 +1031,15 @@ export type ReasonOf<E> = E extends { readonly reason: infer R } ? R : never
  *
  * type Result = Types.ReasonTags<ApiError>
  * // "RateLimitError" | "QuotaError"
+ *
+ * const witness: Result = "RateLimitError"
  * ```
  *
  * @see {@link ReasonOf}
  * @see {@link ExtractReason}
  *
- * @category types
+ * @stability stable
+ * @category utility types
  * @since 4.0.0
  */
 export type ReasonTags<E> = E extends { readonly reason: { readonly _tag: string } } ? E["reason"]["_tag"]
@@ -969,7 +1060,7 @@ export type ReasonTags<E> = E extends { readonly reason: { readonly _tag: string
  *
  * **Example** (Extracting a reason variant)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import type { Types } from "effect"
  *
  * type RateLimitError = { readonly _tag: "RateLimitError"; readonly retryAfter: number }
@@ -978,13 +1069,16 @@ export type ReasonTags<E> = E extends { readonly reason: { readonly _tag: string
  *
  * type Result = Types.ExtractReason<ApiError, "RateLimitError">
  * // { readonly _tag: "RateLimitError"; readonly retryAfter: number }
+ *
+ * const witness: Result = { _tag: "RateLimitError", retryAfter: 30 }
  * ```
  *
  * @see {@link ExcludeReason}
  * @see {@link ReasonOf}
  * @see {@link ReasonTags}
  *
- * @category types
+ * @stability stable
+ * @category utility types
  * @since 4.0.0
  */
 export type ExtractReason<E, K extends string> = E extends { readonly reason: infer R }
@@ -1007,7 +1101,7 @@ export type ExtractReason<E, K extends string> = E extends { readonly reason: in
  *
  * **Example** (Narrowing a reason variant)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import type { Types } from "effect"
  *
  * type RateLimitError = { readonly _tag: "RateLimitError"; readonly retryAfter: number }
@@ -1016,13 +1110,19 @@ export type ExtractReason<E, K extends string> = E extends { readonly reason: in
  *
  * type Result = Types.NarrowReason<ApiError, "RateLimitError">
  * // ApiError & { readonly reason: { readonly _tag: "RateLimitError"; readonly retryAfter: number } }
+ *
+ * const witness: Result = {
+ *   _tag: "ApiError",
+ *   reason: { _tag: "RateLimitError", retryAfter: 30 }
+ * }
  * ```
  *
  * @see {@link ExcludeReason}
  * @see {@link ReasonOf}
  * @see {@link ReasonTags}
  *
- * @category types
+ * @stability stable
+ * @category utility types
  * @since 4.0.0
  */
 export type NarrowReason<E, K extends string> = E extends { readonly reason: infer R }
@@ -1045,7 +1145,7 @@ export type NarrowReason<E, K extends string> = E extends { readonly reason: inf
  *
  * **Example** (Omitting a reason variant)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import type { Types } from "effect"
  *
  * type RateLimitError = { readonly _tag: "RateLimitError"; readonly retryAfter: number }
@@ -1054,6 +1154,11 @@ export type NarrowReason<E, K extends string> = E extends { readonly reason: inf
  *
  * type Result = Types.OmitReason<ApiError, "RateLimitError">
  * // ApiError & { readonly reason: { readonly _tag: "QuotaError"; readonly limit: number } }
+ *
+ * const witness: Result = {
+ *   _tag: "ApiError",
+ *   reason: { _tag: "QuotaError", limit: 10 }
+ * }
  * ```
  *
  * @see {@link NarrowReason}
@@ -1061,7 +1166,8 @@ export type NarrowReason<E, K extends string> = E extends { readonly reason: inf
  * @see {@link ReasonOf}
  * @see {@link ReasonTags}
  *
- * @category types
+ * @stability stable
+ * @category utility types
  * @since 4.0.0
  */
 export type OmitReason<E, K extends string> = E extends { readonly reason: infer R }
@@ -1084,7 +1190,7 @@ export type OmitReason<E, K extends string> = E extends { readonly reason: infer
  *
  * **Example** (Excluding a reason variant)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import type { Types } from "effect"
  *
  * type RateLimitError = { readonly _tag: "RateLimitError"; readonly retryAfter: number }
@@ -1093,27 +1199,39 @@ export type OmitReason<E, K extends string> = E extends { readonly reason: infer
  *
  * type Result = Types.ExcludeReason<ApiError, "RateLimitError">
  * // { readonly _tag: "QuotaError"; readonly limit: number }
+ *
+ * const witness: Result = { _tag: "QuotaError", limit: 10 }
  * ```
  *
  * @see {@link ExtractReason}
  * @see {@link ReasonOf}
  * @see {@link ReasonTags}
  *
- * @category types
+ * @stability stable
+ * @category utility types
  * @since 4.0.0
  */
 export type ExcludeReason<E, K extends string> = E extends { readonly reason: infer R }
   ? Exclude<R, { readonly _tag: K }>
   : never
 
+type RequiredKeysFrom_<T> = { [K in keyof T]-?: {} extends Pick<T, K> ? never : K }[keyof T]
+
+type IsIndexKey_<K> = string extends K ? true : number extends K ? true : symbol extends K ? true : false
+
+type WithoutIndexSignature_<T> = {
+  [K in keyof T as IsIndexKey_<K> extends true ? never : K]: T[K]
+}
+
 /**
- * Extracts the required keys from a type.
+ * Extracts the keys of required properties from a type.
  *
- * **When to use**
- *
- * Use to derive the keys whose properties must be present on an object type.
- *
- * @category types
+ * @stability stable
+ * @category utility types
  * @since 4.0.0
  */
-export type RequiredKeys<T> = { [K in keyof T]-?: {} extends Pick<T, K> ? never : K }[keyof T]
+export type RequiredKeys<T> = RequiredKeysFrom_<
+  [T] extends [ReadonlyArray<unknown>] ? T
+    : IsIndexKey_<keyof T> extends true ? WithoutIndexSignature_<T>
+    : T
+>

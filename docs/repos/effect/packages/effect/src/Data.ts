@@ -6,6 +6,7 @@
  * makes them easy to narrow with pattern matching or simple checks. These
  * helpers are commonly used for domain values and errors in Effect programs.
  *
+ * @stability stable
  * @since 2.0.0
  */
 import type * as Cause from "./Cause.ts"
@@ -31,21 +32,18 @@ import type { Unify } from "./Unify.ts"
  *
  * **Example** (Defining a value class)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { Data, Equal } from "effect"
  *
  * class Person extends Data.Class<{ readonly name: string }> {}
  *
- * const mike1 = new Person({ name: "Mike" })
- * const mike2 = new Person({ name: "Mike" })
- *
- * console.log(Equal.equals(mike1, mike2))
- * // true
+ * Equal.equals(new Person({ name: "Mike" }), new Person({ name: "Mike" })) // => true
  * ```
  *
  * @see {@link TaggedClass} — adds a `_tag` field
  * @see {@link Error} — yieldable error variant
  *
+ * @stability stable
  * @category constructors
  * @since 2.0.0
  */
@@ -75,22 +73,21 @@ export const Class: new<A extends Record<string, any> = {}>(
  *
  * **Example** (Defining a tagged class)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { Data } from "effect"
  *
  * class Person extends Data.TaggedClass("Person")<{
  *   readonly name: string
  * }> {}
  *
- * const mike = new Person({ name: "Mike" })
- * console.log(mike._tag)
- * // "Person"
+ * new Person({ name: "Mike" })._tag // => "Person"
  * ```
  *
  * @see {@link Class} — without a `_tag`
  * @see {@link TaggedError} — tagged error variant
  * @see {@link TaggedEnum} — multi-variant unions
  *
+ * @stability stable
  * @category constructors
  * @since 2.0.0
  */
@@ -121,7 +118,7 @@ export const TaggedClass = <Tag extends string>(
  *
  * **Example** (Defining a tagged enum)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { Data } from "effect"
  *
  * type HttpError = Data.TaggedEnum<{
@@ -135,15 +132,14 @@ export const TaggedClass = <Tag extends string>(
  *
  * const { BadRequest, NotFound } = Data.taggedEnum<HttpError>()
  *
- * const err = BadRequest({ status: 400, message: "missing id" })
- * console.log(err._tag)
- * // "BadRequest"
+ * BadRequest({ status: 400, message: "missing id" })._tag // => "BadRequest"
  * ```
  *
  * @see {@link taggedEnum} — constructors and matchers for a `TaggedEnum`
  * @see {@link TaggedEnum.WithGenerics} — generic tagged enums
  * @see {@link TaggedEnum.Constructor} — the constructor object type
  *
+ * @stability stable
  * @category models
  * @since 2.0.0
  */
@@ -180,6 +176,7 @@ type UntaggedChildren<A> = true extends ChildrenAreTagged<A>
  *   values ({@link TaggedEnum.Value})
  * - Full constructor objects ({@link TaggedEnum.Constructor})
  *
+ * @stability stable
  * @since 2.0.0
  */
 export declare namespace TaggedEnum {
@@ -198,7 +195,7 @@ export declare namespace TaggedEnum {
    *
    * **Example** (Defining a generic tagged enum)
    *
-   * ```ts
+   * ```ts import.meta.vitest
    * import { Data } from "effect"
    *
    * type MyResult<E, A> = Data.TaggedEnum<{
@@ -214,6 +211,7 @@ export declare namespace TaggedEnum {
    *
    * const ok = Success({ value: 42 })
    * // ok: { readonly _tag: "Success"; readonly value: number }
+   * ok // => { value: 42, _tag: "Success" }
    * ```
    *
    * @see {@link Kind} — apply concrete types to a `WithGenerics` definition
@@ -242,7 +240,7 @@ export declare namespace TaggedEnum {
    *
    * **Example** (Applying generics)
    *
-   * ```ts
+   * ```ts import.meta.vitest
    * import type { Data } from "effect"
    *
    * type Option<A> = Data.TaggedEnum<{
@@ -253,9 +251,9 @@ export declare namespace TaggedEnum {
    *   readonly taggedEnum: Option<this["A"]>
    * }
    *
-   * // Resolve to the concrete union for `string`
-   * type StringOption = Data.TaggedEnum.Kind<OptionDef, string>
+   * // Resolves to the concrete union for `string`:
    * // { _tag: "None" } | { _tag: "Some"; value: string }
+   * type StringOption = Data.TaggedEnum.Kind<OptionDef, string>
    * ```
    *
    * @see {@link WithGenerics} — define the generic shape
@@ -291,7 +289,7 @@ export declare namespace TaggedEnum {
    *
    * **Example** (Extracting variant args)
    *
-   * ```ts
+   * ```ts import.meta.vitest
    * import type { Data } from "effect"
    *
    * type Result =
@@ -328,7 +326,7 @@ export declare namespace TaggedEnum {
    *
    * **Example** (Extracting a variant type)
    *
-   * ```ts
+   * ```ts import.meta.vitest
    * import type { Data } from "effect"
    *
    * type Result =
@@ -368,7 +366,7 @@ export declare namespace TaggedEnum {
    *
    * **Example** (Using the constructor object)
    *
-   * ```ts
+   * ```ts import.meta.vitest
    * import { Data } from "effect"
    *
    * type Shape =
@@ -379,21 +377,19 @@ export declare namespace TaggedEnum {
    *
    * const shape = Circle({ radius: 10 })
    *
-   * // Type guard
    * if ($is("Circle")(shape)) {
-   *   console.log(shape.radius)
+   *   shape.radius // => 10
    * }
    *
-   * // Pattern matching
-   * const label = $match(shape, {
+   * $match(shape, {
    *   Circle: (s) => `circle r=${s.radius}`,
    *   Rect: (s) => `rect ${s.w}x${s.h}`
-   * })
+   * }) // => "circle r=10"
    * ```
    *
    * @see {@link taggedEnum} — creates constructors and matchers
    *
-   * @category types
+   * @category utility types
    * @since 3.1.0
    */
   export type Constructor<A extends { readonly _tag: string }> = Types.Simplify<
@@ -540,7 +536,7 @@ export declare namespace TaggedEnum {
  *
  * **Example** (Creating and matching tagged enum values)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { Data } from "effect"
  *
  * type HttpError = Data.TaggedEnum<{
@@ -552,20 +548,17 @@ export declare namespace TaggedEnum {
  *
  * const err = NotFound({ url: "/missing" })
  *
- * // Type guard
- * console.log($is("NotFound")(err)) // true
+ * $is("NotFound")(err) // => true
  *
- * // Pattern matching
- * const msg = $match(err, {
+ * $match(err, {
  *   BadRequest: (e) => e.message,
  *   NotFound: (e) => `${e.url} not found`
- * })
- * console.log(msg) // "/missing not found"
+ * }) // => "/missing not found"
  * ```
  *
  * **Example** (Defining a generic tagged enum)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { Data } from "effect"
  *
  * type MyResult<E, A> = Data.TaggedEnum<{
@@ -579,12 +572,14 @@ export declare namespace TaggedEnum {
  *
  * const ok = Success({ value: 42 })
  * // ok: { readonly _tag: "Success"; readonly value: number }
+ * ok // => { value: 42, _tag: "Success" }
  * ```
  *
  * @see {@link TaggedEnum} — the type-level companion
  * @see {@link TaggedEnum.Constructor} — the returned object type
  * @see {@link TaggedEnum.WithGenerics} — generic enum support
  *
+ * @stability stable
  * @category constructors
  * @since 2.0.0
  */
@@ -699,8 +694,8 @@ function taggedMatch<
  *
  * **Example** (Defining a yieldable error)
  *
- * ```ts
- * import { Data, Effect } from "effect"
+ * ```ts import.meta.vitest
+ * import { Data, Effect, Exit } from "effect"
  *
  * class NetworkError extends Data.Error<{
  *   readonly code: number
@@ -711,13 +706,13 @@ function taggedMatch<
  *   return yield* new NetworkError({ code: 500, message: "timeout" })
  * })
  *
- * // The effect fails with a NetworkError
- * Effect.runSync(Effect.exit(program))
+ * Effect.runSync(Effect.exit(program)) // => Exit.fail(new NetworkError({ code: 500, message: "timeout" }))
  * ```
  *
  * @see {@link TaggedError} — adds a `_tag` for `Effect.catchTag`
  * @see {@link Class} — non-error data class
  *
+ * @stability stable
  * @category constructors
  * @since 2.0.0
  */
@@ -741,7 +736,7 @@ export const Error: new<A extends Record<string, any> = {}>(
  *
  * **Example** (Recovering by tag)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { Data, Effect } from "effect"
  *
  * class NotFound extends Data.TaggedError("NotFound")<{
@@ -760,11 +755,14 @@ export const Error: new<A extends Record<string, any> = {}>(
  *   Effect.catchTag("NotFound", (e) =>
  *     Effect.succeed(`missing: ${e.resource}`))
  * )
+ *
+ * await Effect.runPromise(recovered) // => "missing: /users/42"
  * ```
  *
  * @see {@link Error} — without a `_tag`
  * @see {@link TaggedClass} — tagged class that is not an error
  *
+ * @stability stable
  * @category constructors
  * @since 2.0.0
  */

@@ -7,8 +7,10 @@
  * bounded, dropping, sliding, and unbounded hubs, publishing helpers, scoped
  * subscriptions, shutdown operations, and a guard.
  *
+ * @stability stable
  * @since 4.0.0
  */
+import * as Arr from "./Array.ts"
 import * as Effect from "./Effect.ts"
 import { dual } from "./Function.ts"
 import type { Inspectable } from "./Inspectable.ts"
@@ -20,7 +22,7 @@ import type * as Scope from "./Scope.ts"
 import * as TxQueue from "./TxQueue.ts"
 import * as TxRef from "./TxRef.ts"
 
-const TypeId = "~effect/transactions/TxPubSub"
+const TypeId = "~effect/TxPubSub"
 
 /**
  * A TxPubSub represents a transactional publish/subscribe hub that broadcasts messages
@@ -28,23 +30,25 @@ const TypeId = "~effect/transactions/TxPubSub"
  *
  * **Example** (Subscribing to a transactional pub/sub)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { Effect, TxPubSub, TxQueue } from "effect"
  *
  * const program = Effect.gen(function*() {
  *   const hub = yield* TxPubSub.unbounded<string>()
  *
- *   yield* Effect.scoped(
+ *   return yield* Effect.scoped(
  *     Effect.gen(function*() {
  *       const sub = yield* TxPubSub.subscribe(hub)
  *       yield* TxPubSub.publish(hub, "hello")
- *       const msg = yield* TxQueue.take(sub)
- *       console.log(msg) // "hello"
+ *       return yield* TxQueue.take(sub)
  *     })
  *   )
  * })
+ *
+ * await Effect.runPromise(program) // => "hello"
  * ```
  *
+ * @stability stable
  * @category models
  * @since 4.0.0
  */
@@ -102,23 +106,25 @@ const makeTxPubSub = <A>(
  *
  * **Example** (Creating a bounded pub/sub)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { Effect, TxPubSub, TxQueue } from "effect"
  *
  * const program = Effect.gen(function*() {
  *   const hub = yield* TxPubSub.bounded<number>(16)
  *
- *   yield* Effect.scoped(
+ *   return yield* Effect.scoped(
  *     Effect.gen(function*() {
  *       const sub = yield* TxPubSub.subscribe(hub)
  *       yield* TxPubSub.publish(hub, 42)
- *       const value = yield* TxQueue.take(sub)
- *       console.log(value) // 42
+ *       return yield* TxQueue.take(sub)
  *     })
  *   )
  * })
+ *
+ * await Effect.runPromise(program) // => 42
  * ```
  *
+ * @stability stable
  * @category constructors
  * @since 2.0.0
  */
@@ -135,13 +141,13 @@ export const bounded = <A = never>(capacity: number): Effect.Effect<TxPubSub<A>>
  *
  * **Example** (Creating a dropping pub/sub)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { Effect, TxPubSub, TxQueue } from "effect"
  *
  * const program = Effect.gen(function*() {
  *   const hub = yield* TxPubSub.dropping<number>(2)
  *
- *   yield* Effect.scoped(
+ *   return yield* Effect.scoped(
  *     Effect.gen(function*() {
  *       const sub = yield* TxPubSub.subscribe(hub)
  *       yield* TxPubSub.publish(hub, 1)
@@ -149,12 +155,15 @@ export const bounded = <A = never>(capacity: number): Effect.Effect<TxPubSub<A>>
  *       yield* TxPubSub.publish(hub, 3) // dropped
  *       const v1 = yield* TxQueue.take(sub)
  *       const v2 = yield* TxQueue.take(sub)
- *       console.log(v1, v2) // 1 2
+ *       return [v1, v2]
  *     })
  *   )
  * })
+ *
+ * await Effect.runPromise(program) // => [1, 2]
  * ```
  *
+ * @stability stable
  * @category constructors
  * @since 2.0.0
  */
@@ -171,25 +180,27 @@ export const dropping = <A = never>(capacity: number): Effect.Effect<TxPubSub<A>
  *
  * **Example** (Creating a sliding pub/sub)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { Effect, TxPubSub, TxQueue } from "effect"
  *
  * const program = Effect.gen(function*() {
  *   const hub = yield* TxPubSub.sliding<number>(2)
  *
- *   yield* Effect.scoped(
+ *   return yield* Effect.scoped(
  *     Effect.gen(function*() {
  *       const sub = yield* TxPubSub.subscribe(hub)
  *       yield* TxPubSub.publish(hub, 1)
  *       yield* TxPubSub.publish(hub, 2)
  *       yield* TxPubSub.publish(hub, 3) // evicts 1
- *       const v1 = yield* TxQueue.take(sub)
- *       console.log(v1) // 2
+ *       return yield* TxQueue.take(sub)
  *     })
  *   )
  * })
+ *
+ * await Effect.runPromise(program) // => 2
  * ```
  *
+ * @stability stable
  * @category constructors
  * @since 2.0.0
  */
@@ -205,23 +216,25 @@ export const sliding = <A = never>(capacity: number): Effect.Effect<TxPubSub<A>>
  *
  * **Example** (Creating an unbounded pub/sub)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { Effect, TxPubSub, TxQueue } from "effect"
  *
  * const program = Effect.gen(function*() {
  *   const hub = yield* TxPubSub.unbounded<string>()
  *
- *   yield* Effect.scoped(
+ *   return yield* Effect.scoped(
  *     Effect.gen(function*() {
  *       const sub = yield* TxPubSub.subscribe(hub)
  *       yield* TxPubSub.publish(hub, "msg")
- *       const msg = yield* TxQueue.take(sub)
- *       console.log(msg) // "msg"
+ *       return yield* TxQueue.take(sub)
  *     })
  *   )
  * })
+ *
+ * await Effect.runPromise(program) // => "msg"
  * ```
  *
+ * @stability stable
  * @category constructors
  * @since 2.0.0
  */
@@ -241,15 +254,18 @@ export const unbounded = <A = never>(): Effect.Effect<TxPubSub<A>> =>
  *
  * **Example** (Reading pub/sub capacity)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { Effect, TxPubSub } from "effect"
  *
  * const program = Effect.gen(function*() {
  *   const hub = yield* TxPubSub.bounded<number>(16)
- *   console.log(TxPubSub.capacity(hub)) // 16
+ *   return TxPubSub.capacity(hub)
  * })
+ *
+ * await Effect.runPromise(program) // => 16
  * ```
  *
+ * @stability stable
  * @category getters
  * @since 2.0.0
  */
@@ -260,24 +276,26 @@ export const capacity = <A>(self: TxPubSub<A>): number => self.capacity
  *
  * **Example** (Reading subscriber queue size)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { Effect, TxPubSub, TxQueue } from "effect"
  *
  * const program = Effect.gen(function*() {
  *   const hub = yield* TxPubSub.unbounded<number>()
  *
- *   yield* Effect.scoped(
+ *   return yield* Effect.scoped(
  *     Effect.gen(function*() {
  *       const sub = yield* TxPubSub.subscribe(hub)
  *       yield* TxPubSub.publish(hub, 1)
  *       yield* TxPubSub.publish(hub, 2)
- *       const s = yield* TxPubSub.size(hub)
- *       console.log(s) // 2
+ *       return yield* TxPubSub.size(hub)
  *     })
  *   )
  * })
+ *
+ * await Effect.runPromise(program) // => 2
  * ```
  *
+ * @stability stable
  * @category getters
  * @since 2.0.0
  */
@@ -297,37 +315,71 @@ export const size = <A>(self: TxPubSub<A>): Effect.Effect<number> =>
  *
  * **Example** (Checking whether a pub/sub is empty)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { Effect, TxPubSub } from "effect"
  *
  * const program = Effect.gen(function*() {
  *   const hub = yield* TxPubSub.unbounded<number>()
- *   const empty = yield* TxPubSub.isEmpty(hub)
- *   console.log(empty) // true
+ *   return yield* TxPubSub.isEmpty(hub)
  * })
+ *
+ * await Effect.runPromise(program) // => true
  * ```
  *
- * @category getters
+ * @stability stable
+ * @category predicates
  * @since 2.0.0
  */
 export const isEmpty = <A>(self: TxPubSub<A>): Effect.Effect<boolean> => Effect.map(size(self), (s) => s === 0)
+
+/**
+ * Checks whether any subscriber queue has pending messages.
+ * A pub/sub with no subscribers is empty, even if values have been published.
+ *
+ * **Example** (Checking whether a pub/sub is non-empty)
+ *
+ * ```ts import.meta.vitest
+ * import { Effect, TxPubSub } from "effect"
+ *
+ * const program = Effect.gen(function*() {
+ *   const hub = yield* TxPubSub.unbounded<number>()
+ *   const empty = yield* TxPubSub.isNonEmpty(hub)
+ *
+ *   const nonEmpty = yield* Effect.scoped(Effect.gen(function*() {
+ *     yield* TxPubSub.subscribe(hub)
+ *     yield* TxPubSub.publish(hub, 1)
+ *     return yield* TxPubSub.isNonEmpty(hub)
+ *   }))
+ *   return [empty, nonEmpty] as const
+ * })
+ *
+ * await Effect.runPromise(program) // => [false, true]
+ * ```
+ *
+ * @stability stable
+ * @category predicates
+ * @since 4.0.0
+ */
+export const isNonEmpty = <A>(self: TxPubSub<A>): Effect.Effect<boolean> => Effect.map(size(self), (s) => s > 0)
 
 /**
  * Checks whether any subscriber queue is at capacity.
  *
  * **Example** (Checking whether a pub/sub is full)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { Effect, TxPubSub } from "effect"
  *
  * const program = Effect.gen(function*() {
  *   const hub = yield* TxPubSub.bounded<number>(2)
- *   const full = yield* TxPubSub.isFull(hub)
- *   console.log(full) // false
+ *   return yield* TxPubSub.isFull(hub)
  * })
+ *
+ * await Effect.runPromise(program) // => false
  * ```
  *
- * @category getters
+ * @stability stable
+ * @category predicates
  * @since 2.0.0
  */
 export const isFull = <A>(self: TxPubSub<A>): Effect.Effect<boolean> =>
@@ -345,18 +397,21 @@ export const isFull = <A>(self: TxPubSub<A>): Effect.Effect<boolean> =>
  *
  * **Example** (Checking whether a pub/sub is shut down)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { Effect, TxPubSub } from "effect"
  *
  * const program = Effect.gen(function*() {
  *   const hub = yield* TxPubSub.unbounded<number>()
- *   console.log(yield* TxPubSub.isShutdown(hub)) // false
+ *   const before = yield* TxPubSub.isShutdown(hub)
  *   yield* TxPubSub.shutdown(hub)
- *   console.log(yield* TxPubSub.isShutdown(hub)) // true
+ *   return [before, yield* TxPubSub.isShutdown(hub)]
  * })
+ *
+ * await Effect.runPromise(program) // => [false, true]
  * ```
  *
- * @category getters
+ * @stability stable
+ * @category predicates
  * @since 2.0.0
  */
 export const isShutdown = <A>(self: TxPubSub<A>): Effect.Effect<boolean> => TxRef.get(self.shutdownRef)
@@ -374,7 +429,7 @@ export const isShutdown = <A>(self: TxPubSub<A>): Effect.Effect<boolean> => TxRe
  *
  * **Example** (Publishing a message to subscribers)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { Effect, TxPubSub, TxQueue } from "effect"
  *
  * const program = Effect.gen(function*() {
@@ -382,19 +437,21 @@ export const isShutdown = <A>(self: TxPubSub<A>): Effect.Effect<boolean> => TxRe
  *
  *   // No subscribers - publish is a no-op
  *   const r1 = yield* TxPubSub.publish(hub, "no one listening")
- *   console.log(r1) // true
  *
- *   yield* Effect.scoped(
+ *   const msg = yield* Effect.scoped(
  *     Effect.gen(function*() {
  *       const sub = yield* TxPubSub.subscribe(hub)
  *       yield* TxPubSub.publish(hub, "hello")
- *       const msg = yield* TxQueue.take(sub)
- *       console.log(msg) // "hello"
+ *       return yield* TxQueue.take(sub)
  *     })
  *   )
+ *   return [r1, msg]
  * })
+ *
+ * await Effect.runPromise(program) // => [true, "hello"]
  * ```
  *
+ * @stability stable
  * @category mutations
  * @since 2.0.0
  */
@@ -428,25 +485,28 @@ export const publish: {
  *
  * **Example** (Publishing multiple messages to subscribers)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { Effect, TxPubSub, TxQueue } from "effect"
  *
  * const program = Effect.gen(function*() {
  *   const hub = yield* TxPubSub.unbounded<number>()
  *
- *   yield* Effect.scoped(
+ *   return yield* Effect.scoped(
  *     Effect.gen(function*() {
  *       const sub = yield* TxPubSub.subscribe(hub)
  *       yield* TxPubSub.publishAll(hub, [1, 2, 3])
  *       const v1 = yield* TxQueue.take(sub)
  *       const v2 = yield* TxQueue.take(sub)
  *       const v3 = yield* TxQueue.take(sub)
- *       console.log(v1, v2, v3) // 1 2 3
+ *       return [v1, v2, v3]
  *     })
  *   )
  * })
+ *
+ * await Effect.runPromise(program) // => [1, 2, 3]
  * ```
  *
+ * @stability stable
  * @category mutations
  * @since 2.0.0
  */
@@ -455,17 +515,19 @@ export const publishAll: {
   <A>(self: TxPubSub<A>, values: Iterable<A>): Effect.Effect<boolean>
 } = dual(
   2,
-  <A>(self: TxPubSub<A>, values: Iterable<A>): Effect.Effect<boolean> =>
-    Effect.gen(function*() {
+  <A>(self: TxPubSub<A>, values: Iterable<A>): Effect.Effect<boolean> => {
+    const valuesArray = Arr.fromIterable(values)
+    return Effect.gen(function*() {
       if (yield* TxRef.get(self.shutdownRef)) return false
 
       let allAccepted = true
-      for (const value of values) {
+      for (const value of valuesArray) {
         const accepted = yield* publish(self, value)
         if (!accepted) allAccepted = false
       }
       return allAccepted
     }).pipe(Effect.tx)
+  }
 )
 
 /**
@@ -477,13 +539,13 @@ export const publishAll: {
  *
  * **Example** (Subscribing multiple queues)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { Effect, TxPubSub, TxQueue } from "effect"
  *
  * const program = Effect.gen(function*() {
  *   const hub = yield* TxPubSub.unbounded<string>()
  *
- *   yield* Effect.scoped(
+ *   return yield* Effect.scoped(
  *     Effect.gen(function*() {
  *       const sub1 = yield* TxPubSub.subscribe(hub)
  *       const sub2 = yield* TxPubSub.subscribe(hub)
@@ -492,12 +554,15 @@ export const publishAll: {
  *
  *       const msg1 = yield* TxQueue.take(sub1)
  *       const msg2 = yield* TxQueue.take(sub2)
- *       console.log(msg1, msg2) // "broadcast" "broadcast"
+ *       return [msg1, msg2]
  *     })
  *   )
  * })
+ *
+ * await Effect.runPromise(program) // => ["broadcast", "broadcast"]
  * ```
  *
+ * @stability unstable
  * @category mutations
  * @since 2.0.0
  */
@@ -522,6 +587,7 @@ export const subscribe = <A>(self: TxPubSub<A>): Effect.Effect<TxQueue.TxQueue<A
  * @see {@link subscribe} for the scoped acquire and release wrapper when no custom transaction composition is needed
  * @see {@link releaseSubscriber} to remove and shut down a queue returned by `acquireSubscriber`
  *
+ * @stability unstable
  * @category mutations
  * @since 4.0.0
  */
@@ -555,6 +621,7 @@ export const acquireSubscriber = <A>(
  * @see {@link acquireSubscriber} for the matching transactional acquire step
  * @see {@link subscribe} for the scoped acquire and release wrapper
  *
+ * @stability unstable
  * @category mutations
  * @since 4.0.0
  */
@@ -602,7 +669,7 @@ const makeSubscriberQueue = <A>(
  *
  * **Example** (Shutting down a pub/sub)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { Effect, TxPubSub } from "effect"
  *
  * const program = Effect.gen(function*() {
@@ -610,13 +677,14 @@ const makeSubscriberQueue = <A>(
  *   yield* TxPubSub.shutdown(hub)
  *
  *   const shut = yield* TxPubSub.isShutdown(hub)
- *   console.log(shut) // true
- *
  *   const accepted = yield* TxPubSub.publish(hub, 1)
- *   console.log(accepted) // false
+ *   return [shut, accepted]
  * })
+ *
+ * await Effect.runPromise(program) // => [true, false]
  * ```
  *
+ * @stability stable
  * @category mutations
  * @since 2.0.0
  */
@@ -637,18 +705,22 @@ export const shutdown = <A>(self: TxPubSub<A>): Effect.Effect<void> =>
  *
  * **Example** (Waiting for shutdown)
  *
- * ```ts
- * import { Effect, TxPubSub } from "effect"
+ * ```ts import.meta.vitest
+ * import { Effect, Fiber, TxPubSub } from "effect"
  *
  * const program = Effect.gen(function*() {
  *   const hub = yield* TxPubSub.unbounded<number>()
  *
  *   const fiber = yield* Effect.forkChild(TxPubSub.awaitShutdown(hub))
  *   yield* TxPubSub.shutdown(hub)
- *   yield* fiber.await
+ *   yield* Fiber.await(fiber)
+ *   return yield* TxPubSub.isShutdown(hub)
  * })
+ *
+ * await Effect.runPromise(program) // => true
  * ```
  *
+ * @stability stable
  * @category mutations
  * @since 2.0.0
  */
@@ -668,16 +740,14 @@ export const awaitShutdown = <A>(self: TxPubSub<A>): Effect.Effect<void> =>
  *
  * **Example** (Checking for a TxPubSub)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { TxPubSub } from "effect"
  *
- * declare const someValue: unknown
- *
- * if (TxPubSub.isTxPubSub(someValue)) {
- *   console.log("This is a TxPubSub")
- * }
+ * const someValue: unknown = {}
+ * TxPubSub.isTxPubSub(someValue) // => false
  * ```
  *
+ * @stability stable
  * @category guards
  * @since 4.0.0
  */

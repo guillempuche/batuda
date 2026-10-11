@@ -9,6 +9,7 @@
  * provides a constructor for service values and a small test layer with
  * overridable defaults.
  *
+ * @stability unstable
  * @since 4.0.0
  */
 import * as Context from "./Context.ts"
@@ -25,6 +26,7 @@ import * as Stream from "./Stream.ts"
  *
  * Use to type the runtime identifier stored on `Stdio` service implementations.
  *
+ * @stability unstable
  * @category type IDs
  * @since 4.0.0
  */
@@ -38,6 +40,7 @@ export type TypeId = "~effect/Stdio"
  * This marker is part of the runtime representation of `Stdio` service
  * implementations.
  *
+ * @stability unstable
  * @category type IDs
  * @since 4.0.0
  */
@@ -57,12 +60,31 @@ export const TypeId: TypeId = "~effect/Stdio"
  * standard error, and a stream of standard input bytes. I/O operations can fail
  * with `PlatformError`.
  *
- * @category models
+ * @stability unstable
+ * @category services
  * @since 4.0.0
  */
 export interface Stdio {
   readonly [TypeId]: TypeId
   readonly args: Effect.Effect<ReadonlyArray<string>>
+  /**
+   * Whether standard input is attached to a terminal.
+   *
+   * @since 4.0.0
+   */
+  readonly stdinIsTerminal: Effect.Effect<boolean>
+  /**
+   * Whether standard output is attached to a terminal.
+   *
+   * @since 4.0.0
+   */
+  readonly stdoutIsTerminal: Effect.Effect<boolean>
+  /**
+   * Whether standard error is attached to a terminal.
+   *
+   * @since 4.0.0
+   */
+  readonly stderrIsTerminal: Effect.Effect<boolean>
   stdout(options?: {
     readonly endOnDone?: boolean | undefined
   }): Sink.Sink<void, string | Uint8Array, never, PlatformError>
@@ -82,6 +104,7 @@ export interface Stdio {
  * @see {@link make} for constructing a `Stdio` service directly
  * @see {@link layerTest} for a test layer with defaults and overrides
  *
+ * @stability unstable
  * @category services
  * @since 4.0.0
  */
@@ -98,16 +121,25 @@ export const Stdio: Context.Service<Stdio, Stdio> = Context.Service<Stdio>(TypeI
  *
  * **Details**
  *
- * The returned service reuses the supplied fields unchanged and only adds the
- * `Stdio` type identifier; it does not create a `Layer` or provide defaults.
+ * The returned service reuses the supplied fields unchanged and adds the
+ * `Stdio` type identifier. Omitted terminal-detection fields default to
+ * effects that succeed with `false`.
  *
  * @see {@link layerTest} for a test layer with default fields that can be overridden
  *
+ * @stability unstable
  * @category constructors
  * @since 4.0.0
  */
-export const make = (options: Omit<Stdio, TypeId>): Stdio => ({
+export const make = (
+  options:
+    & Omit<Stdio, TypeId | "stdinIsTerminal" | "stdoutIsTerminal" | "stderrIsTerminal">
+    & Partial<Pick<Stdio, "stdinIsTerminal" | "stdoutIsTerminal" | "stderrIsTerminal">>
+): Stdio => ({
   [TypeId]: TypeId,
+  stdinIsTerminal: Effect.succeed(false),
+  stdoutIsTerminal: Effect.succeed(false),
+  stderrIsTerminal: Effect.succeed(false),
   ...options
 })
 
@@ -123,10 +155,11 @@ export const make = (options: Omit<Stdio, TypeId>): Stdio => ({
  *
  * Any provided fields override defaults. By default, arguments are empty,
  * standard output and error are draining sinks, and standard input is an empty
- * stream.
+ * stream, and terminal-detection effects succeed with `false`.
  *
  * @see {@link make} for constructing a `Stdio` service directly without a `Layer` or defaults
  *
+ * @stability unstable
  * @category layers
  * @since 4.0.0
  */
