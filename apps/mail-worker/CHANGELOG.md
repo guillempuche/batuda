@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-10-11 (mail-worker-v2026.10.11)
+
+### Refactoring
+
+* remove research code that nothing calls ([4f0f3c4](https://github.com/guillempuche/batuda/commit/4f0f3c49733f6bf25336c0d254c204515685d74f))
+
 ## 2026-10-09 (mail-worker-v2026.10.9)
 
 ### CI/CD
