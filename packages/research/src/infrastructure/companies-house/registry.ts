@@ -22,7 +22,7 @@ import { type RegistryInput, RegistryRouter } from '../../application/ports'
 import { ProviderError } from '../../domain/errors'
 import { RegistryRecord } from '../../domain/types'
 import { keyForSlot } from '../_config'
-import { hardenHttp } from '../_http-harden'
+import { hardenHttp, statusRecoverable } from '../_http-harden'
 
 const BASE_URL = 'https://api.company-information.service.gov.uk'
 
@@ -69,10 +69,6 @@ const OfficersResponse = Schema.Struct({
 		),
 	),
 })
-
-// 429 + 5xx are transient (retry); 401/404/400 are terminal for this request.
-const statusRecoverable = (status: number): boolean =>
-	status === 429 || status >= 500
 
 const failStatus = (status: number) =>
 	Effect.fail(

@@ -25,7 +25,7 @@
 
 import { EQUIVALENT_LETTERS } from '@batuda/domain'
 
-const LETTERS_TO_REWRITE = new RegExp(
+export const LETTERS_TO_REWRITE = new RegExp(
 	`[${[...EQUIVALENT_LETTERS.keys()].join('')}]`,
 	'gu',
 )

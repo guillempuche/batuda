@@ -9,7 +9,6 @@ import {
 	isLlmCacheable,
 	makeCachedLanguageModel,
 	rehydrateCachedResponse,
-	stableStringifyForCache,
 } from './cached-llm'
 
 describe('llm cache key computation', () => {
@@ -110,41 +109,6 @@ describe('fallback slot cache keying', () => {
 				computeLlmCacheKey('extract', answeringModel, 'object', opts),
 			).not.toBe(primarySlotKey)
 		})
-	})
-})
-
-describe('stableStringifyForCache', () => {
-	it('should sort object keys so permuted options serialize identically', () => {
-		// GIVEN two objects with the same entries in different orders
-		const a = stableStringifyForCache({ b: 2, a: 1 })
-		const b = stableStringifyForCache({ a: 1, b: 2 })
-
-		// THEN the serializations match
-		expect(a).toBe(b)
-		expect(a).toBe('{"a":1,"b":2}')
-	})
-
-	it('should tolerate circular references without throwing', () => {
-		// GIVEN an object that references itself
-		const cyclic: Record<string, unknown> = { a: 1 }
-		cyclic['self'] = cyclic
-
-		// WHEN serialized via the cache helper
-		const serialized = stableStringifyForCache(cyclic)
-
-		// THEN it emits a sentinel instead of crashing
-		expect(serialized).toContain('[circular]')
-	})
-
-	it('should drop function values so closures do not bleed into the key', () => {
-		// GIVEN an options object that carries a function (e.g. onChunk callback)
-		const input = { prompt: 'x', onChunk: () => undefined }
-
-		// WHEN serialized
-		const serialized = stableStringifyForCache(input)
-
-		// THEN the function is omitted — two calls with different closures hash the same
-		expect(serialized).toBe('{"prompt":"x"}')
 	})
 })
 

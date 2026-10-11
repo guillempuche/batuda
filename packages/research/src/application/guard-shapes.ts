@@ -25,6 +25,17 @@ export const isPlainObject = (
 ): value is Record<string, unknown> =>
 	value !== null && typeof value === 'object' && !Array.isArray(value)
 
+/** The company block of a profile's findings, when there is one. */
+export const enrichmentOf = (
+	findings: unknown,
+): Record<string, unknown> | undefined => {
+	if (findings === null || typeof findings !== 'object') return undefined
+	const enrichment = (findings as { enrichment?: unknown }).enrichment
+	return enrichment !== null && typeof enrichment === 'object'
+		? (enrichment as Record<string, unknown>)
+		: undefined
+}
+
 /** Carries a `value`, with or without provenance. */
 export const isValueWrapper = (
 	value: unknown,

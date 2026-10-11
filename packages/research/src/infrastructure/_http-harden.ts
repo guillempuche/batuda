@@ -18,26 +18,18 @@
  * cascade in `_fallback.ts`.
  */
 
-import { Cause, Duration, Effect, Schedule } from 'effect'
+import { Cause, type Duration, Effect, Schedule } from 'effect'
 
 import { ProviderError } from '../domain/errors'
+import { integerJitter } from './_jitter'
 
 const DEFAULT_TIMEOUT: Duration.Input = '30 seconds'
 const DEFAULT_MAX_ATTEMPTS = 3
 
-/**
- * Jitter between 80%–120% of the base delay, rounded to integer millis — the
- * same `TestClock`-safe rounding `_harden.ts` uses (fractional-millis Durations
- * break the test clock's nanos path).
- */
-const integerJitter = <O, I, E, R>(
-	schedule: Schedule.Schedule<O, I, E, R>,
-): Schedule.Schedule<O, I, E, R> =>
-	Schedule.modifyDelay(schedule, metadata => {
-		const ms = Duration.toMillis(metadata.duration)
-		const jittered = ms * 0.8 + ms * 0.4 * Math.random()
-		return Effect.succeed(Duration.millis(Math.round(jittered)))
-	})
+// A rate limit or a server-side failure is worth another try; any other 4xx is
+// a bad key, no credit or a bad request, which asking again cannot fix.
+export const statusRecoverable = (status: number): boolean =>
+	status === 429 || status >= 500
 
 const isRecoverable = (err: unknown): boolean =>
 	err instanceof ProviderError && err.recoverable

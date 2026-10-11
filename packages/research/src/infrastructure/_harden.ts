@@ -55,6 +55,7 @@ import {
 	RESPONSE_CUT_OFF,
 	RejectedToolCall,
 } from '../domain/errors'
+import { integerJitter } from './_jitter'
 import { reclassifyRejectedToolCall } from './_tool-call-rejection'
 
 const DEFAULT_TIMEOUT: Duration.Input = '60 seconds'
@@ -240,23 +241,6 @@ const rateLimitRetryAfter = (err: unknown): Duration.Duration | undefined => {
 	if (reason._tag !== 'RateLimitError') return undefined
 	return reason.retryAfter
 }
-
-/**
- * Jitter between 80%–120% of the base delay, rounded to integer millis.
- *
- * `Schedule.jittered` produces fractional-millis Durations which break
- * `TestClock` (its internal `toNanos` path throws when the accumulated clock
- * ticks are non-integer millis). Rounding here keeps jitter behavior
- * identical in production while letting the test clock stay integer-clean.
- */
-const integerJitter = <O, I, E, R>(
-	schedule: Schedule.Schedule<O, I, E, R>,
-): Schedule.Schedule<O, I, E, R> =>
-	Schedule.modifyDelay(schedule, metadata => {
-		const ms = Duration.toMillis(metadata.duration)
-		const jittered = ms * 0.8 + ms * 0.4 * Math.random()
-		return Effect.succeed(Duration.millis(Math.round(jittered)))
-	})
 
 /**
  * Base schedule: jittered exponential backoff, capped at

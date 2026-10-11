@@ -32,6 +32,7 @@ import { SearchResult, SearchResultItem } from '../../domain/types'
 import { keyForSlot } from '../_config'
 import { hardenHttp } from '../_http-harden'
 import { NullableOptional } from '../_schema'
+import { freshnessForRecency } from './_freshness'
 
 // Context budget returned per request and per source page. Set to Brave's own
 // defaults (total 8192 of 1024–32768; per-url 4096 of 512–8192): billing is
@@ -61,11 +62,6 @@ const LlmContextResponse = Schema.Struct({
 		}),
 	),
 })
-
-// Brave's freshness takes discrete buckets (past day/week/month/year), never a
-// "past N days" number, so map the requested window to the nearest bucket.
-const freshnessForRecency = (days: number): string =>
-	days <= 1 ? 'pd' : days <= 7 ? 'pw' : days <= 31 ? 'pm' : 'py'
 
 // ── Provider factory ──
 

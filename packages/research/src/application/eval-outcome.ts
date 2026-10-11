@@ -25,7 +25,7 @@ import {
 } from './eval-scoring'
 import { isConfirmedRow } from './existence-verdict'
 import { contactFill, contactsOf, enrichmentFill } from './extraction-fill'
-import { unwrapValue } from './guard-shapes'
+import { enrichmentOf, unwrapValue } from './guard-shapes'
 import { isSearchStopped, type SearchStopped } from './search-stopped'
 import { hostOf } from './source-key'
 
@@ -58,16 +58,6 @@ const readFieldValue = (raw: unknown): string | null => {
 const readFilled = (raw: unknown): string | null => {
 	const value = readFieldValue(raw)
 	return value === null || value.trim() === '' ? null : value.trim()
-}
-
-const enrichmentOf = (
-	findings: unknown,
-): Record<string, unknown> | undefined => {
-	if (findings === null || typeof findings !== 'object') return undefined
-	const enrichment = (findings as { enrichment?: unknown }).enrichment
-	return enrichment !== null && typeof enrichment === 'object'
-		? (enrichment as Record<string, unknown>)
-		: undefined
 }
 
 // A headcount as a row carries it: a number, alone or paired with the page it

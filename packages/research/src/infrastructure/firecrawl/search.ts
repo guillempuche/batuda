@@ -29,7 +29,7 @@ import { parseCountryAlpha2 } from '../../domain/country'
 import { ProviderError } from '../../domain/errors'
 import { SearchResult, SearchResultItem } from '../../domain/types'
 import { keyForSlot } from '../_config'
-import { hardenHttp } from '../_http-harden'
+import { hardenHttp, statusRecoverable } from '../_http-harden'
 import { NullableOptional } from '../_schema'
 
 const SEARCH_URL = 'https://api.firecrawl.dev/v2/search'
@@ -59,10 +59,6 @@ const SearchResponse = Schema.Struct({
 	// Total credits this call actually cost.
 	creditsUsed: NullableOptional(Schema.Number),
 })
-
-// 429 + 5xx are transient (retry); other 4xx are auth/quota/bad-request (fail fast).
-const statusRecoverable = (status: number): boolean =>
-	status === 429 || status >= 500
 
 // Map a recency window (in days) to Firecrawl's time-based-search bucket: past
 // day / week / month / year. Coarser than Brave's exact `pd<days>`, but the API
