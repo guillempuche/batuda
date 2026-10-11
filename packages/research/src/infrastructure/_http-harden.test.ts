@@ -219,15 +219,18 @@ describe('hardenHttp', () => {
 	})
 
 	it('should convert a timed-out attempt into a recoverable error and retry', async () => {
-		// GIVEN an inner call that never resolves, under a short per-attempt timeout
+		// GIVEN an inner call that never resolves
 		const callsRef = Ref.makeUnsafe(0)
 		const inner = countingInner(callsRef, () =>
 			Effect.flatMap(Effect.void, () => Effect.never),
 		)
 
-		// WHEN it runs through a hardener with a 1s timeout
-		const exit = await runWithVirtualClock(() =>
-			hardenHttp('test', { timeout: '1 second' })(inner),
+		// WHEN it runs through the hardener, with the clock moved far enough for
+		// all three of its 30-second attempts
+		const exit = await runWithVirtualClock(
+			() => hardenHttp('test')(inner),
+			120_000,
+			1_000,
 		)
 
 		// THEN each attempt times out and retries, exhausting the budget

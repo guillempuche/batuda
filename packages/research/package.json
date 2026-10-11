@@ -26,10 +26,6 @@
 			"types": "./src/application/paid-action-tool.ts",
 			"import": "./src/application/paid-action-tool.ts"
 		},
-		"./application/place-guard": {
-			"types": "./src/application/place-guard.ts",
-			"import": "./src/application/place-guard.ts"
-		},
 		"./application/prospect-hold-back": {
 			"types": "./src/application/prospect-hold-back.ts",
 			"import": "./src/application/prospect-hold-back.ts"

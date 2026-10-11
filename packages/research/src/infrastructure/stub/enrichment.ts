@@ -5,7 +5,7 @@
  * emails, so the pipeline exercises the real guess + verify path against them.
  */
 
-import { Effect, Layer } from 'effect'
+import { Effect } from 'effect'
 
 import { EnrichmentProvider } from '../../application/ports'
 import { EnrichmentResult } from '../../domain/types'
@@ -38,7 +38,3 @@ export const StubEnrichmentProviderInstance = EnrichmentProvider.of({
 			}),
 		),
 })
-
-export const StubEnrichmentProvider = Layer.succeed(EnrichmentProvider)(
-	StubEnrichmentProviderInstance,
-)

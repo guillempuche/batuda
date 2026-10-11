@@ -127,7 +127,6 @@ export interface ScrapeInput {
 	readonly formats?:
 		| ('markdown' | 'html' | 'links' | 'screenshot')[]
 		| undefined
-	readonly waitForSelector?: string | undefined
 }
 
 export class ScrapeProvider extends Context.Service<

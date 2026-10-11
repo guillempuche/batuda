@@ -30,9 +30,6 @@
  *   - Before that mapping erases it, the failure's real shape (timeout vs the
  *     provider's HTTP status / reason) is written to the `llm.call` span and an
  *     error log, so a generic "<provider> request failed" stays diagnosable.
- *   - Optional `Semaphore`-bounded concurrency: when a `permits` option is
- *     supplied the wrapper caps concurrent in-flight calls — defends a shared
- *     tier key against stampede without a full gateway service.
  *
  * `withFallbackLanguageModel` folds N hardened slots into a single caller
  * that tries each slot in order. On `ProviderError` from slot i (regardless
@@ -46,7 +43,7 @@
  * generateObject).
  */
 
-import { Cause, Duration, Effect, Schedule, Semaphore } from 'effect'
+import { Cause, Duration, Effect, Schedule } from 'effect'
 import type { LanguageModel } from 'effect/unstable/ai'
 import { AiError } from 'effect/unstable/ai'
 
@@ -309,12 +306,6 @@ const makeRetrySchedule = (provider: string, tier: string | undefined) =>
 export interface HardenOptions {
 	readonly timeout?: Duration.Input
 	/**
-	 * Optional concurrency limit. When provided, an in-memory `Semaphore`
-	 * gates the wrapped methods so at most `permits` calls run in parallel
-	 * against this slot. A typical value is `Math.max(2, Math.floor(rpm / 4))`.
-	 */
-	readonly permits?: number
-	/**
 	 * Tier label for observability (`agent` / `extract` / `writer`). Surfaced
 	 * on retry logs and the `llm.call` span so traces group by phase.
 	 */
@@ -322,12 +313,7 @@ export interface HardenOptions {
 }
 
 const harden =
-	(
-		provider: string,
-		timeout: Duration.Input,
-		semaphore: Semaphore.Semaphore | undefined,
-		tier: string | undefined,
-	) =>
+	(provider: string, timeout: Duration.Input, tier: string | undefined) =>
 	<A, R>(eff: Effect.Effect<A, AiError.AiError, R>) => {
 		const schedule = makeRetrySchedule(provider, tier)
 		// First of all, so the retry below judges the failure by what it really was.
@@ -346,7 +332,7 @@ const harden =
 				toProviderError(provider, err, timeout),
 			),
 		) as Effect.Effect<A, ProviderError, R>
-		return semaphore ? semaphore.withPermits(1)(wrapped) : wrapped
+		return wrapped
 	}
 
 // The reason the model stopped, written on the span. A reply the vendor cut at
@@ -391,15 +377,8 @@ export const hardenLanguageModel = (
 	provider: string,
 	opts?: HardenOptions,
 ): LanguageModel.Service => {
-	const semaphore =
-		opts?.permits !== undefined ? Semaphore.makeUnsafe(opts.permits) : undefined
 	const tier = opts?.tier
-	const wrap = harden(
-		provider,
-		opts?.timeout ?? DEFAULT_TIMEOUT,
-		semaphore,
-		tier,
-	)
+	const wrap = harden(provider, opts?.timeout ?? DEFAULT_TIMEOUT, tier)
 	const spanAttributes: Record<string, string> = {
 		'llm.provider': provider,
 		...(tier !== undefined ? { 'llm.tier': tier } : {}),

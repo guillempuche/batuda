@@ -31,8 +31,6 @@ export interface ScanEvidenceResult {
 	readonly findings: unknown
 	/** Entries dropped for resting on nothing but posts. */
 	readonly dropped: number
-	/** The names dropped, so a run can say which companies went and why. */
-	readonly droppedNames: ReadonlyArray<string>
 }
 
 const citationSourceIds = (entry: Record<string, unknown>): string[] => {
@@ -53,12 +51,11 @@ export const guardScanEvidence = (
 ): ScanEvidenceResult => {
 	const field = SCANNED_ENTRIES[schemaName]
 	if (field === undefined || !isPlainObject(findings))
-		return { findings, dropped: 0, droppedNames: [] }
+		return { findings, dropped: 0 }
 
 	const entries = findings[field]
-	if (!Array.isArray(entries)) return { findings, dropped: 0, droppedNames: [] }
+	if (!Array.isArray(entries)) return { findings, dropped: 0 }
 
-	const droppedNames: string[] = []
 	const kept = entries.filter(entry => {
 		if (!isPlainObject(entry)) return true
 		const sourceIds = citationSourceIds(entry)
@@ -67,17 +64,11 @@ export const guardScanEvidence = (
 		// an entry whose evidence exists and is all posts.
 		if (sourceIds.length === 0) return true
 		if (!sourceIds.every(id => classifyNamespace(id) === 'ugc')) return true
-		const name = entry['name']
-		droppedNames.push(typeof name === 'string' ? name : 'unnamed')
 		return false
 	})
 
-	if (droppedNames.length === 0)
-		return { findings, dropped: 0, droppedNames: [] }
+	const dropped = entries.length - kept.length
+	if (dropped === 0) return { findings, dropped: 0 }
 
-	return {
-		findings: { ...findings, [field]: kept },
-		dropped: droppedNames.length,
-		droppedNames,
-	}
+	return { findings: { ...findings, [field]: kept }, dropped }
 }

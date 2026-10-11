@@ -12,10 +12,7 @@
  */
 
 /** The tools a follow-up run knows how to run. */
-export const PAID_FOLLOWUP_TOOLS = new Set([
-	'registry_lookup',
-	'discover_contacts',
-])
+const PAID_FOLLOWUP_TOOLS = new Set(['registry_lookup', 'discover_contacts'])
 
 // Names the model tends to invent for the two real tools. Kept small and
 // explicit: each entry is a name seen in practice, not a guess.

@@ -23,9 +23,9 @@
  * obvious repeats across a single research run.
  *
  * `research_run_sources` attribution is intentionally NOT handled here. It
- * lives at the tool-loop caller (`research-service.ts` phase 1) which knows
- * the `research_id` and can emit a `tool.cache_hit` SSE event. Keeping this
- * layer ignorant of the run context lets the same wrapper serve any caller.
+ * lives at the tool-loop caller (`research-service.ts` phase 1), which knows
+ * the `research_id`. Keeping this layer ignorant of the run context lets the
+ * same wrapper serve any caller.
  */
 
 import { createHash } from 'node:crypto'

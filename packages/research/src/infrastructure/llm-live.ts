@@ -82,8 +82,6 @@ export interface ConfiguredSlot {
 	readonly vendor: string
 	readonly model: string
 	readonly baseUrl: string
-	/** The most tokens one reply may write. */
-	readonly maxOutputTokens: number
 	/** The variable holding this slot's key — named, never read here. */
 	readonly apiKeyEnv: string
 }
@@ -149,7 +147,9 @@ const slotsForVendors = (
 		// precisely because it was never going to need one.
 		if (vendors[0] === 'stub') return []
 		const model = yield* Config.string(`${envPrefix}_MODEL`)
-		const maxOutputTokens = yield* Config.int(`${envPrefix}_MAX_OUTPUT_TOKENS`)
+		// Read for its validation only: a tier that names a model must also name
+		// how much one reply may write, and the probe reports a bad value by name.
+		yield* Config.int(`${envPrefix}_MAX_OUTPUT_TOKENS`)
 		return yield* Effect.forEach(vendors, (vendor, i) =>
 			Effect.gen(function* () {
 				if (vendor === 'stub') return []
@@ -170,7 +170,6 @@ const slotsForVendors = (
 						vendor,
 						model: slotModel,
 						baseUrl,
-						maxOutputTokens,
 						apiKeyEnv: keyForSlot(`${envPrefix}_API_KEY`, i),
 					} satisfies ConfiguredSlot,
 				]

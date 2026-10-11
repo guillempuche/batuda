@@ -82,7 +82,7 @@ export const PAGE_LITERAL_FIELDS = new Set(['location', 'role'])
 // Fields a model writes from memory when the page says nothing — a headcount, a
 // job title — so a value that arrives with no quote behind it is dropped rather
 // than kept on trust. Every other field may still stand on its source alone.
-export const QUOTE_REQUIRED_FIELDS = new Set(['employee_estimate', 'role'])
+const QUOTE_REQUIRED_FIELDS = new Set(['employee_estimate', 'role'])
 
 // Ways of reaching a person, which the value guard already matches against the
 // evidence address-for-address and digit-for-digit — far more precisely than the
@@ -394,7 +394,7 @@ const titleInitialsAgree = (quote: string, value: string): boolean => {
 // the doubt. Read strictly, an acronym is distinctive too, so "CEO" has to be in
 // the quote: that is how a job title or a declared text value is read, since
 // those are what a model writes from memory.
-export const quoteSupportsValue = (
+const quoteSupportsValue = (
 	quote: string,
 	value: string,
 	strict = false,
@@ -416,7 +416,7 @@ export const quoteSupportsValue = (
 
 // A job title is read strictly, and in one more way: by the letters it
 // shortens to, since a page and a model do not always shorten it alike.
-export const quoteSupportsTitle = (quote: string, value: string): boolean =>
+const quoteSupportsTitle = (quote: string, value: string): boolean =>
 	quoteSupportsValue(quote, value, true) || titleInitialsAgree(quote, value)
 
 // A remark a model writes after a value, in brackets — "HP Indigo VP37 (digital
@@ -679,7 +679,7 @@ export const quoteIsVerbatim = (
 
 // A date a value is said to hold as of is kept only when the quote names its
 // year; a model asked for a date writes one whether the page gives it or not.
-export const quoteNamesYearOf = (quote: string, asOf: unknown): boolean => {
+const quoteNamesYearOf = (quote: string, asOf: unknown): boolean => {
 	if (typeof asOf !== 'string') return false
 	const year = asOf.match(/\d{4}/)?.[0]
 	return year !== undefined && quote.includes(year)

@@ -589,47 +589,6 @@ describe('hardenLanguageModel', () => {
 		expect(Ref.getUnsafe(attemptsRef)).toBe(2)
 	})
 
-	it('should cap concurrent in-flight calls at the configured permit count', async () => {
-		// GIVEN a stub LM that tracks its in-flight concurrency and sleeps 1s per call
-		const inFlightRef = Ref.makeUnsafe(0)
-		const peakRef = Ref.makeUnsafe(0)
-		const busySvc = {
-			generateText: () =>
-				Effect.gen(function* () {
-					const current = yield* Ref.updateAndGet(inFlightRef, n => n + 1)
-					yield* Ref.update(peakRef, p => (current > p ? current : p))
-					yield* Effect.sleep('1 second')
-					yield* Ref.update(inFlightRef, n => n - 1)
-					return { text: 'ok', usage: {} }
-				}),
-			generateObject: () => Effect.succeed({}),
-			streamText: () => Effect.succeed({}),
-		} as unknown as LanguageModel.Service
-		// AND a harness with permits=2
-		const hardened = hardenLanguageModel(busySvc, 'together', { permits: 2 })
-
-		// WHEN 10 callers invoke the hardened service concurrently under TestClock
-		const program = Effect.gen(function* () {
-			const fibers = yield* Effect.forEach(
-				Array.from({ length: 10 }, (_, i) => i),
-				() => Effect.forkChild(invokeGenerateText(hardened)),
-				{ concurrency: 'unbounded' },
-			)
-			yield* TestClock.adjust('20 seconds')
-			yield* Effect.forEach(fibers, f => Fiber.await(f), {
-				concurrency: 'unbounded',
-			})
-		})
-		await Effect.runPromise(
-			Effect.scoped(program).pipe(Effect.provide(TestClock.layer())),
-		)
-
-		// THEN peak concurrency never exceeded the 2-permit cap
-		expect(Ref.getUnsafe(peakRef)).toBeLessThanOrEqual(2)
-		// AND all callers eventually released their permits
-		expect(Ref.getUnsafe(inFlightRef)).toBe(0)
-	})
-
 	it('should fail when a call exceeds the configured timeout', async () => {
 		// GIVEN a stub LM whose call never resolves within the budget
 		const neverSvc = {

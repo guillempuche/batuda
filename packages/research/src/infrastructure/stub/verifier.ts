@@ -4,7 +4,7 @@
  * deliverable, so tests can exercise both ranking branches without a network.
  */
 
-import { Effect, Layer } from 'effect'
+import { Effect } from 'effect'
 
 import { EmailVerifier } from '../../application/ports'
 import { EmailVerification } from '../../domain/types'
@@ -23,7 +23,3 @@ export const StubEmailVerifierInstance = EmailVerifier.of({
 		)
 	},
 })
-
-export const StubEmailVerifier = Layer.succeed(EmailVerifier)(
-	StubEmailVerifierInstance,
-)

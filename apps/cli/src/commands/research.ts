@@ -1646,6 +1646,22 @@ export const researchCap = (input: {
 		)
 	}).pipe(Effect.provide(SqlLive))
 
+// Reads a JSON file given on the command line; `label` says what the file
+// holds, so a bad path reports "could not read the corpus" rather than a bare path.
+const readJsonFile = (relativePath: string, label: string) =>
+	Effect.gen(function* () {
+		const path = fromRepoRoot(relativePath)
+		const raw = yield* Effect.tryPromise({
+			try: () => readFile(path, 'utf8'),
+			catch: cause =>
+				new Error(`could not read the ${label} at ${path}: ${String(cause)}`),
+		})
+		return yield* Effect.try({
+			try: () => JSON.parse(raw) as unknown,
+			catch: cause => new Error(`${path} is not JSON: ${String(cause)}`),
+		})
+	})
+
 /**
  * Grade the operator-network check against rows real scans already returned.
  *
@@ -1662,16 +1678,7 @@ export const researchCap = (input: {
  */
 export const researchFarmReplay = (input: { readonly corpus: string }) =>
 	Effect.gen(function* () {
-		const path = fromRepoRoot(input.corpus)
-		const raw = yield* Effect.tryPromise({
-			try: () => readFile(path, 'utf8'),
-			catch: cause =>
-				new Error(`could not read the corpus at ${path}: ${String(cause)}`),
-		})
-		const parsed = yield* Effect.try({
-			try: () => JSON.parse(raw) as unknown,
-			catch: cause => new Error(`${path} is not JSON: ${String(cause)}`),
-		})
+		const parsed = yield* readJsonFile(input.corpus, 'corpus')
 		const { rows, errors } = parseFarmCorpus(parsed)
 		for (const error of errors) yield* Console.error(`skipped — ${error}`)
 		if (rows.length === 0) {
@@ -1750,16 +1757,7 @@ export const researchKindReask = (input: {
 				new Error(`--asks must be 1 or more, got ${input.asks}`),
 			)
 		}
-		const path = fromRepoRoot(input.rows)
-		const raw = yield* Effect.tryPromise({
-			try: () => readFile(path, 'utf8'),
-			catch: cause =>
-				new Error(`could not read the rows at ${path}: ${String(cause)}`),
-		})
-		const parsed = yield* Effect.try({
-			try: () => JSON.parse(raw) as unknown,
-			catch: cause => new Error(`${path} is not JSON: ${String(cause)}`),
-		})
+		const parsed = yield* readJsonFile(input.rows, 'rows')
 		const { runs, errors } = parseKindCorpus(parsed)
 		for (const error of errors) yield* Console.error(`skipped — ${error}`)
 		if (runs.length === 0) {

@@ -100,7 +100,7 @@ export const MAX_KINDS_OF_COMPANY = 16
  * because a name written in those characters folds to nothing and no reading here
  * reaches it either way — see `entity-guard.ts`.
  */
-export const SHORTEST_KIND_OF_COMPANY = 4
+const SHORTEST_KIND_OF_COMPANY = 4
 
 /**
  * Longest a wording may be. A trade is named in a few words; anything past this is
