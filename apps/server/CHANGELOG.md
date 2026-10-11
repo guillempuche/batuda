@@ -3,6 +3,22 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-10-11 (server-v2026.10.11)
+
+### Bug Fixes
+
+* **research:** need two votes to remove a row, and hide social hosts ([07e993c](https://github.com/guillempuche/batuda/commit/07e993c8a438905b8604a5394710f80c3f0079a2))
+* **research:** refuse a phone, date, account or address as a number ([8a3ced7](https://github.com/guillempuche/batuda/commit/8a3ced7a510e94ce2832b5fc02dd5f6fa267aa54))
+* **research:** withdraw a first vote the second asking never answered ([7d24796](https://github.com/guillempuche/batuda/commit/7d2479600e3a30eb80b2b2a96d6a007e8fcfe05a))
+
+### Refactoring
+
+* remove research code that nothing calls ([4f0f3c4](https://github.com/guillempuche/batuda/commit/4f0f3c49733f6bf25336c0d254c204515685d74f))
+
+### Tests
+
+* **research:** drop duplicated extraction-prompt cases ([0ac3c28](https://github.com/guillempuche/batuda/commit/0ac3c28f1e7f89d57464510db56b79622fbeedbf))
+
 ## 2026-10-09 (server-v2026.10.9)
 
 ### Bug Fixes
