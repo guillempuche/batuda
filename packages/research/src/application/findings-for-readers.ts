@@ -72,7 +72,7 @@ import { isPlainObject, isValueWrapper } from './guard-shapes'
  * would have been gathered stay paired. A reader then meets the old shape, which
  * is a shape it could already read; overwriting would destroy an answer instead.
  */
-export const EVIDENCE_FIELD = 'evidence'
+const EVIDENCE_FIELD = 'evidence'
 
 /**
  * Branches this does not walk into, the same two the per-field guard steps over.

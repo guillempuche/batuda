@@ -4,7 +4,6 @@ import {
 	buildEvalReport,
 	evalSpanAttributes,
 	evalSummaryAttributes,
-	scorePayloadsForRun,
 } from './eval-report'
 import type { EvalSummary, RunScore } from './eval-scoring'
 
@@ -24,95 +23,6 @@ const score = (over: Partial<RunScore>): RunScore => ({
 	contactsExpected: 0,
 	contactsFound: 0,
 	...over,
-})
-
-const byName = <T extends { name: string }>(payloads: ReadonlyArray<T>) =>
-	new Map(payloads.map(p => [p.name, p] as const))
-
-describe('scorePayloadsForRun', () => {
-	describe('when a run reached the target and filled every field correctly', () => {
-		it('should mark every metric passed with value 1', () => {
-			// GIVEN a clean, fully-correct run
-			const payloads = byName(
-				scorePayloadsForRun(
-					score({ fieldsExpected: 2, fieldsScored: 2, fieldsCorrect: 2 }),
-				),
-			)
-
-			// WHEN mapped — THEN each metric is 1 / passed
-			expect(payloads.get('grounding')).toMatchObject({
-				value: 1,
-				passed: true,
-			})
-			expect(payloads.get('not_wrong_company')?.passed).toBe(true)
-			expect(payloads.get('not_empty')?.passed).toBe(true)
-			expect(payloads.get('field_precision')).toMatchObject({
-				value: 1,
-				passed: true,
-			})
-			expect(payloads.get('field_recall')).toMatchObject({
-				value: 1,
-				passed: true,
-			})
-		})
-	})
-
-	describe('when a run returned another company as a success', () => {
-		it('should score not_wrong_company as 0 / failed', () => {
-			// GIVEN a look-alike run
-			const payloads = byName(
-				scorePayloadsForRun(score({ grounded: false, wrongCompany: true })),
-			)
-
-			// WHEN mapped — THEN the good-direction score is 0
-			expect(payloads.get('not_wrong_company')).toMatchObject({
-				value: 0,
-				passed: false,
-			})
-			expect(payloads.get('grounding')?.value).toBe(0)
-		})
-	})
-
-	describe('when a run filled only some fields correctly', () => {
-		it('should report precision below 1 and mark it not passed', () => {
-			// GIVEN 1 correct of 2 filled, 1 of 3 known
-			const payloads = byName(
-				scorePayloadsForRun(
-					score({ fieldsExpected: 3, fieldsScored: 2, fieldsCorrect: 1 }),
-				),
-			)
-
-			// WHEN mapped — THEN precision is 0.5 (failed), recall is 1/3 (failed)
-			expect(payloads.get('field_precision')).toMatchObject({
-				value: 0.5,
-				passed: false,
-			})
-			expect(payloads.get('field_recall')?.passed).toBe(false)
-		})
-	})
-
-	describe('when a run filled no fields', () => {
-		it('should omit the precision score entirely', () => {
-			// GIVEN nothing filled, but fields were known
-			const payloads = byName(
-				scorePayloadsForRun(score({ fieldsExpected: 2, fieldsScored: 0 })),
-			)
-
-			// WHEN mapped — THEN there is no precision to report, but recall (0) is
-			expect(payloads.has('field_precision')).toBe(false)
-			expect(payloads.get('field_recall')).toMatchObject({ value: 0 })
-		})
-	})
-
-	describe('when the golden set specified no fields for the company', () => {
-		it('should omit the recall score', () => {
-			// GIVEN a company with no known fields to recover
-			const payloads = byName(scorePayloadsForRun(score({ fieldsExpected: 0 })))
-
-			// WHEN mapped — THEN recall is not reported
-			expect(payloads.has('field_recall')).toBe(false)
-		})
-	})
 })
 
 describe('evalSpanAttributes', () => {
@@ -407,87 +317,6 @@ describe('reporting a pass that held market requests', () => {
 			// that said nothing as a run that found nothing wrong
 			expect(attrs).not.toHaveProperty('eval.reported_missing')
 			expect(attrs).not.toHaveProperty('eval.reported_thought_answered')
-		})
-	})
-
-	describe('when a market run is turned into per-run scores', () => {
-		it('should score the list and leave out the questions it was never asked', () => {
-			// GIVEN a market request, which names no company to have reached
-			const payloads = byName(scorePayloadsForRun(marketScore()))
-
-			// WHEN mapped
-			// THEN the list is graded on what was wrong with it, and grounding is
-			// absent rather than scored nought — a market run cannot fail to reach a
-			// company nobody named
-			expect(payloads.get('organisation_kind_precision')).toMatchObject({
-				value: 39 / 62,
-				passed: false,
-			})
-			expect(payloads.get('request_coverage')).toMatchObject({
-				value: 0.2,
-				passed: false,
-			})
-			expect(payloads.get('not_duplicated')).toMatchObject({
-				value: 1 - 10 / 62,
-				passed: false,
-			})
-			expect(payloads.get('location_fill')).toMatchObject({ value: 25 / 62 })
-			expect(payloads.has('grounding')).toBe(false)
-			expect(payloads.has('not_wrong_company')).toBe(false)
-		})
-
-		it('should still score a clean list as passed', () => {
-			// GIVEN a market whose every row is a company, located, and unique
-			const payloads = byName(
-				scorePayloadsForRun(
-					marketScore({
-						rowsReturned: 10,
-						rowsRightKind: 10,
-						rowsLocated: 10,
-						rowsDuplicated: 0,
-						partsAnswered: 5,
-						reportedCoverage: null,
-					}),
-				),
-			)
-
-			// WHEN mapped — THEN every market metric is 1 and passed, the same
-			// direction as every other metric here
-			for (const name of [
-				'organisation_kind_precision',
-				'request_coverage',
-				'not_duplicated',
-				'location_fill',
-			]) {
-				expect(payloads.get(name)).toMatchObject({ value: 1, passed: true })
-			}
-		})
-	})
-
-	describe('when a market came back with no rows', () => {
-		it('should still report the coverage and leave out the per-row scores', () => {
-			// GIVEN a market request that returned nothing
-			const payloads = byName(
-				scorePayloadsForRun(
-					marketScore({
-						rowsReturned: 0,
-						rowsRightKind: 0,
-						rowsLocated: 0,
-						rowsDuplicated: 0,
-						partsAnswered: 0,
-						reportedCoverage: null,
-					}),
-				),
-			)
-
-			// WHEN mapped
-			// THEN "none of the five parts was answered" is a reading worth sending;
-			// the other three have nothing to divide by, so they are absent rather
-			// than a zero that reads as a quality collapse
-			expect(payloads.get('request_coverage')).toMatchObject({ value: 0 })
-			expect(payloads.has('organisation_kind_precision')).toBe(false)
-			expect(payloads.has('not_duplicated')).toBe(false)
-			expect(payloads.has('location_fill')).toBe(false)
 		})
 	})
 

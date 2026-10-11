@@ -57,10 +57,6 @@ const makeSchedule = (provider: string) =>
 		),
 	)
 
-export interface HttpHardenOptions {
-	readonly timeout?: Duration.Input
-}
-
 /**
  * Wrap one HTTP provider call with timeout + recoverable-only retry. Returns a
  * function so a provider builds it once (`const harden = hardenHttp('firecrawl')`)
@@ -72,11 +68,11 @@ export interface HttpHardenOptions {
  * an `Ex` passes straight through — never retried and never mislabeled a timeout.
  */
 export const hardenHttp =
-	(provider: string, opts?: HttpHardenOptions) =>
+	(provider: string) =>
 	<A, Ex, R>(
 		eff: Effect.Effect<A, ProviderError | Ex, R>,
 	): Effect.Effect<A, ProviderError | Ex, R> => {
-		const attempt = Effect.timeout(eff, opts?.timeout ?? DEFAULT_TIMEOUT).pipe(
+		const attempt = Effect.timeout(eff, DEFAULT_TIMEOUT).pipe(
 			Effect.mapError((err): ProviderError | Ex =>
 				Cause.isTimeoutError(err)
 					? new ProviderError({

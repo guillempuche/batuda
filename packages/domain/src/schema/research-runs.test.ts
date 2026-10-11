@@ -170,7 +170,6 @@ describe('isTerminalResearchEvent', () => {
 				'run.refining',
 				'tool.called',
 				'tool.result',
-				'provider.circuit_open',
 				'',
 			]) {
 				expect(isTerminalResearchEvent(event)).toBe(false)

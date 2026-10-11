@@ -392,7 +392,7 @@ export const nameWordsWithoutForms = (name: string): ReadonlyArray<string> =>
  * nothing there. Being loose is the safe direction for that question — the worst
  * it does is spot the company's name in one more place.
  */
-export const nameWithoutForms = (name: string): string =>
+const nameWithoutForms = (name: string): string =>
 	nameWordsWithoutForms(name).join('')
 
 /**

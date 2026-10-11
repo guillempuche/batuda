@@ -878,8 +878,8 @@ describe('dedupePeople', () => {
 // ── Discover orchestration (integration) ──
 // ContactDiscovery.discover writes an anchor research_runs row, resolves policy,
 // and meters paid spend, so it needs real Postgres (`pnpm cli services up` + the
-// research migrations) wired to the StubEnrichmentProvider / StubEmailVerifier /
-// MxResolver layers. Scaffolded as todo so the acceptance-criteria branches stay
+// research migrations) wired to the stub enrichment, verifier and MxResolver
+// instances. Scaffolded as todo so the acceptance-criteria branches stay
 // visible — each maps to a bullet in issue #140. Wire fixtures in the
 // integration harness.
 describe('ContactDiscovery.discover (integration)', () => {

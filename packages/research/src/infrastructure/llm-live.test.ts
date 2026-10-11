@@ -171,21 +171,6 @@ describe('the most a reply may write', () => {
 		})
 	})
 
-	describe('when a tier names a ceiling', () => {
-		it('should carry it on every slot of the tier', async () => {
-			// GIVEN a tier with a first and a second choice
-			const slots = slotsOf(
-				await read({
-					...AGENT_ON_GROQ,
-					RESEARCH_LLM_AGENT_PROVIDERS: 'groq,groq',
-				}),
-			)
-
-			// THEN both slots write no more than the tier's ceiling
-			expect(slots.map(slot => slot.maxOutputTokens)).toEqual([8192, 8192])
-		})
-	})
-
 	describe('when a tier runs on the stub', () => {
 		it('should ask for no ceiling, since the stub writes nothing', async () => {
 			// GIVEN every tier stubbed and no ceiling anywhere

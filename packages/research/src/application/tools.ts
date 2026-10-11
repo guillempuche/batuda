@@ -160,7 +160,7 @@ export const RegistryLookupTool = Tool.make('registry_lookup', {
 	failureMode: 'return',
 })
 
-export const DiscoverContactsTool = Tool.make('discover_contacts', {
+const DiscoverContactsTool = Tool.make('discover_contacts', {
 	description:
 		'Find decision-maker contacts for a company: guesses likely emails, MX-gates them, and pays to verify deliverability. Metered against this run. Returns ranked candidates, each with a deliverability verdict where an address was found, or {status:"no_reliable_contact"}. Pass domain:null for a company with no website — you then get names and job titles with no address, which is still worth having. Worth calling when reading the company\'s own pages turned up nobody with a title. Put the people it returns in the findings\' contacts list; to persist one, add a proposed_updates entry with operation:"create" carrying the contact and any channels it has.',
 	parameters: DiscoverContactsParams,

@@ -142,7 +142,7 @@ export const SourcedTitle = Schema.Struct({
 // a model fills reliably; the map every reader expects is made from it once the
 // reply is in. The words are required: a value with nothing behind it is what a
 // model writes from memory.
-export const AttributeEntry = Schema.Struct({
+const AttributeEntry = Schema.Struct({
 	key: Schema.String.annotate({
 		description: 'The attribute key exactly as listed in the prompt.',
 	}),

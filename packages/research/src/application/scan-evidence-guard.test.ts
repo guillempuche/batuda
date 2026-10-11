@@ -47,10 +47,6 @@ describe('guardScanEvidence', () => {
 			const result = guardScanEvidence('prospect_scan_v1', findings)
 			expect(namesOf(result.findings)).toEqual([])
 			expect(result.dropped).toBe(2)
-			expect(result.droppedNames).toEqual([
-				'WeldFab manufacturing',
-				'Machine & Tool Co.',
-			])
 		})
 	})
 

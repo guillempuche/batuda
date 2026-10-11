@@ -75,7 +75,7 @@ export const EXISTENCE_REASON_FIELD = 'existence_reason'
  * company, and a reader who cannot tell that from `no_own_site` reads a run that
  * never looked as a run that looked and came back empty.
  */
-export const EXISTENCE_REASONS = {
+const EXISTENCE_REASONS = {
 	/** Nothing usable named the company at all. */
 	no_sources: true,
 	/** Only one website named it, however many pages of it were read. */

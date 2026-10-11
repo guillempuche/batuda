@@ -27,7 +27,7 @@ scripts/research-eval.sh --env dev --golden eval/golden.json
 scripts/research-eval.sh --env dev --golden eval/golden-markets.json --schema prospect_scan_v1
 
 # Which candidate models support the two features the tiers need (tool-calling + strict JSON schema)?
-pnpm cli research probe --api-key <nebius-key>
+pnpm cli research probe   # reads the key from RESEARCH_LLM_AGENT_API_KEY; a key never goes on the command line
 ```
 
 The wrapper calls `pnpm cli research eval` and nothing else, so every flag below is still the CLI's own; reach for the command directly when you need a shape the wrapper does not pass through.
