@@ -4,6 +4,7 @@
  * Provides Anthropic-specific metadata fields for AI error types through module
  * augmentation, enabling typed access to Anthropic error details.
  *
+ * @stability unstable
  * @since 4.0.0
  */
 
@@ -18,6 +19,7 @@
  *
  * @see {@link AnthropicRateLimitMetadata} for rate-limit responses that also include parsed Anthropic rate-limit headers
  *
+ * @stability unstable
  * @category models
  * @since 4.0.0
  */
@@ -39,6 +41,7 @@ export type AnthropicErrorMetadata = {
  *
  * Extends base error metadata with rate limit-specific information from Anthropic's rate limit headers.
  *
+ * @stability unstable
  * @category models
  * @since 4.0.0
  */
@@ -69,7 +72,7 @@ export type AnthropicRateLimitMetadata = AnthropicErrorMetadata & {
   readonly tokensReset: string | null
 }
 
-declare module "effect/unstable/ai/AiError" {
+declare module "effect/ai/AiError" {
   /**
    * Anthropic metadata attached to `RateLimitError` values.
    *
@@ -77,7 +80,7 @@ declare module "effect/unstable/ai/AiError" {
    *
    * Includes request identifiers, Anthropic error types, and parsed request or token limit headers when the provider rejects a request due to rate limits.
    *
-   * @category configuration
+   * @category models
    * @since 4.0.0
    */
   export interface RateLimitErrorMetadata {
@@ -91,7 +94,7 @@ declare module "effect/unstable/ai/AiError" {
    *
    * Captures the Anthropic error type and request identifier for failures where the account or workspace has exhausted its available quota.
    *
-   * @category configuration
+   * @category models
    * @since 4.0.0
    */
   export interface QuotaExhaustedErrorMetadata {
@@ -105,7 +108,7 @@ declare module "effect/unstable/ai/AiError" {
    *
    * Preserves Anthropic error details for missing, invalid, or unauthorized API credentials while keeping the error in the shared AI error model.
    *
-   * @category configuration
+   * @category models
    * @since 4.0.0
    */
   export interface AuthenticationErrorMetadata {
@@ -119,7 +122,7 @@ declare module "effect/unstable/ai/AiError" {
    *
    * Records Anthropic error details returned when a request or response is rejected by Anthropic safety or content policy enforcement.
    *
-   * @category configuration
+   * @category models
    * @since 4.0.0
    */
   export interface ContentPolicyErrorMetadata {
@@ -133,7 +136,7 @@ declare module "effect/unstable/ai/AiError" {
    *
    * Provides the Anthropic error type and request identifier for malformed or unsupported requests rejected before model execution.
    *
-   * @category configuration
+   * @category models
    * @since 4.0.0
    */
   export interface InvalidRequestErrorMetadata {
@@ -147,7 +150,7 @@ declare module "effect/unstable/ai/AiError" {
    *
    * Preserves Anthropic request correlation data for provider-side failures that should be reported or investigated with Anthropic support.
    *
-   * @category configuration
+   * @category models
    * @since 4.0.0
    */
   export interface InternalProviderErrorMetadata {
@@ -161,7 +164,7 @@ declare module "effect/unstable/ai/AiError" {
    *
    * Describes Anthropic-specific context for responses that could not be decoded or interpreted as valid AI output.
    *
-   * @category configuration
+   * @category models
    * @since 4.0.0
    */
   export interface InvalidOutputErrorMetadata {
@@ -175,7 +178,7 @@ declare module "effect/unstable/ai/AiError" {
    *
    * Captures Anthropic error details for structured-output failures, including request correlation data useful when diagnosing schema-related responses.
    *
-   * @category configuration
+   * @category models
    * @since 4.0.0
    */
   export interface StructuredOutputErrorMetadata {
@@ -189,7 +192,7 @@ declare module "effect/unstable/ai/AiError" {
    *
    * Provides Anthropic error details for schemas that cannot be represented by or submitted to the Anthropic API.
    *
-   * @category configuration
+   * @category models
    * @since 4.0.0
    */
   export interface UnsupportedSchemaErrorMetadata {
@@ -203,7 +206,7 @@ declare module "effect/unstable/ai/AiError" {
    *
    * Retains the Anthropic error type and request identifier when a provider response cannot be classified as a more specific AI error.
    *
-   * @category configuration
+   * @category models
    * @since 4.0.0
    */
   export interface UnknownErrorMetadata {

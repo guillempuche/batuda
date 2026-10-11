@@ -1,7 +1,9 @@
 import * as internal from "@effect/opentelemetry/internal/metrics"
+import * as OtelMetrics from "@effect/opentelemetry/OtelMetrics"
 import { assert, describe, it } from "@effect/vitest"
 import { ValueType } from "@opentelemetry/api"
 import { resourceFromAttributes } from "@opentelemetry/resources"
+import { MetricReader } from "@opentelemetry/sdk-metrics"
 import * as Effect from "effect/Effect"
 import * as Metric from "effect/Metric"
 
@@ -336,4 +338,85 @@ describe("Metrics", () => {
         ]
       })
     }))
+
+  it.effect("reports the same delta to every registered reader", () =>
+    Effect.gen(function*() {
+      class Reader extends MetricReader {
+        protected onShutdown(): Promise<void> {
+          return Promise.resolve()
+        }
+        protected onForceFlush(): Promise<void> {
+          return Promise.resolve()
+        }
+      }
+
+      const services = yield* Effect.context<never>()
+      const producer = new internal.MetricProducerImpl(resourceFromAttributes({}), services, "delta")
+      const first = new Reader()
+      const second = new Reader()
+      yield* OtelMetrics.registerProducer(producer, () => [first, second])
+      yield* Metric.update(Metric.counter("requests", { incremental: true }), 1)
+
+      const firstResult = yield* Effect.promise(() => first.collect())
+      const secondResult = yield* Effect.promise(() => second.collect())
+      const firstValue = (firstResult.resourceMetrics.scopeMetrics[0]!.metrics[0] as any).dataPoints[0].value
+      const secondValue = (secondResult.resourceMetrics.scopeMetrics[0]!.metrics[0] as any).dataPoints[0].value
+      assert.deepStrictEqual([firstValue, secondValue], [1, 1])
+    }).pipe(Effect.provideService(Metric.MetricRegistry, new Map())))
+
+  it.effect.each(["delta", "cumulative"] as const)(
+    "histogram extrema with %s temporality",
+    (temporality) =>
+      Effect.gen(function*() {
+        const services = yield* Effect.context<never>()
+        const producer = new internal.MetricProducerImpl(resourceFromAttributes({}), services, temporality)
+        const histogram = Metric.histogram("latency", {
+          boundaries: Metric.linearBoundaries({ start: 0, width: 50, count: 3 })
+        })
+
+        yield* Metric.update(histogram, 1)
+        yield* Metric.update(histogram, 100)
+        const first = findMetric(yield* Effect.promise(() => producer.collect()), "latency").dataPoints[0].value
+        assert.deepStrictEqual(first, {
+          buckets: { boundaries: [50], counts: [1, 1] },
+          count: 2,
+          sum: 101,
+          min: 1,
+          max: 100
+        })
+
+        yield* Metric.update(histogram, 50)
+        yield* Metric.update(histogram, 60)
+        const second = findMetric(yield* Effect.promise(() => producer.collect()), "latency").dataPoints[0].value
+        assert.deepStrictEqual(
+          second,
+          temporality === "delta"
+            ? {
+              buckets: { boundaries: [50], counts: [1, 1] },
+              count: 2,
+              sum: 110
+            }
+            : {
+              buckets: { boundaries: [50], counts: [2, 2] },
+              count: 4,
+              sum: 211,
+              min: 1,
+              max: 100
+            }
+        )
+      }).pipe(Effect.provideService(Metric.MetricRegistry, new Map()))
+  )
+
+  it.effect("histogram buckets above the last custom boundary", () =>
+    Effect.gen(function*() {
+      const services = yield* Effect.context<never>()
+      const producer = new internal.MetricProducerImpl(resourceFromAttributes({}), services)
+      const histogram = Metric.histogram("latency", { boundaries: [10, 50, 100] })
+
+      yield* Metric.update(histogram, 25)
+      yield* Metric.update(histogram, 75)
+      yield* Metric.update(histogram, 500)
+      const value = findMetric(yield* Effect.promise(() => producer.collect()), "latency").dataPoints[0].value
+      assert.deepStrictEqual(value.buckets, { boundaries: [10, 50, 100], counts: [0, 1, 1, 1] })
+    }).pipe(Effect.provideService(Metric.MetricRegistry, new Map())))
 })

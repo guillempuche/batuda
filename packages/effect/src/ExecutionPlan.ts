@@ -7,10 +7,13 @@
  * order until the workflow succeeds or the plan is exhausted. This module also
  * supports merging plans and reading metadata for the active step and attempt.
  *
+ * @stability unstable
  * @since 3.16.0
  */
 import type { NonEmptyReadonlyArray } from "./Array.ts"
+import type * as Cause from "./Cause.ts"
 import * as Context from "./Context.ts"
+import type * as Duration from "./Duration.ts"
 import type * as Effect from "./Effect.ts"
 import { constant } from "./Function.ts"
 import * as effect from "./internal/effect.ts"
@@ -18,12 +21,13 @@ import * as Layer from "./Layer.ts"
 import type { Pipeable } from "./Pipeable.ts"
 import { pipeArguments } from "./Pipeable.ts"
 import * as Predicate from "./Predicate.ts"
-import type * as Schedule from "./Schedule.ts"
+import * as Schedule from "./Schedule.ts"
 
 /**
  * String literal type used as the runtime type identifier for `ExecutionPlan`
  * values.
  *
+ * @stability unstable
  * @category type IDs
  * @since 3.16.0
  */
@@ -33,6 +37,7 @@ export type TypeId = "~effect/ExecutionPlan"
  * Runtime type identifier attached to `ExecutionPlan` values and used by
  * `isExecutionPlan`.
  *
+ * @stability unstable
  * @category type IDs
  * @since 3.16.0
  */
@@ -56,6 +61,7 @@ export const TypeId: TypeId = "~effect/ExecutionPlan"
  * @see {@link make} for constructing execution plans that satisfy this guard
  * @see {@link TypeId} for the runtime marker checked by this guard
  *
+ * @stability unstable
  * @category guards
  * @since 3.16.0
  */
@@ -66,43 +72,23 @@ export const isExecutionPlan = (u: unknown): u is ExecutionPlan<any> => Predicat
  *
  * **Example** (Defining fallback execution steps)
  *
- * ```ts
- * import { Effect, ExecutionPlan, Schedule } from "effect"
- * import type { Layer } from "effect"
- * import type { LanguageModel } from "effect/unstable/ai"
- *
- * declare const layerBad: Layer.Layer<LanguageModel.LanguageModel>
- * declare const layerGood: Layer.Layer<LanguageModel.LanguageModel>
+ * ```ts import.meta.vitest
+ * import { Context, ExecutionPlan } from "effect"
  *
  * const ThePlan = ExecutionPlan.make(
  *   {
- *     // First try with the bad layer 2 times with a 3 second delay between attempts
- *     provide: layerBad,
- *     attempts: 2,
- *     schedule: Schedule.spaced(3000)
+ *     provide: Context.empty(),
+ *     attempts: 2
  *   },
- *   // Then try with the bad layer 3 times with a 1 second delay between attempts
  *   {
- *     provide: layerBad,
- *     attempts: 3,
- *     schedule: Schedule.spaced(1000)
- *   },
- *   // Finally try with the good layer.
- *   //
- *   // If `attempts` is omitted, the plan will only attempt once, unless a schedule is provided.
- *   {
- *     provide: layerGood
+ *     provide: Context.empty()
  *   }
  * )
  *
- * declare const effect: Effect.Effect<
- *   void,
- *   never,
- *   LanguageModel.LanguageModel
- * >
- * const withPlan: Effect.Effect<void> = Effect.withExecutionPlan(effect, ThePlan)
+ * ThePlan.steps.map((step) => step.attempts ?? 1) // => [2, 1]
  * ```
  *
+ * @stability unstable
  * @category models
  * @since 3.16.0
  */
@@ -123,7 +109,9 @@ export interface ExecutionPlan<
     readonly while?:
       | ((input: Config["input"]) => Effect.Effect<boolean, Config["error"], Config["requirements"]>)
       | undefined
-    readonly schedule?: Schedule.Schedule<any, Config["input"], Config["requirements"]> | undefined
+    readonly schedule?:
+      | Schedule.Schedule<any, Config["input"], Config["error"], Config["requirements"]>
+      | undefined
   }>
 
   /**
@@ -148,9 +136,10 @@ export interface ExecutionPlan<
  *
  * `provides` tracks services supplied by plan steps, `input` tracks the error
  * input consumed by schedules and `while` predicates, `error` tracks failures
- * from plan layers or predicates, and `requirements` tracks services needed to
- * build or run the plan.
+ * from plan layers, predicates, or schedules, and `requirements` tracks
+ * services needed to build or run the plan.
  *
+ * @stability unstable
  * @category models
  * @since 4.0.0
  */
@@ -166,43 +155,23 @@ export type ConfigBase = {
  *
  * **Example** (Creating an execution plan)
  *
- * ```ts
- * import { Effect, ExecutionPlan, Schedule } from "effect"
- * import type { Layer } from "effect"
- * import type { LanguageModel } from "effect/unstable/ai"
- *
- * declare const layerBad: Layer.Layer<LanguageModel.LanguageModel>
- * declare const layerGood: Layer.Layer<LanguageModel.LanguageModel>
+ * ```ts import.meta.vitest
+ * import { Context, ExecutionPlan } from "effect"
  *
  * const ThePlan = ExecutionPlan.make(
  *   {
- *     // First try with the bad layer 2 times with a 3 second delay between attempts
- *     provide: layerBad,
- *     attempts: 2,
- *     schedule: Schedule.spaced(3000)
+ *     provide: Context.empty(),
+ *     attempts: 2
  *   },
- *   // Then try with the bad layer 3 times with a 1 second delay between attempts
  *   {
- *     provide: layerBad,
- *     attempts: 3,
- *     schedule: Schedule.spaced(1000)
- *   },
- *   // Finally try with the good layer.
- *   //
- *   // If `attempts` is omitted, the plan will only attempt once, unless a schedule is provided.
- *   {
- *     provide: layerGood
+ *     provide: Context.empty()
  *   }
  * )
  *
- * declare const effect: Effect.Effect<
- *   void,
- *   never,
- *   LanguageModel.LanguageModel
- * >
- * const withPlan: Effect.Effect<void> = Effect.withExecutionPlan(effect, ThePlan)
+ * ThePlan.steps.length // => 2
  * ```
  *
+ * @stability unstable
  * @category constructors
  * @since 3.16.0
  */
@@ -211,17 +180,11 @@ export const make = <const Steps extends NonEmptyReadonlyArray<make.Step>>(
 ): ExecutionPlan<{
   provides: make.StepProvides<Steps>
   input: make.StepInput<Steps>
-  error:
-    | (Steps[number]["provide"] extends Context.Context<infer _P> | Layer.Layer<infer _P, infer E, infer _R> ? E
-      : never)
-    | (Steps[number]["while"] extends (input: infer _I) => Effect.Effect<infer _A, infer _E, infer _R> ? _E : never)
-  requirements:
-    | (Steps[number]["provide"] extends Layer.Layer<infer _A, infer _E, infer R> ? R : never)
-    | (Steps[number]["while"] extends (input: infer _I) => Effect.Effect<infer _A, infer _E, infer R> ? R : never)
-    | (Steps[number]["schedule"] extends Schedule.Schedule<infer _O, infer _I, infer R> ? R : never)
+  error: make.StepError<Steps[number]>
+  requirements: make.StepRequirements<Steps[number]>
 }> =>
   makeProto(steps.map((options, i) => {
-    if (options.attempts && options.attempts < 1) {
+    if (options.attempts !== undefined && options.attempts < 1) {
       throw new Error(`ExecutionPlan.make: step[${i}].attempts must be greater than 0`)
     }
     return {
@@ -241,6 +204,7 @@ export const make = <const Steps extends NonEmptyReadonlyArray<make.Step>>(
 /**
  * Namespace containing type helpers used by `ExecutionPlan.make`.
  *
+ * @stability unstable
  * @since 3.16.0
  */
 export declare namespace make {
@@ -260,8 +224,30 @@ export declare namespace make {
     readonly provide: Context.Context<any> | Context.Context<never> | Layer.Any
     readonly attempts?: number | undefined
     readonly while?: ((input: any) => boolean | Effect.Effect<boolean, any, any>) | undefined
-    readonly schedule?: Schedule.Schedule<any, any, any> | undefined
+    readonly schedule?: Schedule.Schedule<any, any, any, any> | undefined
   }
+
+  /**
+   * Computes the errors from a step's layer, predicate, and schedule.
+   *
+   * @category utility types
+   * @since 4.0.0
+   */
+  export type StepError<Step> =
+    | (Step extends { readonly provide: Layer.Layer<infer _A, infer E, infer _R> } ? E : never)
+    | (Step extends { readonly while?: (input: any) => infer Result } ? Effect.Error<Result> : never)
+    | (Step extends { readonly schedule?: infer S } ? Schedule.Error<S> : never)
+
+  /**
+   * Computes the services required by a step's layer, predicate, and schedule.
+   *
+   * @category utility types
+   * @since 4.0.0
+   */
+  export type StepRequirements<Step> =
+    | (Step extends { readonly provide: Layer.Layer<infer _A, infer _E, infer R> } ? R : never)
+    | (Step extends { readonly while?: (input: any) => infer Result } ? Effect.Services<Result> : never)
+    | (Step extends { readonly schedule?: infer S } ? Schedule.Env<S> : never)
 
   /**
    * Computes the intersection of services provided by a list of execution-plan
@@ -305,7 +291,7 @@ export declare namespace make {
       & Out
       & (
         & (Step extends { readonly while: (input: infer I) => infer _ } ? I : unknown)
-        & (Step extends { readonly schedule: Schedule.Schedule<infer _O, infer I, infer _R> } ? I : unknown)
+        & (Step extends { readonly schedule: Schedule.Schedule<infer _O, infer I, infer _E, infer _R> } ? I : unknown)
       )
     > :
     Out
@@ -329,6 +315,20 @@ const Proto: Omit<ExecutionPlan<any>, "steps"> = {
     return effect.contextWith((context: Context.Context<any>) =>
       effect.succeed(makeProto(self.steps.map((step) => ({
         ...step,
+        while: step.while
+          ? (input: any) => effect.provideContext(step.while!(input), context)
+          : undefined,
+        schedule: step.schedule
+          ? Schedule.fromStep(
+            effect.provideContext(
+              effect.map(
+                Schedule.toStep(step.schedule),
+                (next) => (now: number, input: any) => effect.provideContext(next(now, input), context)
+              ),
+              context
+            )
+          )
+          : undefined,
         provide: Layer.isLayer(step.provide)
           ? Layer.provide(step.provide, Layer.succeedContext(context))
           : step.provide
@@ -368,6 +368,7 @@ const makeProto = <Provides, In, PlanE, PlanR>(
  *
  * @see {@link make} for building a plan from individual steps instead of combining existing plans
  *
+ * @stability unstable
  * @category combining
  * @since 3.16.0
  */
@@ -388,6 +389,7 @@ export const merge = <const Plans extends NonEmptyReadonlyArray<ExecutionPlan<an
  * `attempt` is the current 1-based attempt number, and `stepIndex` is the
  * 0-based index of the plan step currently being evaluated.
  *
+ * @stability unstable
  * @category metadata
  * @since 4.0.0
  */
@@ -405,7 +407,8 @@ export interface Metadata {
  * Use to read the active plan step and attempt while code is running under an
  * execution plan.
  *
- * @category metadata
+ * @stability unstable
+ * @category services
  * @since 4.0.0
  */
 export const CurrentMetadata = Context.Reference<Metadata>("effect/ExecutionPlan/CurrentMetadata", {
@@ -414,3 +417,82 @@ export const CurrentMetadata = Context.Reference<Metadata>("effect/ExecutionPlan
     stepIndex: 0
   })
 })
+
+/**
+ * Lifecycle event emitted before an execution-plan attempt runs.
+ *
+ * **Details**
+ *
+ * `attempt` is the cumulative 1-based attempt number across all steps and
+ * matches `CurrentMetadata.attempt` for the same attempt. `stepAttempt` is the
+ * 1-based attempt number within the current step, and `stepIndex` is the
+ * 0-based index of the step being attempted.
+ *
+ * @stability unstable
+ * @category models
+ * @since 4.0.0
+ */
+export interface AttemptStart {
+  readonly _tag: "AttemptStart"
+  readonly attempt: number
+  readonly stepAttempt: number
+  readonly stepIndex: number
+}
+
+/**
+ * Lifecycle event emitted when an execution-plan attempt succeeds.
+ *
+ * **Details**
+ *
+ * A successful attempt completes the plan, so this is always the final event.
+ * `duration` is the elapsed time of the attempt.
+ *
+ * @stability unstable
+ * @category models
+ * @since 4.0.0
+ */
+export interface AttemptSuccess {
+  readonly _tag: "AttemptSuccess"
+  readonly attempt: number
+  readonly stepAttempt: number
+  readonly stepIndex: number
+  readonly duration: Duration.Duration
+}
+
+/**
+ * Lifecycle event emitted when an execution-plan attempt fails.
+ *
+ * **Details**
+ *
+ * `cause` holds the full failure cause, so defects and interruption are
+ * reported as well as expected errors. Whether the plan retries or fails over
+ * afterwards is decided by the step's `attempts`, `while`, and `schedule`; a
+ * following `AttemptStart` indicates another attempt was made.
+ *
+ * @stability unstable
+ * @category models
+ * @since 4.0.0
+ */
+export interface AttemptFailure<E> {
+  readonly _tag: "AttemptFailure"
+  readonly attempt: number
+  readonly stepAttempt: number
+  readonly stepIndex: number
+  readonly duration: Duration.Duration
+  readonly cause: Cause.Cause<E>
+}
+
+/**
+ * Union of the lifecycle events emitted while an execution plan runs.
+ *
+ * **Details**
+ *
+ * Every `AttemptStart` is followed by exactly one terminal event, either
+ * `AttemptSuccess` or `AttemptFailure`. An interrupted attempt emits
+ * `AttemptFailure` with the interruption cause.
+ *
+ * @stability unstable
+ * @category models
+ * @since 4.0.0
+ */
+export type Event<E> = AttemptStart | AttemptSuccess | AttemptFailure<E>

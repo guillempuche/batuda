@@ -4,11 +4,12 @@
  * accessor. Each provider creates its own Atom once, so different subtrees can
  * use the same scoped atom definition without sharing state.
  *
+ * @stability unstable
  * @since 4.0.0
  */
 "use client"
 
-import type * as Atom from "effect/unstable/reactivity/Atom"
+import type * as Atom from "effect/reactivity/Atom"
 import * as React from "react"
 
 /**
@@ -19,6 +20,7 @@ import * as React from "react"
  * Used as the computed property key and marker value stored on `ScopedAtom`
  * objects.
  *
+ * @stability unstable
  * @category type IDs
  * @since 4.0.0
  */
@@ -32,6 +34,7 @@ export type TypeId = "~@effect/atom-react/ScopedAtom"
  * Used as the computed property key and marker value stored on `ScopedAtom`
  * objects.
  *
+ * @stability unstable
  * @category type IDs
  * @since 4.0.0
  */
@@ -42,10 +45,11 @@ export const TypeId: TypeId = "~@effect/atom-react/ScopedAtom"
  *
  * **Example** (Providing and reading a scoped atom)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { make, useAtomValue } from "@effect/atom-react"
- * import { Atom } from "effect/unstable/reactivity"
+ * import { Atom } from "effect/reactivity"
  * import * as React from "react"
+ * import { renderToStaticMarkup } from "react-dom/server"
  *
  * const Counter = make(() => Atom.make(0))
  *
@@ -58,8 +62,11 @@ export const TypeId: TypeId = "~@effect/atom-react/ScopedAtom"
  * export function App() {
  *   return React.createElement(Counter.Provider, null, React.createElement(View))
  * }
+ *
+ * renderToStaticMarkup(React.createElement(App)) // => "<div>0</div>"
  * ```
  *
+ * @stability unstable
  * @category models
  * @since 4.0.0
  */
@@ -92,10 +99,11 @@ export interface ScopedAtom<A extends Atom.Atom<any>, Input = never> {
  *
  * **Example** (Creating a scoped atom with input)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { make, useAtomValue } from "@effect/atom-react"
- * import { Atom } from "effect/unstable/reactivity"
+ * import { Atom } from "effect/reactivity"
  * import * as React from "react"
+ * import { renderToStaticMarkup } from "react-dom/server"
  *
  * const User = make((name: string) => Atom.make(name))
  *
@@ -112,8 +120,11 @@ export interface ScopedAtom<A extends Atom.Atom<any>, Input = never> {
  *     React.createElement(UserName)
  *   )
  * }
+ *
+ * renderToStaticMarkup(React.createElement(App)) // => "<span>Ada</span>"
  * ```
  *
+ * @stability unstable
  * @category constructors
  * @since 4.0.0
  */

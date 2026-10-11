@@ -7,6 +7,7 @@
  * logger references, console routing helpers, built-in formatters, batching,
  * file logging, and layers for installing loggers.
  *
+ * @stability stable
  * @since 2.0.0
  */
 import * as Array from "./Array.ts"
@@ -42,25 +43,23 @@ const TypeId = "~effect/Logger"
  *
  * **Example** (Creating custom loggers)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { Effect, Logger } from "effect"
  *
- * // Create a custom logger that accepts unknown messages and returns void
+ * const messages: Array<string> = []
  * const stringLogger = Logger.make<unknown, void>((options) => {
- *   console.log(`[${options.logLevel}] ${options.message}`)
+ *   messages.push(`[${options.logLevel}] ${options.message}`)
  * })
  *
- * // Create a logger that accepts any message type and returns a formatted string
- * const formattedLogger = Logger.make<unknown, string>((options) =>
- *   `${options.date.toISOString()} [${options.logLevel}] ${options.message}`
- * )
- *
- * // Use the logger in an Effect program
  * const program = Effect.log("Hello World").pipe(
  *   Effect.provide(Logger.layer([stringLogger]))
  * )
+ *
+ * Effect.runSync(program)
+ * messages // => ["[Info] Hello World"]
  * ```
  *
+ * @stability stable
  * @category models
  * @since 2.0.0
  */
@@ -78,26 +77,27 @@ export interface Logger<in Message, out Output> extends Pipeable {
  *
  * **Example** (Accessing logger options)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { Effect, Logger } from "effect"
  *
- * // Options interface provides all logging context
+ * const outputs: Array<unknown> = []
  * const detailedLogger = Logger.make((options) => {
- *   const output = {
+ *   outputs.push({
  *     message: options.message,
  *     level: options.logLevel,
- *     timestamp: options.date.toISOString(),
- *     fiberId: options.fiber.id,
- *     hasCause: options.cause !== undefined
- *   }
- *   console.log(JSON.stringify(output))
+ *     hasCause: options.cause.reasons.length > 0
+ *   })
  * })
  *
  * const program = Effect.log("Processing request").pipe(
  *   Effect.provide(Logger.layer([detailedLogger]))
  * )
+ *
+ * Effect.runSync(program)
+ * outputs // => [{ message: ["Processing request"], level: "Info", hasCause: false }]
  * ```
  *
+ * @stability stable
  * @category options
  * @since 2.0.0
  */
@@ -114,18 +114,17 @@ export interface Options<out Message> {
  *
  * **Example** (Checking logger values)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { Logger } from "effect"
  *
- * const myLogger = Logger.make((options) => {
- *   console.log(options.message)
- * })
+ * const myLogger = Logger.make(() => undefined)
  *
- * console.log(Logger.isLogger(myLogger)) // true
- * console.log(Logger.isLogger("not a logger")) // false
- * console.log(Logger.isLogger({ log: () => {} })) // false
+ * Logger.isLogger(myLogger) // => true
+ * Logger.isLogger("not a logger") // => false
+ * Logger.isLogger({ log: () => {} }) // => false
  * ```
  *
+ * @stability stable
  * @category guards
  * @since 4.0.0
  */
@@ -142,26 +141,27 @@ export const isLogger = (u: unknown): u is Logger<unknown, unknown> => Predicate
  *
  * **Example** (Accessing current loggers)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { Effect, Logger } from "effect"
  *
- * // Access current loggers from fiber context
+ * const messages: Array<unknown> = []
+ * const customLogger = Logger.make((options) => {
+ *   messages.push(options.message)
+ * })
  * const program = Effect.gen(function*() {
  *   const currentLoggers = yield* Effect.service(Logger.CurrentLoggers)
- *   console.log(`Number of active loggers: ${currentLoggers.size}`)
- *
- *   // Add a custom logger to the set
- *   const customLogger = Logger.make((options) => {
- *     console.log(`Custom: ${options.message}`)
- *   })
- *
  *   yield* Effect.log("Hello from custom logger").pipe(
  *     Effect.provide(Logger.layer([customLogger]))
  *   )
+ *   return currentLoggers.has(Logger.defaultLogger)
  * })
+ *
+ * Effect.runSync(program) // => true
+ * messages // => [["Hello from custom logger"]]
  * ```
  *
- * @category references
+ * @stability stable
+ * @category services
  * @since 4.0.0
  */
 export const CurrentLoggers: Context.Reference<ReadonlySet<Logger<unknown, any>>> = effect.CurrentLoggers
@@ -184,7 +184,8 @@ export const CurrentLoggers: Context.Reference<ReadonlySet<Logger<unknown, any>>
  * @see {@link consolePretty} for the TTY-mode pretty console logger affected by this reference
  * @see {@link withConsoleError} for routing a specific formatter logger to `console.error`
  *
- * @category references
+ * @stability stable
+ * @category services
  * @since 4.0.0
  */
 export const LogToStderr: Context.Reference<boolean> = effect.LogToStderr
@@ -199,29 +200,27 @@ export const LogToStderr: Context.Reference<boolean> = effect.LogToStderr
  *
  * **Example** (Transforming logger output)
  *
- * ```ts
- * import { Logger } from "effect"
+ * ```ts import.meta.vitest
+ * import { Effect, Logger } from "effect"
  *
- * // Create a logger that outputs objects
+ * const outputs: Array<unknown> = []
  * const structuredLogger = Logger.make((options) => ({
- *   level: options.logLevel,
- *   message: options.message,
- *   timestamp: options.date.toISOString()
+ *   message: options.message
  * }))
- *
- * // Transform the output to JSON strings
- * const jsonStringLogger = Logger.map(
- *   structuredLogger,
- *   (output) => JSON.stringify(output)
- * )
  *
  * // Transform to uppercase messages
  * const uppercaseLogger = Logger.map(
  *   structuredLogger,
  *   (output) => ({ ...output, message: String(output.message).toUpperCase() })
  * )
+ *
+ * const collector = Logger.make((options) => outputs.push(uppercaseLogger.log(options)))
+ * const program = Effect.log("hello").pipe(Effect.provide(Logger.layer([collector])))
+ * Effect.runSync(program)
+ * outputs // => [{ message: "HELLO" }]
  * ```
  *
+ * @stability stable
  * @category mapping
  * @since 2.0.0
  */
@@ -248,22 +247,26 @@ export const map = dual<
  *
  * **Example** (Writing logger output with console.log)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { Effect, Logger } from "effect"
+ * import { TestConsole } from "effect/testing"
  *
  * // Create a custom formatter
  * const customFormatter = Logger.make((options) =>
- *   `[${options.date.toISOString()}] ${options.logLevel}: ${options.message}`
+ *   `${options.logLevel}: ${options.message}`
  * )
  *
- * // Route to console
  * const consoleLogger = Logger.withConsoleLog(customFormatter)
  *
- * const program = Effect.log("Hello World").pipe(
- *   Effect.provide(Logger.layer([consoleLogger]))
- * )
+ * const program = Effect.gen(function*() {
+ *   yield* Effect.log("Hello World").pipe(Effect.provide(Logger.layer([consoleLogger])))
+ *   return yield* TestConsole.logLines
+ * }).pipe(Effect.provide(TestConsole.layer))
+ *
+ * await Effect.runPromise(program) // => ["Info: Hello World"]
  * ```
  *
+ * @stability stable
  * @category logging
  * @since 2.0.0
  */
@@ -285,22 +288,26 @@ export const withConsoleLog = <Message, Output>(
  *
  * **Example** (Writing logger output with console.error)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { Effect, Logger } from "effect"
+ * import { TestConsole } from "effect/testing"
  *
  * // Create an error-specific formatter
  * const errorFormatter = Logger.make((options) =>
- *   `ERROR [${options.date.toISOString()}]: ${options.message}`
+ *   `ERROR: ${options.message}`
  * )
  *
- * // Route to console.error
  * const errorLogger = Logger.withConsoleError(errorFormatter)
  *
- * const program = Effect.logError("Database connection failed").pipe(
- *   Effect.provide(Logger.layer([errorLogger]))
- * )
+ * const program = Effect.gen(function*() {
+ *   yield* Effect.logError("Database connection failed").pipe(Effect.provide(Logger.layer([errorLogger])))
+ *   return yield* TestConsole.errorLines
+ * }).pipe(Effect.provide(TestConsole.layer))
+ *
+ * await Effect.runPromise(program) // => ["ERROR: Database connection failed"]
  * ```
  *
+ * @stability stable
  * @category logging
  * @since 2.0.0
  */
@@ -326,9 +333,15 @@ export const withConsoleError = <Message, Output>(
  *
  * **Example** (Writing logs with level-based console methods)
  *
- * ```ts
- * import { Effect, Logger } from "effect"
+ * ```ts import.meta.vitest
+ * import { Console, Effect, Logger } from "effect"
  *
+ * const messages: Array<ReadonlyArray<unknown>> = []
+ * const testConsole: Console.Console = Object.assign(Object.create(console), {
+ *   info: (message: unknown) => messages.push(["info", message]),
+ *   warn: (message: unknown) => messages.push(["warn", message]),
+ *   error: (message: unknown) => messages.push(["error", message])
+ * })
  * const formatter = Logger.make((options) =>
  *   `[${options.logLevel}] ${options.message}`
  * )
@@ -339,12 +352,17 @@ export const withConsoleError = <Message, Output>(
  *   yield* Effect.logInfo("Info message") // -> console.info
  *   yield* Effect.logWarning("Warning") // -> console.warn
  *   yield* Effect.logError("Error occurred") // -> console.error
- *   yield* Effect.logDebug("Debug info") // -> console.debug
- * }).pipe(
- *   Effect.provide(Logger.layer([leveledLogger]))
- * )
+ * }).pipe(Effect.provide(Logger.layer([leveledLogger])))
+ * Effect.runSync(Effect.provideService(program, Console.Console, testConsole))
+ * const expected = [
+ *   ["info", "[Info] Info message"],
+ *   ["warn", "[Warn] Warning"],
+ *   ["error", "[Error] Error occurred"]
+ * ]
+ * messages // => expected
  * ```
  *
+ * @stability stable
  * @category logging
  * @since 3.8.0
  */
@@ -405,7 +423,7 @@ const format = (
   const append = (label: string, value: string): string => " " + format(label, value)
 
   let out = format("timestamp", date.toISOString())
-  out += append("level", logLevel)
+  out += append("level", logLevel.toUpperCase())
   out += append("fiber", formatFiberId(fiber.id))
 
   const messages = Array.ensure(message)
@@ -441,36 +459,23 @@ const format = (
  *
  * **Example** (Creating loggers from functions)
  *
- * ```ts
- * import { Effect, Logger, References } from "effect"
+ * ```ts import.meta.vitest
+ * import { Effect, Logger } from "effect"
  *
- * // Simple text logger
+ * const outputs: Array<string> = []
  * const textLogger = Logger.make((options) =>
- *   `${options.date.toISOString()} [${options.logLevel}] ${options.message}`
+ *   `${options.logLevel}: ${options.message}`
  * )
- *
- * // Structured object logger
- * const objectLogger = Logger.make((options) => ({
- *   timestamp: options.date.toISOString(),
- *   level: options.logLevel,
- *   message: options.message,
- *   fiberId: options.fiber.id,
- *   annotations: options.fiber.getRef(References.CurrentLogAnnotations)
- * }))
- *
- * // Custom filtering logger
- * const filteredLogger = Logger.make((options) => {
- *   if (options.logLevel === "Debug") {
- *     return // Skip debug messages
- *   }
- *   return `${options.logLevel}: ${options.message}`
- * })
+ * const collector = Logger.make((options) => outputs.push(textLogger.log(options)))
  *
  * const program = Effect.log("Hello World").pipe(
- *   Effect.provide(Logger.layer([textLogger]))
+ *   Effect.provide(Logger.layer([collector]))
  * )
+ * Effect.runSync(program)
+ * outputs // => ["Info: Hello World"]
  * ```
  *
+ * @stability stable
  * @category constructors
  * @since 2.0.0
  */
@@ -483,27 +488,13 @@ export const make: <Message, Output>(
  *
  * **Example** (Referencing the default logger)
  *
- * ```ts
- * import { Effect, Logger } from "effect"
+ * ```ts import.meta.vitest
+ * import { Logger } from "effect"
  *
- * // Use the default logger (automatically used by Effect runtime)
- * const program = Effect.gen(function*() {
- *   yield* Effect.log("This uses the default logger")
- *   yield* Effect.logInfo("Info message")
- *   yield* Effect.logError("Error message")
- * })
- *
- * // Explicitly use the default logger
- * const withDefaultLogger = Effect.log("Explicit default").pipe(
- *   Effect.provide(Logger.layer([Logger.defaultLogger]))
- * )
- *
- * // Compare with custom logger
- * const customLogger = Logger.make((options) => {
- *   console.log(`CUSTOM: ${options.message}`)
- * })
+ * Logger.isLogger(Logger.defaultLogger) // => true
  * ```
  *
+ * @stability stable
  * @category constructors
  * @since 2.0.0
  */
@@ -519,26 +510,27 @@ export const defaultLogger: Logger<unknown, void> = effect.defaultLogger
  *
  * **Example** (Formatting logs as simple strings)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { Effect, Logger } from "effect"
+ * import { TestConsole } from "effect/testing"
  *
  * // Use the simple format logger
- * const simpleLoggerProgram = Effect.log("Hello Simple Format").pipe(
- *   Effect.provide(Logger.layer([Logger.formatSimple]))
+ * const stableSimple = Logger.map(Logger.formatSimple, (output) =>
+ *   output
+ *     .replace(/timestamp=\S+ /, "")
+ *     .replace(/fiber=#\d+ /, "")
  * )
- *
- * // Combine with console output
- * const consoleSimpleLogger = Logger.withConsoleLog(Logger.formatSimple)
- *
  * const program = Effect.gen(function*() {
- *   yield* Effect.log("Application started")
- *   yield* Effect.logInfo("Processing data")
- *   yield* Effect.logWarning("Memory usage high")
- * }).pipe(
- *   Effect.provide(Logger.layer([consoleSimpleLogger]))
- * )
+ *   yield* Effect.log("Application started").pipe(
+ *     Effect.provide(Logger.layer([Logger.withConsoleLog(stableSimple)]))
+ *   )
+ *   return yield* TestConsole.logLines
+ * }).pipe(Effect.provide(TestConsole.layer))
+ *
+ * await Effect.runPromise(program) // => ["level=INFO message=\"Application started\""]
  * ```
  *
+ * @stability stable
  * @category constructors
  * @since 4.0.0
  */
@@ -555,29 +547,26 @@ export const formatSimple = effect.loggerMake(format(escapeDoubleQuotes))
  *
  * **Example** (Formatting logs as logfmt)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { Effect, Logger } from "effect"
+ * import { TestConsole } from "effect/testing"
  *
- * // Use the logfmt format logger
- * const logfmtLoggerProgram = Effect.log("Hello LogFmt Format").pipe(
- *   Effect.provide(Logger.layer([Logger.formatLogFmt]))
+ * const stableLogFmt = Logger.map(Logger.formatLogFmt, (output) =>
+ *   output
+ *     .replace(/timestamp=\S+ /, "")
+ *     .replace(/fiber=#\d+ /, "")
  * )
+ * const program = Effect.gen(function*() {
+ *   yield* Effect.log("User login").pipe(
+ *     Effect.provide(Logger.layer([Logger.withConsoleLog(stableLogFmt)]))
+ *   )
+ *   return yield* TestConsole.logLines
+ * }).pipe(Effect.provide(TestConsole.layer))
  *
- * // Perfect for structured logging systems
- * const structuredProgram = Effect.gen(function*() {
- *   yield* Effect.log("User login", { userId: 123, method: "OAuth" })
- *   yield* Effect.logInfo("Request processed", {
- *     duration: 45,
- *     status: "success"
- *   })
- * }).pipe(
- *   Effect.provide(Logger.layer([Logger.withConsoleLog(Logger.formatLogFmt)]))
- * )
- *
- * // Good for log aggregation systems like Splunk, ELK
- * const productionLogger = Logger.formatLogFmt
+ * await Effect.runPromise(program) // => ["level=INFO message=\"User login\""]
  * ```
  *
+ * @stability stable
  * @category constructors
  * @since 4.0.0
  */
@@ -595,32 +584,25 @@ export const formatLogFmt = effect.loggerMake(format(JSON.stringify, 0))
  *
  * **Example** (Formatting logs as structured objects)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { Effect, Logger } from "effect"
+ * import { TestConsole } from "effect/testing"
  *
- * // Use the structured format logger
- * const structuredLoggerProgram = Effect.log("Hello Structured Format").pipe(
- *   Effect.provide(Logger.layer([Logger.formatStructured]))
- * )
+ * const stableStructured = Logger.map(Logger.formatStructured, (output) => ({
+ *   message: output.message,
+ *   level: output.level
+ * }))
+ * const program = Effect.gen(function*() {
+ *   yield* Effect.log("User action").pipe(
+ *     Effect.provide(Logger.layer([Logger.withConsoleLog(stableStructured)]))
+ *   )
+ *   return yield* TestConsole.logLines
+ * }).pipe(Effect.provide(TestConsole.layer))
  *
- * // Perfect for JSON processing and analytics
- * const analyticsProgram = Effect.gen(function*() {
- *   yield* Effect.log("User action", { action: "click", element: "button" })
- *   yield* Effect.logInfo("API call", { endpoint: "/users", duration: 150 })
- * }).pipe(
- *   Effect.annotateLogs("sessionId", "abc123"),
- *   Effect.withLogSpan("request"),
- *   Effect.provide(Logger.layer([Logger.formatStructured]))
- * )
- *
- * // Process structured output
- * const processingLogger = Logger.map(Logger.formatStructured, (output) => {
- *   // Process the structured object
- *   const enhanced = { ...output, processed: true }
- *   return enhanced
- * })
+ * await Effect.runPromise(program) // => [{ message: "User action", level: "INFO" }]
  * ```
  *
+ * @stability stable
  * @category constructors
  * @since 4.0.0
  */
@@ -673,37 +655,25 @@ export const formatStructured: Logger<unknown, {
  *
  * **Example** (Formatting logs as JSON)
  *
- * ```ts
- * import { Effect, Logger } from "effect"
+ * ```ts import.meta.vitest
+ * import { Effect, Formatter, Logger } from "effect"
+ * import { TestConsole } from "effect/testing"
  *
- * // Use the JSON format logger
- * const jsonLoggerProgram = Effect.log("Hello JSON Format").pipe(
- *   Effect.provide(Logger.layer([Logger.formatJson]))
- * )
+ * const stableJson = Logger.map(Logger.formatJson, (json) => {
+ *   const output = JSON.parse(json)
+ *   return Formatter.formatJson({ message: output.message, level: output.level })
+ * })
+ * const program = Effect.gen(function*() {
+ *   yield* Effect.log("Server started").pipe(
+ *     Effect.provide(Logger.layer([Logger.withConsoleLog(stableJson)]))
+ *   )
+ *   return yield* TestConsole.logLines
+ * }).pipe(Effect.provide(TestConsole.layer))
  *
- * // Perfect for log aggregation and processing systems
- * const productionProgram = Effect.gen(function*() {
- *   yield* Effect.log("Server started", { port: 3000, env: "production" })
- *   yield* Effect.logInfo("Request received", {
- *     method: "GET",
- *     path: "/api/users"
- *   })
- *   yield* Effect.logError("Database error", { error: "Connection timeout" })
- * }).pipe(
- *   Effect.annotateLogs("service", "api-server"),
- *   Effect.withLogSpan("request-processing"),
- *   Effect.provide(Logger.layer([Logger.formatJson]))
- * )
- *
- * // Adapt the JSON string before giving it to an output sink
- * const envelopedJsonLogger = Logger.map(
- *   Logger.formatJson,
- *   (jsonString) => `{"service":"api-server","entry":${jsonString}}`
- * )
- *
- * const envelopedConsoleLogger = Logger.withConsoleLog(envelopedJsonLogger)
+ * await Effect.runPromise(program) // => ["{\"message\":\"Server started\",\"level\":\"INFO\"}"]
  * ```
  *
+ * @stability stable
  * @category constructors
  * @since 4.0.0
  */
@@ -720,45 +690,29 @@ export const formatJson = map(formatStructured, Formatter.formatJson)
  *
  * **Example** (Batching logger output)
  *
- * ```ts
- * import { Duration, Effect, Logger } from "effect"
+ * ```ts import.meta.vitest
+ * import { Effect, Logger } from "effect"
  *
- * // Create a batched logger that flushes every 5 seconds
- * const batchedLogger = Logger.batched(Logger.formatJson, {
- *   window: Duration.seconds(5),
+ * const flushed: Array<ReadonlyArray<string>> = []
+ * const messageLogger = Logger.make((options) => String(options.message))
+ * const batchedLogger = Logger.batched(messageLogger, {
+ *   window: "1 hour",
  *   flush: (messages) =>
  *     Effect.sync(() => {
- *       console.log(`Flushing ${messages.length} log entries:`)
- *       messages.forEach((msg, i) => console.log(`${i + 1}. ${msg}`))
+ *       flushed.push(messages)
  *     })
  * })
  *
- * const program = Effect.gen(function*() {
+ * const program = Effect.scoped(Effect.gen(function*() {
  *   const logger = yield* batchedLogger
- *
- *   yield* Effect.provide(
- *     Effect.all([
- *       Effect.log("Event 1"),
- *       Effect.log("Event 2"),
- *       Effect.log("Event 3"),
- *       Effect.sleep(Duration.seconds(6)), // Trigger flush
- *       Effect.log("Event 4")
- *     ]),
- *     Logger.layer([logger])
- *   )
- * })
- *
- * // Remote batch logging example
- * const remoteBatchLogger = Logger.batched(Logger.formatStructured, {
- *   window: Duration.seconds(10),
- *   flush: (entries) =>
- *     Effect.sync(() => {
- *       // Send batch to remote logging service
- *       console.log(`Sending ${entries.length} log entries to remote service`)
- *     })
- * })
+ *   yield* Effect.log("Event 1").pipe(Effect.provide(Logger.layer([logger])))
+ *   yield* Effect.log("Event 2").pipe(Effect.provide(Logger.layer([logger])))
+ * }))
+ * await Effect.runPromise(program)
+ * flushed // => [["Event 1", "Event 2"]]
  * ```
  *
+ * @stability stable
  * @category constructors
  * @since 2.0.0
  */
@@ -783,16 +737,16 @@ export const batched = dual<
     readonly flush: (messages: Array<NoInfer<Output>>) => Effect.Effect<void>
   }
 ): Effect.Effect<Logger<Message, void>, never, Scope.Scope> =>
-  effect.flatMap(effect.scope, (scope) => {
+  effect.suspend(() => {
     let buffer: Array<Output> = []
-    const flush = effect.suspend(() => {
+    const flush = effect.uninterruptible(effect.suspend(() => {
       if (buffer.length === 0) {
         return effect.void
       }
       const arr = buffer
       buffer = []
       return options.flush(arr)
-    })
+    }))
 
     return effect.uninterruptibleMask((restore) =>
       restore(
@@ -802,8 +756,12 @@ export const batched = dual<
         )
       ).pipe(
         effect.forkDetach,
-        effect.flatMap((fiber) => effect.scopeAddFinalizerExit(scope, () => effect.fiberInterrupt(fiber))),
-        effect.andThen(effect.addFinalizer(() => flush)),
+        effect.flatMap((fiber) =>
+          effect.addFinalizer(() =>
+            // Wait for any in-flight flush before draining the remaining buffer.
+            effect.andThen(effect.fiberInterrupt(fiber), flush)
+          )
+        ),
         effect.as(
           effect.loggerMake((options) => {
             buffer.push(self.log(options))
@@ -815,7 +773,9 @@ export const batched = dual<
 
 /**
  * A `Logger` which outputs logs in a "pretty" format and writes them to the
- * console.
+ * console. Chooses between tty and browser implementation. If the runtime
+ * platform is known and fixed, prefer {@link consolePrettyBrowser} or
+ * {@link consolePrettyTty}.
  *
  * **Details**
  *
@@ -825,48 +785,138 @@ export const batched = dual<
  *
  * **Example** (Logging with pretty console output)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { Effect, Logger } from "effect"
  *
- * // Use the pretty console logger with default settings
- * const basicPretty = Effect.log("Hello Pretty Format").pipe(
- *   Effect.provide(Logger.layer([Logger.consolePretty()]))
+ * const prettyLogger = Logger.layer([Logger.consolePretty()])
+ *
+ * Effect.log("hello").pipe(
+ *   Effect.withLogSpan('label'),
+ *   Effect.annotateLogs('key', 'value'),
+ *   Effect.provide(prettyLogger),
+ *   Effect.runSync
  * )
- *
- * // Configure pretty logger options
- * const customPretty = Logger.consolePretty({
- *   colors: true,
- *   stderr: false,
- *   mode: "tty",
- *   formatDate: (date) => date.toLocaleTimeString()
- * })
- *
- * // Perfect for development environment
- * const developmentProgram = Effect.gen(function*() {
- *   yield* Effect.log("Application starting")
- *   yield* Effect.logInfo("Database connected")
- *   yield* Effect.logWarning("High memory usage detected")
- * }).pipe(
- *   Effect.annotateLogs("environment", "development"),
- *   Effect.withLogSpan("startup"),
- *   Effect.provide(Logger.layer([customPretty]))
- * )
- *
- * // Disable colors for CI/CD environments
- * const ciLogger = Logger.consolePretty({ colors: false })
  * ```
  *
+ * **Example** (Logging with console.error, when the environment has TTY)
+ *
+ * ```ts import.meta.vitest
+ * import { Effect, Layer, Logger } from "effect"
+ *
+ * const prettyLoggerLayer = Layer.merge(
+ *   Logger.layer([Logger.consolePretty()]),
+ *   Layer.succeed(Logger.LogToStderr, true)
+ * )
+ *
+ * Effect.log('hello').pipe(
+ *   Effect.provide(prettyLoggerLayer),
+ *   Effect.runSync
+ * )
+ * ```
+ *
+ * @see {@link consolePrettyBrowser} for browser-specific implementation
+ * @see {@link consolePrettyTty} for the TTY-mode implementation
+ * @stability stable
  * @category constructors
  * @since 4.0.0
  */
 export const consolePretty: (
   options?: {
     readonly colors?: "auto" | boolean | undefined
-    readonly stderr?: boolean | undefined
     readonly formatDate?: ((date: Date) => string) | undefined
     readonly mode?: "browser" | "tty" | "auto" | undefined
   }
 ) => Logger<unknown, void> = effect.consolePretty
+
+/**
+ * A `Logger` which outputs logs in a "pretty" format and writes them to the
+ * console. Intended to be used on platforms with a browser console.
+ *
+ * **Details**
+ *
+ * For example, pretty output can render as
+ * `[09:37:17.579] INFO (#1) label=0ms: hello` followed by an annotation line
+ * such as `key: value`.
+ *
+ * **Example** (Logging with pretty console output)
+ *
+ * ```ts import.meta.vitest
+ * import { Effect, Logger } from "effect"
+ *
+ * const prettyLogger = Logger.layer([Logger.consolePrettyBrowser()])
+ *
+ * Effect.log("hello").pipe(
+ *   Effect.withLogSpan('label'),
+ *   Effect.annotateLogs('key', 'value'),
+ *   Effect.provide(prettyLogger),
+ *   Effect.runSync
+ * )
+ * ```
+ *
+ * @see {@link consolePretty} for the platform-independent implementation
+ * @stability stable
+ * @category constructors
+ * @since 4.0.0
+ */
+export const consolePrettyBrowser: (
+  options?: {
+    readonly colors?: boolean | undefined
+    readonly formatDate?: ((date: Date) => string) | undefined
+  }
+) => Logger<unknown, void> = effect.prettyLoggerBrowser
+
+/**
+ * A `Logger` which outputs logs in a "pretty" format and writes them to the
+ * console. Intended to be used on platforms with tty console.
+ *
+ * **Details**
+ *
+ * For example, pretty output can render as
+ * `[09:37:17.579] INFO (#1) label=0ms: hello` followed by an annotation line
+ * such as `key: value`.
+ *
+ * **Example** (Logging with pretty console output)
+ *
+ * ```ts import.meta.vitest
+ * import { Effect, Logger } from "effect"
+ *
+ * const prettyLogger = Logger.layer([Logger.consolePrettyTty()])
+ *
+ * Effect.log("hello").pipe(
+ *   Effect.withLogSpan('label'),
+ *   Effect.annotateLogs('key', 'value'),
+ *   Effect.provide(prettyLogger),
+ *   Effect.runSync
+ * )
+ * ```
+ *
+ * **Example** (Logging with console.error)
+ *
+ * ```ts import.meta.vitest
+ * import { Effect, Layer, Logger } from "effect"
+ *
+ * const prettyLoggerLayer = Layer.merge(
+ *   Logger.layer([Logger.consolePrettyTty()]),
+ *   Layer.succeed(Logger.LogToStderr, true)
+ * )
+ *
+ * Effect.log('hello').pipe(
+ *   Effect.provide(prettyLoggerLayer),
+ *   Effect.runSync
+ * )
+ * ```
+ *
+ * @see {@link consolePretty} for the platform-independent implementation
+ * @stability stable
+ * @category constructors
+ * @since 4.0.0
+ */
+export const consolePrettyTty: (
+  options?: {
+    readonly colors?: boolean | undefined
+    readonly formatDate?: ((date: Date) => string) | undefined
+  }
+) => Logger<unknown, void> = effect.prettyLoggerTty
 
 /**
  * A `Logger` which outputs logs using the [logfmt](https://brandur.org/logfmt)
@@ -879,35 +929,13 @@ export const consolePretty: (
  *
  * **Example** (Logging logfmt output to the console)
  *
- * ```ts
- * import { Effect, Logger } from "effect"
+ * ```ts import.meta.vitest
+ * import { Logger } from "effect"
  *
- * // Use the console logfmt logger
- * const logfmtProgram = Effect.log("Hello LogFmt Console").pipe(
- *   Effect.provide(Logger.layer([Logger.consoleLogFmt]))
- * )
- *
- * // Great for production environments
- * const productionProgram = Effect.gen(function*() {
- *   yield* Effect.log("Server started", { port: 8080, version: "1.0.0" })
- *   yield* Effect.logInfo("Request processed", { userId: 123, duration: 45 })
- *   yield* Effect.logError("Validation failed", {
- *     field: "email",
- *     value: "invalid"
- *   })
- * }).pipe(
- *   Effect.annotateLogs("service", "api"),
- *   Effect.withLogSpan("request-handler"),
- *   Effect.provide(Logger.layer([Logger.consoleLogFmt]))
- * )
- *
- * // Combine with other loggers
- * const multiLoggerLive = Logger.layer([
- *   Logger.consoleLogFmt,
- *   Logger.consolePretty()
- * ])
+ * Logger.isLogger(Logger.consoleLogFmt) // => true
  * ```
  *
+ * @stability stable
  * @category constructors
  * @since 4.0.0
  */
@@ -927,43 +955,13 @@ export const consoleLogFmt: Logger<unknown, void> = withConsoleLog(formatLogFmt)
  *
  * **Example** (Logging structured output to the console)
  *
- * ```ts
- * import { Effect, Logger } from "effect"
+ * ```ts import.meta.vitest
+ * import { Logger } from "effect"
  *
- * // Use the console structured logger
- * const structuredProgram = Effect.log("Hello Structured Console").pipe(
- *   Effect.provide(Logger.layer([Logger.consoleStructured]))
- * )
- *
- * // Perfect for development debugging
- * const debugProgram = Effect.gen(function*() {
- *   yield* Effect.log("User event", {
- *     userId: 123,
- *     action: "login",
- *     ip: "192.168.1.1"
- *   })
- *   yield* Effect.logInfo("API call", {
- *     endpoint: "/users",
- *     method: "GET",
- *     duration: 120
- *   })
- * }).pipe(
- *   Effect.annotateLogs("requestId", "req-123"),
- *   Effect.withLogSpan("authentication"),
- *   Effect.provide(Logger.layer([Logger.consoleStructured]))
- * )
- *
- * // Easy to parse and inspect object structure
- * const inspectionProgram = Effect.gen(function*() {
- *   yield* Effect.log("Complex data", {
- *     user: { id: 1, name: "John" },
- *     metadata: { source: "api", version: 2 }
- *   })
- * }).pipe(
- *   Effect.provide(Logger.layer([Logger.consoleStructured]))
- * )
+ * Logger.isLogger(Logger.consoleStructured) // => true
  * ```
  *
+ * @stability stable
  * @category constructors
  * @since 4.0.0
  */
@@ -981,48 +979,13 @@ export const consoleStructured: Logger<unknown, void> = withConsoleLog(formatStr
  *
  * **Example** (Logging JSON output to the console)
  *
- * ```ts
- * import { Effect, Logger } from "effect"
+ * ```ts import.meta.vitest
+ * import { Logger } from "effect"
  *
- * // Use the console JSON logger
- * const jsonProgram = Effect.log("Hello JSON Console").pipe(
- *   Effect.provide(Logger.layer([Logger.consoleJson]))
- * )
- *
- * // Perfect for production logging and log aggregation
- * const productionProgram = Effect.gen(function*() {
- *   yield* Effect.log("Server started", { port: 3000, env: "production" })
- *   yield* Effect.logInfo("Request", {
- *     method: "POST",
- *     url: "/api/users",
- *     body: { name: "Alice" }
- *   })
- *   yield* Effect.logError("Database error", {
- *     error: "Connection timeout",
- *     retryCount: 3
- *   })
- * }).pipe(
- *   Effect.annotateLogs("service", "user-api"),
- *   Effect.annotateLogs("version", "1.2.3"),
- *   Effect.withLogSpan("request-processing"),
- *   Effect.provide(Logger.layer([Logger.consoleJson]))
- * )
- *
- * // Easy to pipe to log aggregation services
- * const productionSetup = Logger.layer([
- *   Logger.consoleJson, // For stdout JSON logs
- *   Logger.consolePretty() // For local debugging
- * ])
- *
- * // Ideal for containerized environments (Docker, Kubernetes)
- * const containerProgram = Effect.log("Container ready", {
- *   containerId: "abc123",
- *   image: "myapp:latest"
- * }).pipe(
- *   Effect.provide(Logger.layer([Logger.consoleJson]))
- * )
+ * Logger.isLogger(Logger.consoleJson) // => true
  * ```
  *
+ * @stability stable
  * @category constructors
  * @since 4.0.0
  */
@@ -1043,42 +1006,17 @@ export const consoleJson: Logger<unknown, void> = withConsoleLog(formatJson)
  *
  * **Example** (Recording logs as trace span events)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { Effect, Logger } from "effect"
  *
- * // Tracer logger is included by default - logs automatically become span events
- * const defaultProgram = Effect.gen(function*() {
- *   yield* Effect.log("This automatically becomes a span event")
- *   yield* Effect.logInfo("Processing data")
- * })
- *
- * // Explicitly combine tracer logger with other loggers
- * const observabilityProgram = Effect.gen(function*() {
- *   yield* Effect.log("Operation started")
- *   yield* Effect.logInfo("Processing data")
- *   yield* Effect.logError("Error occurred")
- * }).pipe(
- *   Effect.withLogSpan("data-processing"),
- *   Effect.provide(Logger.layer([
- *     Logger.tracerLogger,
- *     Logger.consoleJson
- *   ]))
- * )
- *
- * // Perfect for correlating logs with traces in distributed systems
- * const distributedProgram = Effect.gen(function*() {
- *   yield* Effect.log("Step 1: Fetching user data")
- *   yield* Effect.sleep("100 millis")
- *   yield* Effect.log("Step 2: Processing payment")
- *   yield* Effect.sleep("200 millis")
- *   yield* Effect.log("Step 3: Sending confirmation")
- * }).pipe(
- *   Effect.withLogSpan("payment-workflow"),
- *   Effect.annotateLogs("userId", "user-123"),
+ * const program = Effect.log("span event").pipe(
+ *   Effect.withSpan("operation"),
  *   Effect.provide(Logger.layer([Logger.tracerLogger]))
  * )
+ * Effect.runSync(program)
  * ```
  *
+ * @stability stable
  * @category constructors
  * @since 2.0.0
  */
@@ -1095,37 +1033,24 @@ export const tracerLogger: Logger<unknown, void> = effect.tracerLogger
  *
  * **Example** (Providing logger layers)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { Effect, Logger } from "effect"
  *
- * // Single logger layer
- * const JsonLoggerLive = Logger.layer([Logger.consoleJson])
- *
- * // Multiple loggers layer
- * const MultiLoggerLive = Logger.layer([
- *   Logger.consoleJson,
- *   Logger.consolePretty(),
- *   Logger.formatStructured
- * ])
- *
- * // Merge with existing loggers
- * const AdditionalLoggerLive = Logger.layer(
- *   [Logger.consoleJson],
- *   { mergeWithExisting: true }
- * )
- *
- * // Using multiple logger formats
- * const jsonLogger = Logger.consoleJson
- * const prettyLogger = Logger.consolePretty()
- *
- * const CustomLoggerLive = Logger.layer([jsonLogger, prettyLogger])
+ * const messages: Array<unknown> = []
+ * const customLogger = Logger.make((options) => {
+ *   messages.push(options.message)
+ * })
+ * const CustomLoggerLayer = Logger.layer([customLogger])
  *
  * const program = Effect.log("Application started").pipe(
- *   Effect.provide(CustomLoggerLive)
+ *   Effect.provide(CustomLoggerLayer)
  * )
+ * Effect.runSync(program)
+ * messages // => [["Application started"]]
  * ```
  *
- * @category context
+ * @stability stable
+ * @category layers
  * @since 4.0.0
  */
 export const layer = <
@@ -1163,91 +1088,58 @@ export const layer = <
  *
  * **Example** (Writing JSON logs to a file)
  *
- * ```ts
- * import { Effect, Layer, Logger } from "effect"
- * import { NodeFileSystem, NodeRuntime } from "@effect/platform-node"
+ * ```ts import.meta.vitest
+ * import { Effect, FileSystem, Logger } from "effect"
  *
- * const fileLogger = Logger.formatJson.pipe(
- *   Logger.toFile("/tmp/log.txt")
- * )
- * const LoggerLive = Logger.layer([fileLogger]).pipe(
- *   Layer.provide(NodeFileSystem.layer)
- * )
+ * const writes: Array<string> = []
+ * const file = {
+ *   writeAll: (buffer: Uint8Array) => Effect.sync(() => {
+ *     writes.push(new TextDecoder().decode(buffer).trim())
+ *   })
+ * } as unknown as FileSystem.File
+ * const fileSystem = FileSystem.makeNoop({ open: () => Effect.succeed(file) })
+ * const messageLogger = Logger.make((options) => String(options.message))
  *
- * Effect.log("a").pipe(
- *   Effect.andThen(Effect.log("b")),
- *   Effect.andThen(Effect.log("c")),
- *   Effect.provide(LoggerLive),
- *   NodeRuntime.runMain
- * )
+ * const program = Effect.scoped(Effect.gen(function*() {
+ *   const fileLogger = yield* Logger.toFile(messageLogger, "/tmp/log.txt")
+ *   yield* Effect.log("a").pipe(Effect.provide(Logger.layer([fileLogger])))
+ *   yield* Effect.log("b").pipe(Effect.provide(Logger.layer([fileLogger])))
+ *   yield* Effect.log("c").pipe(Effect.provide(Logger.layer([fileLogger])))
+ * })).pipe(Effect.provideService(FileSystem.FileSystem, fileSystem))
+ *
+ * await Effect.runPromise(program)
+ * writes // => ["a\nb\nc"]
  * ```
  *
  * **Example** (Writing logs to files)
  *
- * ```ts
- * import { Duration, Effect, Logger } from "effect"
- * import { NodeFileSystem } from "@effect/platform-node"
+ * ```ts import.meta.vitest
+ * import { Effect, FileSystem, Logger } from "effect"
  *
- * // Basic file logging. The scope keeps the file open while logs are emitted
- * // and flushes pending entries when it closes.
- * const basicFileLogger = Effect.scoped(
- *   Effect.gen(function*() {
- *     const fileLogger = yield* Logger.formatJson.pipe(
- *       Logger.toFile("/tmp/app.log")
- *     )
- *
- *     yield* Effect.log("Application started").pipe(
- *       Effect.provide(Logger.layer([fileLogger]))
- *     )
+ * const writes: Array<string> = []
+ * const file = {
+ *   writeAll: (buffer: Uint8Array) => Effect.sync(() => {
+ *     writes.push(new TextDecoder().decode(buffer).trim())
  *   })
- * ).pipe(
- *   Effect.provide(NodeFileSystem.layer)
- * )
+ * } as unknown as FileSystem.File
+ * const fileSystem = FileSystem.makeNoop({ open: () => Effect.succeed(file) })
+ * const messageLogger = Logger.make((options) => String(options.message))
  *
- * // File logger with custom batch window
- * const batchedFileLogger = Effect.scoped(
- *   Effect.gen(function*() {
- *     const fileLogger = yield* Logger.formatLogFmt.pipe(
- *       Logger.toFile("/var/log/myapp.log", {
- *         flag: "a",
- *         batchWindow: Duration.seconds(5)
- *       })
- *     )
- *
- *     yield* Effect.all([
- *       Effect.log("Event 1"),
- *       Effect.log("Event 2"),
- *       Effect.log("Event 3")
- *     ]).pipe(
- *       Effect.provide(Logger.layer([fileLogger]))
- *     )
+ * const program = Effect.scoped(Effect.gen(function*() {
+ *   const fileLogger = yield* Logger.toFile(messageLogger, "/tmp/app.log", {
+ *     batchWindow: "1 hour"
  *   })
- * ).pipe(
- *   Effect.provide(NodeFileSystem.layer)
- * )
+ *   yield* Effect.log("Application started").pipe(
+ *     Effect.provide(Logger.layer([fileLogger]))
+ *   )
+ * })).pipe(Effect.provideService(FileSystem.FileSystem, fileSystem))
  *
- * // Multiple loggers: console + file
- * const multiLogger = Effect.scoped(
- *   Effect.gen(function*() {
- *     const fileLogger = yield* Logger.formatJson.pipe(
- *       Logger.toFile("/tmp/production.log")
- *     )
- *
- *     const loggerLive = Logger.layer([
- *       Logger.consolePretty(),
- *       fileLogger
- *     ])
- *
- *     yield* Effect.log("Production event").pipe(
- *       Effect.provide(loggerLive)
- *     )
- *   })
- * ).pipe(
- *   Effect.provide(NodeFileSystem.layer)
- * )
+ * await Effect.runPromise(program)
+ * writes // => ["Application started"]
  * ```
  *
- * @category file
+ * @stability unstable
+ * @category logging
  * @since 4.0.0
  */
 export const toFile = dual<
@@ -1279,7 +1171,7 @@ export const toFile = dual<
       const encoder = new TextEncoder()
       return yield* batched(self, {
         window: options?.batchWindow ?? 1000,
-        flush: (output) => effect.ignore(logFile.write(encoder.encode(output.join("\n") + "\n")))
+        flush: (output) => effect.ignore(logFile.writeAll(encoder.encode(output.join("\n") + "\n")))
       })
     })
 )

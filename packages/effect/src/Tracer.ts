@@ -7,9 +7,11 @@
  * external span support, trace propagation settings, and the default in-memory
  * span implementation.
  *
+ * @stability stable
  * @since 2.0.0
  */
 import * as Context from "./Context.ts"
+import * as Hex from "./encoding/Hex.ts"
 import type * as Exit from "./Exit.ts"
 import type { Fiber } from "./Fiber.ts"
 import { constFalse, type LazyArg } from "./Function.ts"
@@ -22,7 +24,8 @@ import * as Option from "./Option.ts"
  * `span` to allocate a span from the supplied name, parent, annotations,
  * links, start time, kind, root flag, and sampling decision.
  *
- * @category models
+ * @stability stable
+ * @category services
  * @since 2.0.0
  */
 export interface Tracer {
@@ -47,6 +50,7 @@ const evaluate = "~effect/Effect/evaluate" satisfies core.evaluate
  * A low-level Effect primitive that can be evaluated by a tracer-specific
  * context for the current fiber.
  *
+ * @stability stable
  * @category models
  * @since 4.0.0
  */
@@ -61,7 +65,7 @@ export interface EffectPrimitive<X> {
  *
  * **Example** (Creating span statuses)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { Exit } from "effect"
  * import type { Tracer } from "effect"
  *
@@ -80,10 +84,11 @@ export interface EffectPrimitive<X> {
  *   exit: Exit.succeed("result")
  * }
  *
- * console.log(startedStatus._tag) // "Started"
- * console.log(endedStatus.endTime - endedStatus.startTime) // 500000000n
+ * startedStatus._tag // => "Started"
+ * endedStatus.endTime - endedStatus.startTime // => 500_000_000n
  * ```
  *
+ * @stability stable
  * @category models
  * @since 2.0.0
  */
@@ -103,22 +108,22 @@ export type SpanStatus = {
  *
  * **Example** (Accepting any span)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { Effect, Tracer } from "effect"
  *
  * // Function that accepts any span type
- * const logSpan = (span: Tracer.AnySpan) => {
- *   console.log(`Span ID: ${span.spanId}, Trace ID: ${span.traceId}`)
- *   return Effect.succeed(span)
- * }
+ * const getSpanIds = (span: Tracer.AnySpan) => Effect.succeed([span.spanId, span.traceId])
  *
  * // Works with both Span and ExternalSpan
  * const externalSpan = Tracer.externalSpan({
  *   spanId: "span-123",
  *   traceId: "trace-456"
  * })
+ *
+ * await Effect.runPromise(getSpanIds(externalSpan)) // => ["span-123", "trace-456"]
  * ```
  *
+ * @stability stable
  * @category models
  * @since 2.0.0
  */
@@ -134,13 +139,14 @@ export type AnySpan = Span | ExternalSpan
  *
  * **Example** (Reading the parent span key)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { Tracer } from "effect"
  *
  * // The key used to identify parent spans in the context
- * console.log(Tracer.ParentSpanKey) // "effect/Tracer/ParentSpan"
+ * Tracer.ParentSpanKey // => "effect/Tracer/ParentSpan"
  * ```
  *
+ * @stability stable
  * @category constants
  * @since 4.0.0
  */
@@ -152,20 +158,24 @@ export const ParentSpanKey = "effect/Tracer/ParentSpan"
  *
  * **Example** (Accessing the parent span)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { Effect, Tracer } from "effect"
  *
  * // Access the parent span from the context
  * const program = Effect.gen(function*() {
  *   const parentSpan = yield* Effect.service(Tracer.ParentSpan)
- *   console.log(`Parent span: ${parentSpan.spanId}`)
+ *   return parentSpan.spanId
  * })
+ *
+ * const parent = Tracer.externalSpan({ spanId: "span-123", traceId: "trace-456" })
+ * await Effect.runPromise(Effect.provideService(program, Tracer.ParentSpan, parent)) // => "span-123"
  * ```
  *
+ * @stability stable
  * @category services
  * @since 2.0.0
  */
-export class ParentSpan extends Context.Service<ParentSpan, AnySpan>()(ParentSpanKey) {}
+export class ParentSpan extends Context.Service<ParentSpan, AnySpan>()(ParentSpanKey, { fiberCached: true }) {}
 
 /**
  * Represents a span created outside Effect's tracer, carrying trace and span
@@ -174,7 +184,7 @@ export class ParentSpan extends Context.Service<ParentSpan, AnySpan>()(ParentSpa
  *
  * **Example** (Creating an external span value)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { Context } from "effect"
  * import type { Tracer } from "effect"
  *
@@ -187,9 +197,10 @@ export class ParentSpan extends Context.Service<ParentSpan, AnySpan>()(ParentSpa
  *   annotations: Context.empty()
  * }
  *
- * console.log(`External span: ${externalSpan.spanId}`)
+ * externalSpan.spanId // => "span-abc-123"
  * ```
  *
+ * @stability stable
  * @category models
  * @since 2.0.0
  */
@@ -208,9 +219,8 @@ export interface ExternalSpan {
  *
  * **Example** (Configuring span options)
  *
- * ```ts
- * import { Effect } from "effect"
- * import type { Tracer } from "effect"
+ * ```ts import.meta.vitest
+ * import { Effect, Tracer } from "effect"
  *
  * // Create an effect with span options
  * const options: Tracer.SpanOptions = {
@@ -223,8 +233,22 @@ export interface ExternalSpan {
  * const program = Effect.succeed("Hello World").pipe(
  *   Effect.withSpan("my-operation", options)
  * )
+ *
+ * const spans: Array<Tracer.NativeSpan> = []
+ * const tracer = Tracer.make({
+ *   span(options) {
+ *     const span = new Tracer.NativeSpan(options)
+ *     spans.push(span)
+ *     return span
+ *   }
+ * })
+ * const value = await Effect.runPromise(Effect.provideService(program, Tracer.Tracer, tracer)) // => "Hello World"
+ *
+ * spans[0]?.attributes.get("user.id") // => "123"
+ * spans[0]?.status._tag // => "Ended"
  * ```
  *
+ * @stability stable
  * @category options
  * @since 3.1.0
  */
@@ -235,6 +259,7 @@ export interface SpanOptions extends SpanOptionsNoTrace, TraceOptions {}
  * attributes, links, parent or root selection, annotations, span kind,
  * sampling, and the trace level used for filtering.
  *
+ * @stability stable
  * @category options
  * @since 4.0.0
  */
@@ -253,6 +278,7 @@ export interface SpanOptionsNoTrace {
  * Options that control stack trace capture for tracing wrappers.
  * `captureStackTrace` can disable capture or provide a lazy stack string.
  *
+ * @stability stable
  * @category options
  * @since 4.0.0
  */
@@ -266,24 +292,30 @@ export interface TraceOptions {
  *
  * **Example** (Configuring span kinds)
  *
- * ```ts
- * import { Effect } from "effect"
- * import type { Tracer } from "effect"
+ * ```ts import.meta.vitest
+ * import { Effect, Tracer } from "effect"
  *
  * // Different span kinds for different operations
- * const serverSpan = Effect.withSpan("handle-request", {
- *   kind: "server" as Tracer.SpanKind
- * })
+ * const program = Effect.succeed("handled").pipe(
+ *   Effect.withSpan("handle-request", {
+ *     kind: "server" as Tracer.SpanKind
+ *   })
+ * )
  *
- * const clientSpan = Effect.withSpan("api-call", {
- *   kind: "client" as Tracer.SpanKind
+ * const spans: Array<Tracer.NativeSpan> = []
+ * const tracer = Tracer.make({
+ *   span(options) {
+ *     const span = new Tracer.NativeSpan(options)
+ *     spans.push(span)
+ *     return span
+ *   }
  * })
+ * const value = await Effect.runPromise(Effect.provideService(program, Tracer.Tracer, tracer)) // => "handled"
  *
- * const internalSpan = Effect.withSpan("internal-process", {
- *   kind: "internal" as Tracer.SpanKind
- * })
+ * spans[0]?.kind // => "server"
  * ```
  *
+ * @stability stable
  * @category models
  * @since 3.1.0
  */
@@ -296,12 +328,13 @@ export type SpanKind = "internal" | "server" | "client" | "producer" | "consumer
  *
  * **Example** (Working with spans)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { Context, Exit, Option } from "effect"
  * import type { Tracer } from "effect"
  *
  * const attributes = new Map<string, unknown>()
  * const links: Array<Tracer.SpanLink> = []
+ * const events: Array<[name: string, startTime: bigint, attributes: Record<string, unknown>]> = []
  * let status: Tracer.SpanStatus = {
  *   _tag: "Started",
  *   startTime: 1_000_000_000n
@@ -328,7 +361,7 @@ export type SpanKind = "internal" | "server" | "client" | "producer" | "consumer
  *     attributes.set(key, value)
  *   },
  *   event(name, startTime, eventAttributes = {}) {
- *     console.log(`${name} at ${startTime} with ${Object.keys(eventAttributes).length} attributes`)
+ *     events.push([name, startTime, eventAttributes])
  *   },
  *   addLinks(newLinks) {
  *     links.push(...newLinks)
@@ -336,13 +369,16 @@ export type SpanKind = "internal" | "server" | "client" | "producer" | "consumer
  * }
  *
  * span.attribute("user.id", "123")
+ * span.event("loaded", 1_250_000_000n, { "cache.hit": true })
  * span.end(1_500_000_000n, Exit.succeed("user"))
  *
- * console.log(span.name) // "load-user"
- * console.log(span.attributes.get("user.id")) // "123"
- * console.log(span.status._tag) // "Ended"
+ * span.name // => "load-user"
+ * span.attributes.get("user.id") // => "123"
+ * span.status._tag // => "Ended"
+ * events // => [["loaded", 1_250_000_000n, { "cache.hit": true }]]
  * ```
  *
+ * @stability stable
  * @category models
  * @since 2.0.0
  */
@@ -370,7 +406,7 @@ export interface Span {
  *
  * **Example** (Linking spans)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { Effect, Tracer } from "effect"
  *
  * // Create a span link to connect spans
@@ -387,8 +423,22 @@ export interface Span {
  * const program = Effect.succeed("result").pipe(
  *   Effect.withSpan("linked-operation", { links: [link] })
  * )
+ *
+ * const spans: Array<Tracer.NativeSpan> = []
+ * const tracer = Tracer.make({
+ *   span(options) {
+ *     const span = new Tracer.NativeSpan(options)
+ *     spans.push(span)
+ *     return span
+ *   }
+ * })
+ * const value = await Effect.runPromise(Effect.provideService(program, Tracer.Tracer, tracer)) // => "result"
+ *
+ * spans[0]?.links[0]?.span.spanId // => "external-span-123"
+ * spans[0]?.links[0]?.attributes["link.type"] // => "follows-from"
  * ```
  *
+ * @stability stable
  * @category models
  * @since 2.0.0
  */
@@ -413,6 +463,7 @@ export interface SpanLink {
  *
  * @see {@link Span} for the span values returned by tracer implementations
  *
+ * @stability stable
  * @category constructors
  * @since 2.0.0
  */
@@ -425,8 +476,8 @@ export const make = (options: Tracer): Tracer => options
  *
  * **Example** (Creating an external span)
  *
- * ```ts
- * import { Effect, Tracer } from "effect"
+ * ```ts import.meta.vitest
+ * import { Effect, Option, Tracer } from "effect"
  *
  * // Create an external span from another tracing system
  * const span = Tracer.externalSpan({
@@ -439,8 +490,22 @@ export const make = (options: Tracer): Tracer => options
  * const program = Effect.succeed("Hello").pipe(
  *   Effect.withSpan("child-operation", { parent: span })
  * )
+ *
+ * const spans: Array<Tracer.NativeSpan> = []
+ * const tracer = Tracer.make({
+ *   span(options) {
+ *     const span = new Tracer.NativeSpan(options)
+ *     spans.push(span)
+ *     return span
+ *   }
+ * })
+ * const value = await Effect.runPromise(Effect.provideService(program, Tracer.Tracer, tracer))
+ *
+ * value // => "Hello"
+ * spans.map((span) => Option.getOrUndefined(span.parent)?.spanId) // => ["span-abc-123"]
  * ```
  *
+ * @stability stable
  * @category constructors
  * @since 2.0.0
  */
@@ -474,18 +539,19 @@ export const externalSpan = (
  *
  * **Example** (Disabling span propagation)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { Effect, Tracer } from "effect"
  *
  * // Disable span propagation for a specific effect
- * const program = Effect.gen(function*() {
- *   yield* Effect.log("This will not propagate parent span")
- * }).pipe(
+ * const program = Tracer.DisablePropagation.pipe(
  *   Effect.provideService(Tracer.DisablePropagation, true)
  * )
+ *
+ * await Effect.runPromise(program) // => true
  * ```
  *
- * @category references
+ * @stability stable
+ * @category services
  * @since 3.12.0
  */
 export const DisablePropagation = Context.Reference<boolean>(
@@ -508,7 +574,8 @@ export const DisablePropagation = Context.Reference<boolean>(
  *
  * @see {@link MinimumTraceLevel} for the threshold that decides whether spans at that level are sampled
  *
- * @category references
+ * @stability stable
+ * @category services
  * @since 4.0.0
  */
 export const CurrentTraceLevel: Context.Reference<LogLevel> = Context.Reference<LogLevel>(
@@ -537,7 +604,8 @@ export const CurrentTraceLevel: Context.Reference<LogLevel> = Context.Reference<
  *
  * @see {@link CurrentTraceLevel} for the default span level used when options do not specify one
  *
- * @category references
+ * @stability stable
+ * @category services
  * @since 4.0.0
  */
 export const MinimumTraceLevel = Context.Reference<
@@ -552,7 +620,8 @@ export const MinimumTraceLevel = Context.Reference<
  * Use when you need the raw context key for active tracer lookup in lower-level
  * tracing code.
  *
- * @category references
+ * @stability stable
+ * @category constants
  * @since 4.0.0
  */
 export const TracerKey = "effect/Tracer"
@@ -563,30 +632,45 @@ export const TracerKey = "effect/Tracer"
  *
  * **Example** (Accessing the current tracer)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { Effect, Tracer } from "effect"
  *
  * // Access the current tracer from the context
  * const program = Effect.gen(function*() {
  *   const tracer = yield* Effect.service(Tracer.Tracer)
- *   console.log("Using current tracer")
+ *   // Or use the built-in tracer effect
+ *   const tracerFromAccessor = yield* Effect.tracer
+ *   return tracer === tracerFromAccessor
  * })
  *
- * // Or use the built-in tracer effect
- * const tracerEffect = Effect.gen(function*() {
- *   const tracer = yield* Effect.tracer
- *   console.log("Current tracer obtained")
- * })
+ * await Effect.runPromise(program) // => true
  * ```
  *
- * @category references
+ * @stability stable
+ * @category services
  * @since 2.0.0
  */
 export const Tracer: Context.Reference<Tracer> = Context.Reference<Tracer>(TracerKey, {
-  defaultValue: () =>
-    make({
-      span: (options) => new NativeSpan(options)
-    })
+  fiberCached: true,
+  defaultValue: () => nativeTracer
+})
+
+/**
+ * The default `Tracer` implementation backing the `Tracer` reference. It
+ * creates in-memory `NativeSpan` instances and does not export them anywhere.
+ *
+ * **Details**
+ *
+ * Runtime code can compare the active tracer against `nativeTracer` to detect
+ * that no tracing backend is installed and skip work that only a backend could
+ * observe, such as recording span attributes.
+ *
+ * @stability stable
+ * @category references
+ * @since 4.0.0
+ */
+export const nativeTracer: Tracer = make({
+  span: (options) => new NativeSpan(options)
 })
 
 /**
@@ -596,19 +680,20 @@ export const Tracer: Context.Reference<Tracer> = Context.Reference<Tracer>(Trace
  *
  * **Details**
  *
- * The constructor initializes the span with `Started` status, inherits the
- * parent trace id or generates a new one, and always generates a new span id.
- * Attributes, events, links, and status are then mutated through `Span` methods.
+ * The constructor initializes the span with `Started` status. Trace and span
+ * identifiers, the attribute map, and the event list are created lazily on
+ * first access, so spans that are never inspected allocate as little as
+ * possible. Attributes, events, links, and status are mutated through `Span`
+ * methods.
  *
  * @see {@link Span} for the interface implemented by native spans
  *
- * @category native tracer
+ * @stability stable
+ * @category models
  * @since 4.0.0
  */
 export class NativeSpan implements Span {
   readonly _tag = "Span"
-  readonly spanId: string
-  readonly traceId: string = "native"
   readonly sampled: boolean
 
   readonly name: string
@@ -619,8 +704,10 @@ export class NativeSpan implements Span {
   readonly kind: SpanKind
 
   status: SpanStatus
-  attributes: Map<string, unknown>
-  events: Array<[name: string, startTime: bigint, attributes: Record<string, unknown>]> = []
+  _traceId: string | undefined = undefined
+  _spanId: string | undefined = undefined
+  _attributes: Map<string, unknown> | undefined = undefined
+  _events: Array<[name: string, startTime: bigint, attributes: Record<string, unknown>]> | undefined = undefined
 
   constructor(options: {
     readonly name: string
@@ -642,9 +729,22 @@ export class NativeSpan implements Span {
       _tag: "Started",
       startTime: options.startTime
     }
-    this.attributes = new Map()
-    this.traceId = Option.getOrUndefined(options.parent)?.traceId ?? randomHexString(32)
-    this.spanId = randomHexString(16)
+  }
+
+  get traceId(): string {
+    return this._traceId ??= Option.getOrUndefined(this.parent)?.traceId ?? Hex.random(32)
+  }
+
+  get spanId(): string {
+    return this._spanId ??= Hex.random(16)
+  }
+
+  get attributes(): Map<string, unknown> {
+    return this._attributes ??= new Map()
+  }
+
+  get events(): Array<[name: string, startTime: bigint, attributes: Record<string, unknown>]> {
+    return this._events ??= []
   }
 
   end(endTime: bigint, exit: Exit.Exit<unknown, unknown>): void {
@@ -669,15 +769,3 @@ export class NativeSpan implements Span {
     this.links.push(...links)
   }
 }
-
-const randomHexString = (function() {
-  const characters = "abcdef0123456789"
-  const charactersLength = characters.length
-  return function(length: number) {
-    let result = ""
-    for (let i = 0; i < length; i++) {
-      result += characters.charAt(Math.floor(Math.random() * charactersLength))
-    }
-    return result
-  }
-})()

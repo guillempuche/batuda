@@ -8,6 +8,7 @@
  * values, and comparison helpers that avoid exposing the wrapped value at the
  * call site.
  *
+ * @stability stable
  * @since 3.3.0
  */
 import * as Equal from "./Equal.ts"
@@ -19,7 +20,7 @@ import type { Pipeable } from "./Pipeable.ts"
 import { hasProperty, isString } from "./Predicate.ts"
 import type { Covariant } from "./Types.ts"
 
-const TypeId = "~effect/data/Redacted"
+const TypeId = "~effect/Redacted"
 
 /**
  * A wrapper for sensitive values whose string, JSON, and inspection output is
@@ -39,7 +40,7 @@ const TypeId = "~effect/data/Redacted"
  *
  * **Example** (Creating redacted values)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { Redacted } from "effect"
  *
  * // Create a redacted value to protect sensitive information
@@ -47,8 +48,10 @@ const TypeId = "~effect/data/Redacted"
  * const userPassword = Redacted.make("user-password")
  *
  * // TypeScript will infer the types as Redacted<string>
+ * Array.of(String(apiKey), String(userPassword)) // => ["<redacted>", "<redacted>"]
  * ```
  *
+ * @stability stable
  * @category models
  * @since 3.3.0
  */
@@ -65,16 +68,17 @@ export interface Redacted<out A = string> extends Redacted.Variance<A>, Equal.Eq
  *
  * **Example** (Using namespace utilities)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { Redacted } from "effect"
  *
  * // Use the Redacted namespace for type-level operations
  * const secret = Redacted.make("my-secret")
  *
  * // The namespace contains utilities for working with Redacted values
- * const isRedacted = Redacted.isRedacted(secret) // true
+ * Redacted.isRedacted(secret) // => true
  * ```
  *
+ * @stability stable
  * @since 3.3.0
  */
 export declare namespace Redacted {
@@ -109,7 +113,7 @@ export declare namespace Redacted {
    *
    * **Example** (Extracting the redacted value type)
    *
-   * ```ts
+   * ```ts import.meta.vitest
    * import { Redacted } from "effect"
    *
    * type ApiKey = Redacted.Redacted<{ readonly token: string }>
@@ -119,7 +123,7 @@ export declare namespace Redacted {
    *   token: `${value.token}:rotated`
    * })
    *
-   * console.log(rotate({ token: "secret" })) // { token: "secret:rotated" }
+   * rotate({ token: "secret" }) // => { token: "secret:rotated" }
    * ```
    *
    * @category utility types
@@ -142,17 +146,18 @@ export declare namespace Redacted {
  *
  * **Example** (Checking for redacted values)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { Redacted } from "effect"
  *
  * const secret = Redacted.make("my-secret")
  * const plainString = "not-secret"
  *
- * console.log(Redacted.isRedacted(secret)) // true
- * console.log(Redacted.isRedacted(plainString)) // false
+ * Redacted.isRedacted(secret) // => true
+ * Redacted.isRedacted(plainString) // => false
  * ```
  *
- * @category refinements
+ * @stability stable
+ * @category guards
  * @since 3.3.0
  */
 export const isRedacted = (u: unknown): u is Redacted<unknown> => hasProperty(u, TypeId)
@@ -173,12 +178,14 @@ export const isRedacted = (u: unknown): u is Redacted<unknown> => hasProperty(u,
  *
  * **Example** (Creating a redacted value)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { Redacted } from "effect"
  *
  * const API_KEY = Redacted.make("1234567890")
+ * String(API_KEY) // => "<redacted>"
  * ```
  *
+ * @stability stable
  * @category constructors
  * @since 3.3.0
  */
@@ -229,15 +236,15 @@ const Proto = {
  *
  * **Example** (Retrieving a redacted value)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { Redacted } from "effect"
- * import * as assert from "node:assert"
  *
  * const API_KEY = Redacted.make("1234567890")
  *
- * assert.equal(Redacted.value(API_KEY), "1234567890")
+ * Redacted.value(API_KEY) // => "1234567890"
  * ```
  *
+ * @stability stable
  * @category getters
  * @since 3.3.0
  */
@@ -260,22 +267,23 @@ export const value: <T>(self: Redacted<T>) => T = redacted.value
  *
  * **Example** (Wiping a redacted value)
  *
- * ```ts
- * import { Redacted } from "effect"
- * import * as assert from "node:assert"
+ * ```ts import.meta.vitest
+ * import { Redacted, Result } from "effect"
  *
  * const API_KEY = Redacted.make("1234567890")
  *
- * assert.equal(Redacted.value(API_KEY), "1234567890")
+ * Redacted.value(API_KEY) // => "1234567890"
  *
  * Redacted.wipeUnsafe(API_KEY)
  *
- * assert.throws(
- *   () => Redacted.value(API_KEY),
- *   new Error("Unable to get redacted value")
- * )
+ * const failure = Result.try({
+ *   try: () => Redacted.value(API_KEY),
+ *   catch: (error) => (error as Error).message
+ * })
+ * failure // => Result.fail("Unable to get redacted value")
  * ```
  *
+ * @stability stable
  * @category unsafe
  * @since 4.0.0
  */
@@ -293,9 +301,8 @@ export const wipeUnsafe = <T>(self: Redacted<T>): boolean => redacted.redactedRe
  *
  * **Example** (Comparing redacted values)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { Equivalence, Redacted } from "effect"
- * import * as assert from "node:assert"
  *
  * const API_KEY1 = Redacted.make("1234567890")
  * const API_KEY2 = Redacted.make("1-34567890")
@@ -303,10 +310,11 @@ export const wipeUnsafe = <T>(self: Redacted<T>): boolean => redacted.redactedRe
  *
  * const equivalence = Redacted.makeEquivalence(Equivalence.strictEqual<string>())
  *
- * assert.equal(equivalence(API_KEY1, API_KEY2), false)
- * assert.equal(equivalence(API_KEY1, API_KEY3), true)
+ * equivalence(API_KEY1, API_KEY2) // => false
+ * equivalence(API_KEY1, API_KEY3) // => true
  * ```
  *
+ * @stability stable
  * @category instances
  * @since 4.0.0
  */

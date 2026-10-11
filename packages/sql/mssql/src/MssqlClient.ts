@@ -10,22 +10,23 @@
  * direct or config-backed layers, and default parameter type mappings.
  * Streaming queries are not implemented by this driver.
  *
+ * @stability unstable
  * @since 4.0.0
  */
 import * as Config from "effect/Config"
 import * as Context from "effect/Context"
+import * as Deferred from "effect/Deferred"
 import * as Duration from "effect/Duration"
 import * as Effect from "effect/Effect"
 import { identity } from "effect/Function"
 import * as Layer from "effect/Layer"
 import * as Pool from "effect/Pool"
+import * as Reactivity from "effect/reactivity/Reactivity"
 import * as Rec from "effect/Record"
 import * as Redacted from "effect/Redacted"
 import * as Scope from "effect/Scope"
-import * as Stream from "effect/Stream"
-import * as Reactivity from "effect/unstable/reactivity/Reactivity"
-import * as Client from "effect/unstable/sql/SqlClient"
-import type { Connection } from "effect/unstable/sql/SqlConnection"
+import * as Client from "effect/sql/SqlClient"
+import type { Connection } from "effect/sql/SqlConnection"
 import {
   AuthenticationError,
   AuthorizationError,
@@ -38,8 +39,10 @@ import {
   SqlSyntaxError,
   UniqueViolation,
   UnknownError
-} from "effect/unstable/sql/SqlError"
-import * as Statement from "effect/unstable/sql/Statement"
+} from "effect/sql/SqlError"
+import * as Statement from "effect/sql/Statement"
+import * as Stream from "effect/Stream"
+import { Buffer } from "node:buffer"
 import * as Tedious from "tedious"
 import type { ConnectionOptions } from "tedious/lib/connection.ts"
 import type { DataType } from "tedious/lib/data-type.ts"
@@ -144,6 +147,7 @@ const classifyError = (
 /**
  * Runtime type identifier used to mark `MssqlClient` values.
  *
+ * @stability unstable
  * @category type IDs
  * @since 4.0.0
  */
@@ -152,6 +156,7 @@ export const TypeId: unique symbol = Symbol.for("@effect/sql-mssql/MssqlClient")
 /**
  * Type-level identifier used to mark `MssqlClient` values.
  *
+ * @stability unstable
  * @category type IDs
  * @since 4.0.0
  */
@@ -160,7 +165,8 @@ export type TypeId = typeof TypeId
 /**
  * Microsoft SQL Server client service, extending `SqlClient` with typed parameter fragments and stored procedure calls.
  *
- * @category models
+ * @stability unstable
+ * @category services
  * @since 4.0.0
  */
 export interface MssqlClient extends Client.SqlClient {
@@ -168,6 +174,11 @@ export interface MssqlClient extends Client.SqlClient {
 
   readonly config: MssqlClientConfig
 
+  /**
+   * Creates a statement parameter with an explicit `tedious` data type.
+   *
+   * @stability unstable
+   */
   readonly param: (
     type: DataType,
     value: unknown,
@@ -191,6 +202,7 @@ export interface MssqlClient extends Client.SqlClient {
  * Use to access or provide a Microsoft SQL Server client through the Effect
  * context.
  *
+ * @stability unstable
  * @category services
  * @since 4.0.0
  */
@@ -199,6 +211,7 @@ export const MssqlClient = Context.Service<MssqlClient>("@effect/sql-mssql/Mssql
 /**
  * Configuration for a Microsoft SQL Server client, including connection, authentication, pool, parameter type, span attribute, and query/result name transform options.
  *
+ * @stability unstable
  * @category models
  * @since 4.0.0
  */
@@ -206,7 +219,13 @@ export interface MssqlClientConfig {
   readonly domain?: string | undefined
   readonly server: string
   readonly instanceName?: string | undefined
+  /**
+   * Whether to encrypt traffic between the client and server. Defaults to `true`. Setting this to `false` disables transport encryption and transmits credentials in cleartext.
+   */
   readonly encrypt?: boolean | undefined
+  /**
+   * Whether to trust the server certificate without validating it. Defaults to `false`. Setting this to `true` disables TLS certificate validation.
+   */
   readonly trustServer?: boolean | undefined
   readonly port?: number | undefined
   readonly authType?: string | undefined
@@ -223,6 +242,11 @@ export interface MssqlClientConfig {
   readonly maxConnections?: number | undefined
   readonly connectionTTL?: Duration.Input | undefined
 
+  /**
+   * Overrides the `tedious` data type used for each primitive parameter kind.
+   *
+   * @stability unstable
+   */
   readonly parameterTypes?: Record<Statement.PrimitiveKind, DataType> | undefined
 
   readonly spanAttributes?: Record<string, unknown> | undefined
@@ -253,6 +277,7 @@ let clientIdCounter = 0
 /**
  * Creates a scoped Microsoft SQL Server client backed by a connection pool, with transaction and stored procedure support. Streaming queries are not implemented.
  *
+ * @stability unstable
  * @category constructors
  * @since 4.0.0
  */
@@ -278,13 +303,22 @@ export const make = (
 
     // oxlint-disable-next-line prefer-const
     let pool: Pool.Pool<MssqlConnection, SqlError>
+    const connectionEnded = new WeakMap<MssqlConnection, Deferred.Deferred<void>>()
+    // Invalidation can run before acquisition publishes the pool item. Check
+    // the latch on every lease so an early event cannot leave it reusable.
+    const acquireConnection: Effect.Effect<MssqlConnection, SqlError, Scope.Scope> = Effect.suspend(() =>
+      Effect.flatMap(Pool.get(pool), (connection) =>
+        Deferred.isDoneUnsafe(connectionEnded.get(connection)!)
+          ? Effect.andThen(Pool.invalidate(pool, connection), acquireConnection)
+          : Effect.succeed(connection))
+    )
 
     const makeConnection = Effect.gen(function*() {
       const conn = new Tedious.Connection({
         options: {
           port: options.port,
           database: options.database,
-          trustServerCertificate: options.trustServer ?? true,
+          trustServerCertificate: options.trustServer ?? false,
           multiSubnetFailover: options.multiSubnetFailover,
           connectTimeout: options.connectTimeout
             ? Duration.toMillis(Duration.fromInputUnsafe(options.connectTimeout))
@@ -292,7 +326,7 @@ export const make = (
           rowCollectionOnRequestCompletion: true,
           useColumnNames: false,
           instanceName: options.instanceName,
-          encrypt: options.encrypt ?? false,
+          encrypt: options.encrypt ?? true,
           cancelTimeout: options.cancelTimeout
             ? Duration.toMillis(Duration.fromInputUnsafe(options.cancelTimeout))
             : undefined,
@@ -305,6 +339,7 @@ export const make = (
         authentication: {
           type: (options.authType as any) ?? "default",
           options: {
+            domain: options.domain,
             userName: options.username,
             password: options.password
               ? Redacted.value(options.password)
@@ -313,7 +348,33 @@ export const make = (
         }
       })
 
-      yield* Effect.addFinalizer(() => Effect.sync(() => conn.close()))
+      const ended = Deferred.makeUnsafe<void>()
+      let closing = false
+      let endEmitted = false
+      const onError = () => {
+        Deferred.doneUnsafe(ended, Effect.void)
+      }
+      const removeListeners = () => {
+        conn.removeListener("error", onError)
+        conn.removeListener("end", onEnd)
+      }
+      const onEnd = () => {
+        endEmitted = true
+        Deferred.doneUnsafe(ended, Effect.void)
+        if (closing) removeListeners()
+      }
+
+      // Install before connect and keep the error handler through asynchronous
+      // close. The latch also records events before the pool item exists.
+      conn.on("error", onError)
+      conn.on("end", onEnd)
+      yield* Effect.addFinalizer(() =>
+        Effect.sync(() => {
+          closing = true
+          conn.close()
+          if (endEmitted) removeListeners()
+        })
+      )
 
       yield* Effect.callback<void, SqlError>((resume) => {
         conn.connect((cause) => {
@@ -367,6 +428,7 @@ export const make = (
 
           conn.cancel()
           conn.execSql(req)
+          return Effect.sync(() => conn.cancel())
         })
 
       const runProcedure = (
@@ -390,7 +452,7 @@ export const make = (
                 }
                 resume(
                   Effect.succeed({
-                    params: result,
+                    output: result,
                     rows
                   })
                 )
@@ -415,6 +477,7 @@ export const make = (
 
           conn.cancel()
           conn.callProcedure(req)
+          return Effect.sync(() => conn.cancel())
         })
 
       const connection = identity<MssqlConnection>({
@@ -503,10 +566,9 @@ export const make = (
           })
       })
 
-      yield* Effect.callback<never, unknown>((resume) => {
-        conn.on("error", (_) => resume(Effect.fail(_)))
-      }).pipe(
-        Effect.catch(() => Pool.invalidate(pool, connection)),
+      connectionEnded.set(connection, ended)
+      yield* Deferred.await(ended).pipe(
+        Effect.andThen(Effect.suspend(() => pool ? Pool.invalidate(pool, connection) : Effect.void)),
         Effect.interruptible,
         Effect.forkScoped
       )
@@ -522,7 +584,7 @@ export const make = (
       timeToLiveStrategy: "creation"
     })
 
-    yield* Pool.get(pool).pipe(
+    yield* acquireConnection.pipe(
       Effect.tap((connection) => connection.executeUnprepared("SELECT 1", [], undefined)),
       Effect.mapError((cause) =>
         new SqlError({ reason: classifyError(cause, "MssqlClient: Failed to connect", "connect", "connection") })
@@ -550,7 +612,7 @@ export const make = (
       spanAttributes,
       acquireConnection: Effect.gen(function*() {
         const scope = Scope.makeUnsafe()
-        const conn = yield* Scope.provide(Pool.get(pool), scope)
+        const conn = yield* Scope.provide(acquireConnection, scope)
         return [scope, conn] as const
       }),
       begin: (conn) => conn.begin,
@@ -562,7 +624,7 @@ export const make = (
 
     return identity<MssqlClient>(Object.assign(
       yield* Client.make({
-        acquirer: Pool.get(pool),
+        acquirer: acquireConnection,
         compiler,
         transactionService: transactionService as any,
         spanAttributes,
@@ -583,9 +645,9 @@ export const make = (
           A
         >(
           procedure: Procedure.ProcedureWithValues<I, O, A>
-        ) => Effect.scoped(Effect.flatMap(Pool.get(pool), (_) => _.call(procedure, transformRows))),
+        ) => Effect.scoped(Effect.flatMap(acquireConnection, (_) => _.call(procedure, transformRows))),
         withoutTransforms() {
-          const statement = Statement.make(Pool.get(pool), compiler.withoutTransform, spanAttributes, undefined)
+          const statement = Statement.make(acquireConnection, compiler.withoutTransform, spanAttributes, undefined)
           const client = Object.assign(
             statement,
             this,
@@ -597,7 +659,7 @@ export const make = (
                 A
               >(
                 procedure: Procedure.ProcedureWithValues<I, O, A>
-              ) => Effect.scoped(Effect.flatMap(Pool.get(pool), (_) => _.call(procedure, undefined)))
+              ) => Effect.scoped(Effect.flatMap(acquireConnection, (_) => _.call(procedure, undefined)))
             }
           )
           ;(client as any).safe = client
@@ -611,6 +673,7 @@ export const make = (
 /**
  * Creates a layer from a `Config`-wrapped SQL Server client configuration, providing both `MssqlClient` and `SqlClient`.
  *
+ * @stability unstable
  * @category layers
  * @since 4.0.0
  */
@@ -633,6 +696,7 @@ export const layerConfig: (
 /**
  * Creates a layer from a concrete SQL Server client configuration, providing both `MssqlClient` and `SqlClient`.
  *
+ * @stability unstable
  * @category layers
  * @since 4.0.0
  */
@@ -649,7 +713,8 @@ export const layer = (
 /**
  * Creates the SQL Server statement compiler, using `@1`-style placeholders, bracket-escaped identifiers, and SQL Server `OUTPUT INSERTED` returning clauses.
  *
- * @category compiler
+ * @stability unstable
+ * @category constructors
  * @since 4.0.0
  */
 export const makeCompiler = (transform?: (_: string) => string) =>
@@ -698,20 +763,32 @@ function numberToParamName(n: number) {
   return `${Math.ceil(n + 1)}`
 }
 
+const byteArrayParameterType: DataType = {
+  ...Tedious.TYPES.VarBinary,
+  validate(value, collation, options) {
+    return Tedious.TYPES.VarBinary.validate(
+      Buffer.isBuffer(value) ? value : Buffer.from(value.buffer, value.byteOffset, value.byteLength),
+      collation,
+      options
+    )
+  }
+}
+
 /**
  * Default mapping from Effect SQL primitive value kinds to Tedious SQL Server parameter data types.
  *
- * @category configuration
+ * @stability unstable
+ * @category constants
  * @since 4.0.0
  */
 export const defaultParameterTypes: Record<Statement.PrimitiveKind, DataType> = {
-  string: Tedious.TYPES.VarChar,
-  number: Tedious.TYPES.Int,
+  string: Tedious.TYPES.NVarChar,
+  number: Tedious.TYPES.Float,
   bigint: Tedious.TYPES.BigInt,
   boolean: Tedious.TYPES.Bit,
   Date: Tedious.TYPES.DateTime,
-  Uint8Array: Tedious.TYPES.VarBinary,
-  Int8Array: Tedious.TYPES.VarBinary,
+  Uint8Array: byteArrayParameterType,
+  Int8Array: byteArrayParameterType,
   null: Tedious.TYPES.Bit
 }
 

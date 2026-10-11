@@ -8,6 +8,7 @@
  * exports the protocol symbols, the `Unify` type that performs normalization,
  * and `unify`, an identity function that changes only the inferred type.
  *
+ * @stability stable
  * @since 2.0.0
  */
 
@@ -29,6 +30,7 @@ import { identity } from "./Function.ts"
  * @see {@link typeSymbol} for storing the source type information used during unification
  * @see {@link ignoreSymbol} for excluding protocol entries from unification
  *
+ * @stability stable
  * @category symbols
  * @since 2.0.0
  */
@@ -48,6 +50,7 @@ export declare const unifySymbol: unique symbol
  * behavior in Effect types. It's typically used in type-level operations
  * to enable automatic type unification.
  *
+ * @stability stable
  * @category symbols
  * @since 2.0.0
  */
@@ -68,6 +71,7 @@ export type unifySymbol = typeof unifySymbol
  *
  * @see {@link unifySymbol} for defining how protocol entries widen
  *
+ * @stability stable
  * @category symbols
  * @since 2.0.0
  */
@@ -87,6 +91,7 @@ export declare const typeSymbol: unique symbol
  * in types that support unification. It's used in type-level operations
  * to access and manipulate type information.
  *
+ * @stability stable
  * @category symbols
  * @since 2.0.0
  */
@@ -107,6 +112,7 @@ export type typeSymbol = typeof typeSymbol
  *
  * @see {@link unifySymbol} for defining the protocol entries being filtered
  *
+ * @stability stable
  * @category symbols
  * @since 2.0.0
  */
@@ -126,6 +132,7 @@ export declare const ignoreSymbol: unique symbol
  * be ignored during unification operations. It's used in type-level operations
  * to exclude specific types from the unification process.
  *
+ * @stability stable
  * @category symbols
  * @since 2.0.0
  */
@@ -178,7 +185,7 @@ type FilterOut<A> = A extends any ? typeSymbol extends keyof A ? never : A : nev
  *
  * **Example** (Unifying protocol types)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import type { Unify } from "effect"
  *
  * // Example of types that can be unified
@@ -196,11 +203,13 @@ type FilterOut<A> = A extends any ? typeSymbol extends keyof A ? never : A : nev
  *
  * // Unify automatically handles the union
  * type Unified = Unify.Unify<UnifiableA | UnifiableB>
- * // Results in a properly unified type
+ *
+ * const witness: Unified = "value"
  * ```
  *
  * @see {@link unify} for applying this normalization to a value or function
  *
+ * @stability stable
  * @category models
  * @since 2.0.0
  */
@@ -243,31 +252,29 @@ export type Unify<A> = Values<
  *
  * **Example** (Unifying values and function results)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { Unify } from "effect"
  *
  * // Unify a simple value
- * const unifiedValue = Unify.unify("hello")
+ * const unifiedValue = Unify.unify("hello") // => "hello"
  * // Type: string
  *
  * // Unify a function result
- * const createUnifiableValue = () => ({
- *   value: "test",
- *   [Unify.typeSymbol]: "string" as const,
- *   [Unify.unifySymbol]: { String: () => "test" as const }
- * })
+ * const createValue = () => ({ value: "test" })
  *
- * const unifiedFunction = Unify.unify(createUnifiableValue)
- * // The result will be properly unified
+ * const unifiedFunction = Unify.unify(createValue)
+ * unifiedFunction().value // => "test"
  *
  * // Unify with curried functions
  * const curriedFunction = (a: string) => (b: number) => ({ result: a + b })
  * const unifiedCurried = Unify.unify(curriedFunction)
  * // Type: (a: string) => (b: number) => Unify<{ result: string }>
+ * unifiedCurried("value-")(1).result // => "value-1"
  * ```
  *
  * @see {@link Unify} for the type-level normalization applied by this helper
  *
+ * @stability stable
  * @category utility types
  * @since 2.0.0
  */

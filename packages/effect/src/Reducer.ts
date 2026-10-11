@@ -5,6 +5,7 @@
  * constructor for reducers and a helper for reversing the order in which values
  * are combined.
  *
+ * @stability stable
  * @since 4.0.0
  */
 
@@ -37,18 +38,18 @@ import type * as Combiner from "./Combiner.ts"
  *
  * **Example** (String concatenation reducer)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { Reducer } from "effect"
  *
  * const Concat = Reducer.make<string>((a, b) => a + b, "")
  *
- * console.log(Concat.combineAll(["hello", " ", "world"]))
- * // Output: "hello world"
+ * Concat.combineAll(["hello", " ", "world"]) // => "hello world"
  * ```
  *
  * @see {@link make} – create a `Reducer` from a function and initial value
  * @see {@link Combiner.Combiner} – parent interface without `initialValue`
  *
+ * @stability stable
  * @category models
  * @since 4.0.0
  */
@@ -89,7 +90,7 @@ export interface Reducer<A> extends Combiner.Combiner<A> {
  *
  * **Example** (Multiplying with short-circuit)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { Reducer } from "effect"
  *
  * const Product = Reducer.make<number>(
@@ -105,16 +106,14 @@ export interface Reducer<A> extends Combiner.Combiner<A> {
  *   }
  * )
  *
- * console.log(Product.combineAll([2, 3, 4]))
- * // Output: 24
- *
- * console.log(Product.combineAll([2, 0, 4]))
- * // Output: 0
+ * Product.combineAll([2, 3, 4]) // => 24
+ * Product.combineAll([2, 0, 4]) // => 0
  * ```
  *
  * @see {@link Reducer} – the interface this creates
  * @see {@link flip} – reverse the argument order
  *
+ * @stability stable
  * @category constructors
  * @since 4.0.0
  */
@@ -155,21 +154,19 @@ export function make<A>(
  *
  * **Example** (Reversing string concatenation)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { Reducer, String } from "effect"
  *
  * const Prepend = Reducer.flip(String.ReducerConcat)
  *
- * console.log(Prepend.combine("a", "b"))
- * // Output: "ba"
- *
- * console.log(Prepend.combineAll(["a", "b", "c"]))
- * // Output: "cba"
+ * Prepend.combine("a", "b") // => "ba"
+ * Prepend.combineAll(["a", "b", "c"]) // => "cba"
  * ```
  *
  * @see {@link make}
  * @see {@link Combiner.flip} – the same operation on a plain `Combiner`
  *
+ * @stability stable
  * @category combinators
  * @since 4.0.0
  */

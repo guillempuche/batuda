@@ -6,6 +6,7 @@
  * available. The module also provides `invalidate` for forcing the next `get`
  * to acquire a fresh resource.
  *
+ * @stability stable
  * @since 3.5.0
  */
 import type * as Duration from "./Duration.ts"
@@ -33,15 +34,17 @@ const TypeId = "~effect/RcRef"
  *
  * **Example** (Sharing a lazily acquired resource)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { Effect, RcRef } from "effect"
+ *
+ * const events: Array<string> = []
  *
  * // Create an RcRef for a database connection
  * const createConnectionRef = (connectionString: string) =>
  *   RcRef.make({
  *     acquire: Effect.acquireRelease(
  *       Effect.succeed(`Connected to ${connectionString}`),
- *       (connection) => Effect.log(`Closing connection: ${connection}`)
+ *       (connection) => Effect.sync(() => events.push(`closed ${connection}`))
  *     )
  *   })
  *
@@ -53,10 +56,13 @@ const TypeId = "~effect/RcRef"
  *   const connection1 = yield* RcRef.get(connectionRef)
  *   const connection2 = yield* RcRef.get(connectionRef)
  *
- *   return [connection1, connection2]
+ *   return [connection1 === connection2, events] as const
  * })
+ *
+ * await Effect.runPromise(Effect.scoped(program)) // => [true, ["closed Connected to postgres://localhost"]]
  * ```
  *
+ * @stability stable
  * @category models
  * @since 3.5.0
  */
@@ -69,14 +75,16 @@ export interface RcRef<out A, out E = never> extends Pipeable {
  *
  * **Example** (Referencing namespace types)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import type { RcRef } from "effect"
  *
  * // Use RcRef namespace types
  * type MyRcRef = RcRef.RcRef<string, Error>
  * type MyVariance = RcRef.RcRef.Variance<string, Error>
+ *
  * ```
  *
+ * @stability stable
  * @since 3.5.0
  */
 export declare namespace RcRef {
@@ -121,14 +129,16 @@ export declare namespace RcRef {
  *
  * **Example** (Creating a reference-counted resource)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { Effect, RcRef } from "effect"
  *
- * Effect.gen(function*() {
+ * const events: Array<string> = []
+ *
+ * const program = Effect.gen(function*() {
  *   const ref = yield* RcRef.make({
  *     acquire: Effect.acquireRelease(
  *       Effect.succeed("foo"),
- *       () => Effect.log("release foo")
+ *       () => Effect.sync(() => events.push("released foo"))
  *     )
  *   })
  *
@@ -139,8 +149,12 @@ export declare namespace RcRef {
  *     Effect.scoped
  *   )
  * })
+ *
+ * await Effect.runPromise(Effect.scoped(program))
+ * events // => ["released foo"]
  * ```
  *
+ * @stability stable
  * @category constructors
  * @since 3.5.0
  */
@@ -148,8 +162,16 @@ export const make: <A, E, R>(
   options: {
     readonly acquire: Effect.Effect<A, E, R>
     /**
-     * When the reference count reaches zero, the resource will be released
-     * after this duration.
+     * How long to keep an idle resource after its last reference is released.
+     *
+     * If the resource has not been invalidated, finite durations, including `0`,
+     * schedule release in a forked fiber that the scope releasing the last
+     * reference does not await. An infinite duration keeps the idle resource
+     * until invalidation or the RcRef's scope closes.
+     *
+     * If this option is omitted or the resource has been invalidated with
+     * `RcRef.invalidate`, the scope releasing the last reference releases the
+     * resource and awaits completion.
      */
     readonly idleTimeToLive?: Duration.Input | undefined
   }
@@ -172,15 +194,17 @@ export const make: <A, E, R>(
  *
  * **Example** (Sharing one acquired value)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { Effect, RcRef } from "effect"
+ *
+ * const events: Array<string> = []
  *
  * const program = Effect.gen(function*() {
  *   // Create an RcRef with a resource
  *   const ref = yield* RcRef.make({
  *     acquire: Effect.acquireRelease(
  *       Effect.succeed("shared resource"),
- *       (resource) => Effect.log(`Releasing ${resource}`)
+ *       (resource) => Effect.sync(() => events.push(`released ${resource}`))
  *     )
  *   })
  *
@@ -188,13 +212,13 @@ export const make: <A, E, R>(
  *   const value1 = yield* RcRef.get(ref)
  *   const value2 = yield* RcRef.get(ref)
  *
- *   // Both values are the same instance
- *   console.log(value1 === value2) // true
- *
- *   return value1
+ *   return [value1 === value2, events] as const
  * })
+ *
+ * await Effect.runPromise(Effect.scoped(program)) // => [true, ["released shared resource"]]
  * ```
  *
+ * @stability stable
  * @category combinators
  * @since 3.5.0
  */
@@ -219,6 +243,7 @@ export const get: <A, E>(self: RcRef<A, E>) => Effect.Effect<A, E, Scope> = inte
  *
  * @see {@link get} for acquiring the current cached resource or the fresh resource after invalidation
  *
+ * @stability stable
  * @category combinators
  * @since 3.19.6
  */

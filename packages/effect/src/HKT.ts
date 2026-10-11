@@ -7,6 +7,7 @@
  * mostly useful when defining generic helpers or type classes that should work
  * across several data types.
  *
+ * @stability stable
  * @since 2.0.0
  */
 import type * as Types from "./Types.ts"
@@ -26,7 +27,7 @@ import type * as Types from "./Types.ts"
  *
  * **Example** (Linking a type class to a type lambda)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import type { HKT } from "effect"
  *
  * interface IdentityTypeLambda extends HKT.TypeLambda {
@@ -45,9 +46,9 @@ import type * as Types from "./Types.ts"
  * type LinkedTypeLambda = typeof identity[typeof HKT.URI]
  *
  * const value: HKT.Kind<NonNullable<LinkedTypeLambda>, never, never, never, string> = identity.of("ok")
- * console.log(value) // "ok"
  * ```
  *
+ * @stability stable
  * @category symbols
  * @since 2.0.0
  */
@@ -68,7 +69,7 @@ export declare const URI: unique symbol
  *
  * **Example** (Defining higher-kinded type classes)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import type { HKT } from "effect"
  *
  * // Define a Functor type class
@@ -86,8 +87,11 @@ export declare const URI: unique symbol
  *     f: (a: A) => HKT.Kind<F, never, never, never, B>
  *   ): HKT.Kind<F, never, never, never, B>
  * }
+ *
+ * const witness: keyof Monad<HKT.TypeLambda> = "flatMap"
  * ```
  *
+ * @stability stable
  * @category models
  * @since 2.0.0
  */
@@ -112,7 +116,7 @@ export interface TypeClass<F extends TypeLambda> {
  *
  * **Example** (Defining type lambdas)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import type { Effect, HKT } from "effect"
  *
  * // TypeLambda for Array<A>
@@ -129,8 +133,11 @@ export interface TypeClass<F extends TypeLambda> {
  * interface FunctionTypeLambda extends HKT.TypeLambda {
  *   readonly type: (a: this["In"]) => this["Target"]
  * }
+ *
+ * const witness: HKT.Kind<ArrayTypeLambda, never, never, never, string> = ["ok"]
  * ```
  *
+ * @stability stable
  * @category models
  * @since 2.0.0
  */
@@ -158,8 +165,9 @@ export interface TypeLambda {
  *
  * **Example** (Applying type lambdas)
  *
- * ```ts
- * import type { Effect, HKT, Option } from "effect"
+ * ```ts import.meta.vitest
+ * import { Option } from "effect"
+ * import type { Effect, HKT } from "effect"
  *
  * // Define TypeLambdas
  * interface OptionTypeLambda extends HKT.TypeLambda {
@@ -191,8 +199,11 @@ export interface TypeLambda {
  *   never,
  *   string
  * >
+ *
+ * const witness: OptionString = Option.some("ok")
  * ```
  *
+ * @stability stable
  * @category utility types
  * @since 2.0.0
  */

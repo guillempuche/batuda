@@ -7,6 +7,7 @@
  * `Combiner` interface, a constructor for custom combining logic, and common
  * combiners for choosing or ordering values.
  *
+ * @stability stable
  * @since 4.0.0
  */
 import type * as Order from "./Order.ts"
@@ -26,16 +27,16 @@ import type * as Order from "./Order.ts"
  *
  * **Example** (Combining numbers with addition)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { Combiner } from "effect"
  *
  * const Sum = Combiner.make<number>((self, that) => self + that)
  *
- * console.log(Sum.combine(3, 4))
- * // Output: 7
+ * Sum.combine(3, 4) // => 7
  * ```
  *
  * @see {@link make} – create a `Combiner` from a function
+ * @stability stable
  * @category models
  * @since 4.0.0
  */
@@ -65,16 +66,16 @@ export interface Combiner<A> {
  *
  * **Example** (Multiplying numbers)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { Combiner } from "effect"
  *
  * const Product = Combiner.make<number>((self, that) => self * that)
  *
- * console.log(Product.combine(3, 5))
- * // Output: 15
+ * Product.combine(3, 5) // => 15
  * ```
  *
  * @see {@link Combiner} – the interface this creates
+ * @stability stable
  * @category constructors
  * @since 4.0.0
  */
@@ -97,16 +98,16 @@ export function make<A>(combine: (self: A, that: A) => A): Combiner<A> {
  *
  * **Example** (Reversing string concatenation)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { Combiner, String } from "effect"
  *
  * const Prepend = Combiner.flip(String.ReducerConcat)
  *
- * console.log(Prepend.combine("a", "b"))
- * // Output: "ba"
+ * Prepend.combine("a", "b") // => "ba"
  * ```
  *
  * @see {@link make}
+ * @stability stable
  * @category combinators
  * @since 4.0.0
  */
@@ -130,19 +131,17 @@ export function flip<A>(combiner: Combiner<A>): Combiner<A> {
  *
  * **Example** (Selecting the minimum of two numbers)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { Combiner, Number } from "effect"
  *
  * const Min = Combiner.min(Number.Order)
  *
- * console.log(Min.combine(3, 1))
- * // Output: 1
- *
- * console.log(Min.combine(1, 3))
- * // Output: 1
+ * Min.combine(3, 1) // => 1
+ * Min.combine(1, 3) // => 1
  * ```
  *
  * @see {@link max}
+ * @stability stable
  * @category constructors
  * @since 4.0.0
  */
@@ -166,19 +165,17 @@ export function min<A>(order: Order.Order<A>): Combiner<A> {
  *
  * **Example** (Selecting the maximum of two numbers)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { Combiner, Number } from "effect"
  *
  * const Max = Combiner.max(Number.Order)
  *
- * console.log(Max.combine(3, 1))
- * // Output: 3
- *
- * console.log(Max.combine(1, 3))
- * // Output: 3
+ * Max.combine(3, 1) // => 3
+ * Max.combine(1, 3) // => 3
  * ```
  *
  * @see {@link min}
+ * @stability stable
  * @category constructors
  * @since 4.0.0
  */
@@ -199,16 +196,16 @@ export function max<A>(order: Order.Order<A>): Combiner<A> {
  *
  * **Example** (Keeping the first value)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { Combiner } from "effect"
  *
  * const First = Combiner.first<number>()
  *
- * console.log(First.combine(1, 2))
- * // Output: 1
+ * First.combine(1, 2) // => 1
  * ```
  *
  * @see {@link last}
+ * @stability stable
  * @category constructors
  * @since 4.0.0
  */
@@ -229,16 +226,16 @@ export function first<A>(): Combiner<A> {
  *
  * **Example** (Keeping the last value)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { Combiner } from "effect"
  *
  * const Last = Combiner.last<number>()
  *
- * console.log(Last.combine(1, 2))
- * // Output: 2
+ * Last.combine(1, 2) // => 2
  * ```
  *
  * @see {@link first}
+ * @stability stable
  * @category constructors
  * @since 4.0.0
  */
@@ -261,17 +258,17 @@ export function last<A>(): Combiner<A> {
  *
  * **Example** (Always returning zero)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { Combiner } from "effect"
  *
  * const Zero = Combiner.constant(0)
  *
- * console.log(Zero.combine(42, 99))
- * // Output: 0
+ * Zero.combine(42, 99) // => 0
  * ```
  *
  * @see {@link first}
  * @see {@link last}
+ * @stability stable
  * @category constructors
  * @since 4.0.0
  */
@@ -297,16 +294,16 @@ export function constant<A>(a: A): Combiner<A> {
  *
  * **Example** (Joining strings with a separator)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { Combiner, String } from "effect"
  *
  * const commaSep = Combiner.intercalate(",")(String.ReducerConcat)
  *
- * console.log(commaSep.combine("a", "b"))
- * // Output: "a,b"
+ * commaSep.combine("a", "b") // => "a,b"
  * ```
  *
  * @see {@link make}
+ * @stability stable
  * @category combinators
  * @since 4.0.0
  */

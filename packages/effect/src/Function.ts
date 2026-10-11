@@ -6,6 +6,7 @@
  * module also contains small identity, constant, tuple, type-level, and
  * memoization helpers used across the library.
  *
+ * @stability stable
  * @since 2.0.0
  */
 import type { TypeLambda } from "./HKT.ts"
@@ -21,7 +22,7 @@ import { pipeArguments } from "./Pipeable.ts"
  *
  * **Example** (Creating a function type with a type lambda)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import type { Function, HKT } from "effect"
  *
  * // Create a function type using the type lambda
@@ -29,7 +30,8 @@ import { pipeArguments } from "./Pipeable.ts"
  * // Equivalent to: (a: string) => number
  * ```
  *
- * @category type lambdas
+ * @stability stable
+ * @category utility types
  * @since 2.0.0
  */
 export interface FunctionTypeLambda extends TypeLambda {
@@ -53,7 +55,7 @@ export interface FunctionTypeLambda extends TypeLambda {
  *
  * **Example** (Selecting data-first or data-last style by arity)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { Function, pipe } from "effect"
  *
  * const sum = Function.dual<
@@ -61,13 +63,13 @@ export interface FunctionTypeLambda extends TypeLambda {
  *   (self: number, that: number) => number
  * >(2, (self, that) => self + that)
  *
- * console.log(sum(2, 3)) // 5
- * console.log(pipe(2, sum(3))) // 5
+ * sum(2, 3) // => 5
+ * pipe(2, sum(3)) // => 5
  * ```
  *
  * **Example** (Defining overloads with call signatures)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { Function, pipe } from "effect"
  *
  * const sum: {
@@ -75,13 +77,13 @@ export interface FunctionTypeLambda extends TypeLambda {
  *   (self: number, that: number): number
  * } = Function.dual(2, (self: number, that: number): number => self + that)
  *
- * console.log(sum(2, 3)) // 5
- * console.log(pipe(2, sum(3))) // 5
+ * sum(2, 3) // => 5
+ * pipe(2, sum(3)) // => 5
  * ```
  *
  * **Example** (Selecting data-first or data-last style with a predicate)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { Function, pipe } from "effect"
  *
  * const sum = Function.dual<
@@ -92,10 +94,11 @@ export interface FunctionTypeLambda extends TypeLambda {
  *   (self, that) => self + that
  * )
  *
- * console.log(sum(2, 3)) // 5
- * console.log(pipe(2, sum(3))) // 5
+ * sum(2, 3) // => 5
+ * pipe(2, sum(3)) // => 5
  * ```
  *
+ * @stability stable
  * @category combinators
  * @since 2.0.0
  */
@@ -169,15 +172,15 @@ export const dual: {
  *
  * **Example** (Applying an argument to a function)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { Function, pipe, String } from "effect"
- * import * as assert from "node:assert"
  *
- * assert.deepStrictEqual(pipe(String.length, Function.apply("hello")), 5)
+ * pipe(String.length, Function.apply("hello")) // => 5
  * ```
  *
  * @see {@link pipe} for building left-to-right pipelines
  *
+ * @stability stable
  * @category combinators
  * @since 2.0.0
  */
@@ -192,12 +195,14 @@ export const apply = <A>(a: A) => <B>(self: (a: A) => B): B => self(a)
  *
  * **Example** (Creating a lazy argument)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { Function } from "effect"
  *
  * const constNull: Function.LazyArg<null> = Function.constant(null)
+ * constNull() // => null
  * ```
  *
+ * @stability stable
  * @category models
  * @since 2.0.0
  */
@@ -213,14 +218,14 @@ export type LazyArg<A> = () => A
  *
  * **Example** (Typing a variadic function)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import type { Function } from "effect"
- * import * as assert from "node:assert"
  *
  * const sum: Function.FunctionN<[number, number], number> = (a, b) => a + b
- * assert.deepStrictEqual(sum(2, 3), 5)
+ * sum(2, 3) // => 5
  * ```
  *
+ * @stability stable
  * @category models
  * @since 2.0.0
  */
@@ -235,13 +240,13 @@ export type FunctionN<A extends ReadonlyArray<unknown>, B> = (...args: A) => B
  *
  * **Example** (Returning the same value)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { identity } from "effect"
- * import * as assert from "node:assert"
  *
- * assert.deepStrictEqual(identity(5), 5)
+ * identity(5) // => 5
  * ```
  *
+ * @stability stable
  * @category combinators
  * @since 2.0.0
  */
@@ -258,21 +263,19 @@ export const identity = <A>(a: A): A => a
  *
  * **Example** (Checking an expression against a type)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { Function } from "effect"
- * import * as assert from "node:assert"
  *
- * const test1 = Function.satisfies<number>()(5 as const)
+ * const test1 = Function.satisfies<number>()(5 as const) // => 5
  * // ^? const test: 5
  * // @ts-expect-error
  * const test2 = Function.satisfies<string>()(5)
  * // ^? Argument of type 'number' is not assignable to parameter of type 'string'
- *
- * assert.deepStrictEqual(Function.satisfies<number>()(5), 5)
  * ```
  *
  * @see {@link cast} for changing only the static TypeScript type
  *
+ * @stability stable
  * @category utility types
  * @since 2.0.0
  */
@@ -293,6 +296,7 @@ export const satisfies = <A>() => <B extends A>(b: B) => b
  *
  * @see {@link satisfies} for checking assignability without changing the resulting type
  *
+ * @stability stable
  * @category utility types
  * @since 4.0.0
  */
@@ -308,16 +312,16 @@ export const cast: <A, B>(a: A) => B = identity as any
  *
  * **Example** (Creating a constant thunk)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { Function } from "effect"
- * import * as assert from "node:assert"
  *
  * const constNull = Function.constant(null)
  *
- * assert.deepStrictEqual(constNull(), null)
- * assert.deepStrictEqual(constNull(), null)
+ * constNull() // => null
+ * constNull() // => null
  * ```
  *
+ * @stability stable
  * @category constructors
  * @since 2.0.0
  */
@@ -332,13 +336,13 @@ export const constant = <A>(value: A): LazyArg<A> => () => value
  *
  * **Example** (Returning true from a thunk)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { Function } from "effect"
- * import * as assert from "node:assert"
  *
- * assert.deepStrictEqual(Function.constTrue(), true)
+ * Function.constTrue() // => true
  * ```
  *
+ * @stability stable
  * @category constants
  * @since 2.0.0
  */
@@ -353,13 +357,13 @@ export const constTrue: LazyArg<boolean> = constant(true)
  *
  * **Example** (Returning false from a thunk)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { Function } from "effect"
- * import * as assert from "node:assert"
  *
- * assert.deepStrictEqual(Function.constFalse(), false)
+ * Function.constFalse() // => false
  * ```
  *
+ * @stability stable
  * @category constants
  * @since 2.0.0
  */
@@ -374,13 +378,13 @@ export const constFalse: LazyArg<boolean> = constant(false)
  *
  * **Example** (Returning null from a thunk)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { Function } from "effect"
- * import * as assert from "node:assert"
  *
- * assert.deepStrictEqual(Function.constNull(), null)
+ * Function.constNull() // => null
  * ```
  *
+ * @stability stable
  * @category constants
  * @since 2.0.0
  */
@@ -395,13 +399,13 @@ export const constNull: LazyArg<null> = constant(null)
  *
  * **Example** (Returning undefined from a thunk)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { Function } from "effect"
- * import * as assert from "node:assert"
  *
- * assert.deepStrictEqual(Function.constUndefined(), undefined)
+ * Function.constUndefined() // => undefined
  * ```
  *
+ * @stability stable
  * @category constants
  * @since 2.0.0
  */
@@ -417,13 +421,13 @@ export const constUndefined: LazyArg<undefined> = constant(undefined)
  *
  * **Example** (Returning void from a thunk)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { Function } from "effect"
- * import * as assert from "node:assert"
  *
- * assert.deepStrictEqual(Function.constVoid(), undefined)
+ * Function.constVoid() // => undefined
  * ```
  *
+ * @stability stable
  * @category constants
  * @since 2.0.0
  */
@@ -439,15 +443,15 @@ export const constVoid: LazyArg<void> = constUndefined
  *
  * **Example** (Flipping curried arguments)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { Function } from "effect"
- * import * as assert from "node:assert"
  *
  * const f = (a: number) => (b: string) => a - b.length
  *
- * assert.deepStrictEqual(Function.flip(f)("aaa")(2), -1)
+ * Function.flip(f)("aaa")(2) // => -1
  * ```
  *
+ * @stability stable
  * @category combinators
  * @since 2.0.0
  */
@@ -467,19 +471,19 @@ export const flip = <A extends Array<unknown>, B extends Array<unknown>, C>(
  *
  * **Example** (Composing two functions)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { Function } from "effect"
- * import * as assert from "node:assert"
  *
  * const increment = (n: number) => n + 1
  * const square = (n: number) => n * n
  *
- * assert.strictEqual(Function.compose(increment, square)(2), 9)
+ * Function.compose(increment, square)(2) // => 9
  * ```
  *
  * @see {@link flow} for composing a left-to-right sequence of functions
  * @see {@link pipe} for applying a value through a left-to-right sequence immediately
  *
+ * @stability stable
  * @category combinators
  * @since 2.0.0
  */
@@ -504,7 +508,7 @@ export const compose: {
  *
  * **Example** (Handling impossible values)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { absurd } from "effect"
  *
  * const handleNever = (value: never) => {
@@ -512,6 +516,7 @@ export const compose: {
  * }
  * ```
  *
+ * @stability stable
  * @category utility types
  * @since 2.0.0
  */
@@ -528,17 +533,17 @@ export const absurd = <A>(_: never): A => {
  *
  * **Example** (Converting arguments to a tuple)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { Function } from "effect"
- * import * as assert from "node:assert"
  *
  * const sumTupled = Function.tupled((x: number, y: number): number => x + y)
  *
- * assert.deepStrictEqual(sumTupled([1, 2]), 3)
+ * sumTupled([1, 2]) // => 3
  * ```
  *
  * @see {@link untupled} for adapting a tuple-argument function back to multiple arguments
  *
+ * @stability stable
  * @category combinators
  * @since 2.0.0
  */
@@ -553,17 +558,17 @@ export const tupled = <A extends ReadonlyArray<unknown>, B>(f: (...a: A) => B): 
  *
  * **Example** (Converting a tuple to arguments)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { Function } from "effect"
- * import * as assert from "node:assert"
  *
  * const getFirst = Function.untupled(<A, B>(tuple: [A, B]): A => tuple[0])
  *
- * assert.deepStrictEqual(getFirst(1, 2), 1)
+ * getFirst(1, 2) // => 1
  * ```
  *
  * @see {@link tupled} for adapting a multi-argument function to one tuple argument
  *
+ * @stability stable
  * @category combinators
  * @since 2.0.0
  */
@@ -593,84 +598,36 @@ export const untupled = <A extends ReadonlyArray<unknown>, B>(f: (a: A) => B): (
  * In this example, `1` is passed to the first function, and each result becomes
  * the input for the next function.
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { pipe } from "effect"
  *
- * const result = pipe(
+ * pipe(
  *   1,
  *   (n) => n + 1,
  *   (n) => n * 2,
  *   (n) => `result: ${n}`
- * )
- *
- * console.log(result) // "result: 4"
- * ```
- *
- * **Example** (Chaining methods before conversion)
- *
- * ```ts
- * const numbers = [1, 2, 3, 4]
- * const double = (n: number) => n * 2
- * const greaterThanFour = (n: number) => n > 4
- *
- * const result = numbers.map(double).filter(greaterThanFour)
- *
- * console.log(result) // [6, 8]
+ * ) // => "result: 4"
  * ```
  *
  * **Example** (Rewriting method chains with pipe)
  *
  * The same transformation can be written with data-last functions.
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { Array, pipe } from "effect"
  *
  * const numbers = [1, 2, 3, 4]
  * const double = (n: number) => n * 2
  * const greaterThanFour = (n: number) => n > 4
  *
- * const result = pipe(
+ * pipe(
  *   numbers,
  *   Array.map(double),
  *   Array.filter(greaterThanFour)
- * )
- *
- * console.log(result) // [6, 8]
+ * ) // => [6, 8]
  * ```
  *
- * **Example** (Chaining arithmetic operations)
- *
- * ```ts
- * import { pipe } from "effect"
- *
- * // Define simple arithmetic operations
- * const increment = (x: number) => x + 1
- * const double = (x: number) => x * 2
- * const subtractTen = (x: number) => x - 10
- *
- * // Sequentially apply these operations using `pipe`
- * const result = pipe(5, increment, double, subtractTen)
- *
- * console.log(result)
- * // Output: 2
- * ```
- *
- * **Example** (Building a simple transformation pipeline)
- *
- * ```ts
- * import { pipe } from "effect"
- *
- * // Simple transformation pipeline
- * const result = pipe(
- *   5,
- *   (x) => x * 2, // 10
- *   (x) => x + 1, // 11
- *   (x) => x.toString() // "11"
- * )
- *
- * console.log(result) // "11"
- * ```
- *
+ * @stability stable
  * @category combinators
  * @since 2.0.0
  */
@@ -1141,21 +1098,21 @@ export function pipe(a: unknown, ...args: Array<any>): unknown {
  *
  * **Example** (Composing functions left to right)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { flow } from "effect"
- * import * as assert from "node:assert"
  *
  * const len = (s: string): number => s.length
  * const double = (n: number): number => n * 2
  *
  * const f = flow(len, double)
  *
- * assert.strictEqual(f("aaa"), 6)
+ * f("aaa") // => 6
  * ```
  *
  * @see {@link pipe} for applying a value through a left-to-right sequence immediately
  * @see {@link compose} for composing exactly two functions
  *
+ * @stability stable
  * @category combinators
  * @since 2.0.0
  */
@@ -1338,7 +1295,7 @@ export function flow(
  *
  * **Example** (Creating a development placeholder)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { hole } from "effect"
  *
  * // Intentionally not called: `hole` throws if the placeholder is evaluated.
@@ -1347,9 +1304,9 @@ export function flow(
  *   name: hole<string>()
  * })
  *
- * console.log(typeof buildUser) // "function"
  * ```
  *
+ * @stability stable
  * @category utility types
  * @since 2.0.0
  */
@@ -1366,13 +1323,13 @@ export const hole: <T>() => T = cast(absurd)
  *
  * **Example** (Discarding the first argument)
  *
- * ```ts
+ * ```ts import.meta.vitest
  * import { Function } from "effect"
- * import * as assert from "node:assert"
  *
- * assert.deepStrictEqual(Function.SK(0, "hello"), "hello")
+ * Function.SK(0, "hello") // => "hello"
  * ```
  *
+ * @stability stable
  * @category combinators
  * @since 2.0.0
  */
@@ -1390,26 +1347,67 @@ export const SK = <A, B>(_: A, b: B): B => b
  * **Details**
  *
  * Each memoized wrapper owns a private `WeakMap` keyed by object identity.
- * Cached `undefined` results are still returned because the cache is checked
- * with `WeakMap.has`.
  *
  * **Gotchas**
+ *
+ * `undefined` is reserved to represent a cache miss and is therefore not
+ * supported as a return value.
  *
  * Structurally equal objects do not share cache entries. If the same object is
  * mutated after its first call, later calls still return the cached result for
  * that reference.
  *
+ * @stability stable
  * @category caching
  * @since 4.0.0
  */
-export function memoize<A extends object, O>(f: (a: A) => O): (ast: A) => O {
+export function memoize<A extends object, O extends {} | null>(f: (a: A) => O): (ast: A) => O {
   const cache = new WeakMap<object, O>()
   return (a) => {
-    if (cache.has(a)) {
-      return cache.get(a)!
-    }
+    const cached = cache.get(a)
+    if (cached !== undefined) return cached
     const result = f(a)
     cache.set(a, result)
+    return result
+  }
+}
+
+/**
+ * Creates a memoized idempotent object transformation that caches both inputs
+ * and their outputs by object identity.
+ *
+ * **When to use**
+ *
+ * Use when an object transformation is idempotent and its output can be safely
+ * reused as a fixed point.
+ *
+ * **Details**
+ *
+ * After computing an input, the returned function caches both the input and
+ * the output. Calling it with either reference returns the output without
+ * invoking the supplied function again.
+ *
+ * **Gotchas**
+ *
+ * The returned function treats each computed output as a fixed point. If
+ * applying the supplied function to an output would produce an observably
+ * different value, this memoization changes that behavior.
+ *
+ * @see {@link memoize} for memoizing functions without an idempotence requirement
+ * @stability stable
+ * @category caching
+ * @since 4.0.0
+ */
+export function memoizeIdempotent<A extends object>(f: (a: A) => A): (a: A) => A {
+  const cache = new WeakMap<A, A>()
+  return (a) => {
+    const cached = cache.get(a)
+    if (cached !== undefined) return cached
+    const result = f(a)
+    cache.set(a, result)
+    if (result !== a) {
+      cache.set(result, result)
+    }
     return result
   }
 }
