@@ -28,6 +28,7 @@
  */
 
 import { ATTRIBUTES_FIELD } from './attribute-bag'
+import { isPlainObject } from './guard-shapes'
 
 /**
  * The fields each kind of scan declares as a value paired with its page.
@@ -46,9 +47,6 @@ const PAIRED_FIELDS_BY_SCHEMA: Record<string, ReadonlyArray<string>> = {
 	],
 	competitor_scan_v1: ['website'],
 }
-
-const isPlainObject = (value: unknown): value is Record<string, unknown> =>
-	typeof value === 'object' && value !== null && !Array.isArray(value)
 
 // A value written on its own, with no page beside it. A number counts: a
 // headcount reaches some rows as the figure alone.

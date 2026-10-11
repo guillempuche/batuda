@@ -36,7 +36,7 @@ import {
 import { ProviderError } from '../../domain/errors'
 import { EnrichmentResult } from '../../domain/types'
 import { keyForSlot } from '../_config'
-import { hardenHttp } from '../_http-harden'
+import { hardenHttp, statusRecoverable } from '../_http-harden'
 
 const PEOPLE_SEARCH_URL = 'https://app.fullenrich.com/api/v2/people/search'
 
@@ -113,10 +113,6 @@ const SearchedPerson = Schema.Struct({
 const PeopleSearchResponse = Schema.Struct({
 	people: Schema.optional(Schema.Array(SearchedPerson)),
 })
-
-// 429 + 5xx are transient (retry); other 4xx are auth/quota/bad-request (fail fast).
-const statusRecoverable = (status: number): boolean =>
-	status === 429 || status >= 500
 
 // FullEnrich email deliverability status → the pipeline's verdict. Undefined
 // when there is no status (the common case: People Search returns no email, so

@@ -22,6 +22,7 @@ import { domainToUnicode } from 'node:url'
 import { EQUIVALENT_LETTERS } from '@batuda/domain'
 
 import { isSocialPlatformHost } from './social-sites'
+import { LETTERS_TO_REWRITE } from './term-match'
 
 // Legal-form suffixes dropped before matching, so "Acme Logistics S.L." and a
 // page that writes "Acme Logistica SL" still match on the same name core.
@@ -136,17 +137,6 @@ const SECOND_LEVEL = new Set([
 	'ac',
 	'gob',
 ])
-
-// Just the letters the table has an answer for. Built from the table so the two
-// cannot drift apart, and kept narrow because this runs over whole scraped pages:
-// asked to look at every letter instead, the same work takes three times as long
-// for the same result, since almost every letter of almost every page is already
-// a plain one. Safe to drop into a character class unescaped — the table is
-// generated from letters only, so nothing in it can mean something to a regex.
-const LETTERS_TO_REWRITE = new RegExp(
-	`[${[...EQUIVALENT_LETTERS.keys()].join('')}]`,
-	'gu',
-)
 
 /**
  * Lower-case, accents off, every letter written in a–z. Everything that reads a

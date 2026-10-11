@@ -21,9 +21,8 @@ import {
 import { MapProvider, type SiteMapInput } from '../../application/ports'
 import { ProviderError } from '../../domain/errors'
 import { keyForSlot } from '../_config'
-import { hardenHttp } from '../_http-harden'
+import { hardenHttp, statusRecoverable } from '../_http-harden'
 import { NullableOptional } from '../_schema'
-import { statusRecoverable } from './scrape'
 
 const MAP_URL = 'https://api.firecrawl.dev/v2/map'
 

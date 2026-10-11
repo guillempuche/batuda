@@ -18,6 +18,7 @@ import { SearchResult, SearchResultItem } from '../../domain/types'
 import { keyForSlot } from '../_config'
 import { hardenHttp } from '../_http-harden'
 import { NullableOptional } from '../_schema'
+import { freshnessForRecency } from './_freshness'
 
 // ── Brave API response schema (subset we care about) ──
 // Only the URL is worth failing a whole result over: without it there is
@@ -42,12 +43,6 @@ const BraveSearchResponse = Schema.Struct({
 		}),
 	),
 })
-
-// Brave's freshness takes discrete buckets (past day/week/month/year) or an
-// explicit date range — never a "past N days" number — so map the requested
-// window to the nearest bucket. (The old `pd<days>` form was silently invalid.)
-const freshnessForRecency = (days: number): string =>
-	days <= 1 ? 'pd' : days <= 7 ? 'pw' : days <= 31 ? 'pm' : 'py'
 
 // ── Provider factory ──
 

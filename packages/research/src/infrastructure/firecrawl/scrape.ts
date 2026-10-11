@@ -10,8 +10,6 @@
  * @see https://docs.firecrawl.dev/api-reference/endpoint/scrape
  */
 
-import { createHash } from 'node:crypto'
-
 import { Config, Effect, Option, Redacted, Schema } from 'effect'
 import {
 	HttpClient,
@@ -21,9 +19,10 @@ import {
 
 import { type ScrapeInput, ScrapeProvider } from '../../application/ports'
 import { ProviderError, UnsupportedSite } from '../../domain/errors'
+import { sha256Hex } from '../../domain/stable-hash'
 import { ScrapedPage } from '../../domain/types'
 import { keyForSlot } from '../_config'
-import { hardenHttp } from '../_http-harden'
+import { hardenHttp, statusRecoverable } from '../_http-harden'
 import {
 	firstText,
 	NullableOptional,
@@ -105,14 +104,6 @@ const ScrapeResponse = Schema.Struct({
 		}),
 	),
 })
-
-const sha256Hex = (input: string): string =>
-	createHash('sha256').update(input).digest('hex')
-
-// 429 + 5xx are transient (retry); other 4xx are auth/quota/bad-request (fail fast).
-// Shared with the sibling firecrawl/map adapter, which retries on the same codes.
-export const statusRecoverable = (status: number): boolean =>
-	status === 429 || status >= 500
 
 // Firecrawl answers a fetch of a site it refuses (LinkedIn and other people
 // directories) with 403 + a body like {"success":false,"error":"…we do not

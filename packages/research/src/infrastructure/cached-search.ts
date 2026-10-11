@@ -18,19 +18,15 @@
  * unchanged.
  */
 
-import { createHash } from 'node:crypto'
-
 import { Cause, Effect, Layer, Option, Schema } from 'effect'
 import { SqlClient } from 'effect/unstable/sql'
 
 import { type SearchInput, SearchProvider } from '../application/ports'
 import { recordSeenSources } from '../application/source-record'
 import { ProviderError } from '../domain/errors'
+import { sha256Hex } from '../domain/stable-hash'
 import { SearchResult } from '../domain/types'
 import { cacheBypassConfig } from './_config'
-
-const sha256Hex = (input: string): string =>
-	createHash('sha256').update(input).digest('hex')
 
 export const computeSearchCacheKey = (
 	provider: string,

@@ -30,7 +30,12 @@ import {
 } from './contacts-rescue'
 import { discoveryResultField, isDiscoveryScan } from './discovery-scan'
 import { enrichmentFill } from './extraction-fill'
-import { isPlainObject, isValueWrapper, unwrapValue } from './guard-shapes'
+import {
+	enrichmentOf,
+	isPlainObject,
+	isValueWrapper,
+	unwrapValue,
+} from './guard-shapes'
 import {
 	dedupeDiscoveryRows,
 	discoveryRowIdentityKeys,
@@ -286,16 +291,6 @@ const attributesOf = (
 	if (!isPlainObject(findings)) return undefined
 	const map = findings[ATTRIBUTES_FIELD]
 	return isPlainObject(map) ? map : undefined
-}
-
-const enrichmentOf = (
-	findings: unknown,
-): Record<string, unknown> | undefined => {
-	if (findings === null || typeof findings !== 'object') return undefined
-	const enrichment = (findings as { enrichment?: unknown }).enrichment
-	return enrichment !== null && typeof enrichment === 'object'
-		? (enrichment as Record<string, unknown>)
-		: undefined
 }
 
 /** The companies a scan found, or none when the findings hold no usable list. */

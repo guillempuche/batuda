@@ -17,44 +17,23 @@
  * or user PII).
  */
 
-import { createHash } from 'node:crypto'
-
 import { Cache, type Config, Duration, Effect, Option } from 'effect'
 import { LanguageModel } from 'effect/unstable/ai'
 import { SqlClient } from 'effect/unstable/sql'
 
 import { type LlmRate, priceLlmMicrocents } from '../application/cost-rates'
 import { UsageMeter } from '../application/usage-meter'
+import { sha256Hex, stableStringify } from '../domain/stable-hash'
 import { cacheBypassConfig } from './_config'
 
 export type LlmTier = 'agent' | 'extract' | 'writer'
-
-const sha256Hex = (input: string): string =>
-	createHash('sha256').update(input).digest('hex')
-
-export const stableStringifyForCache = (value: unknown): string => {
-	const seen = new WeakSet()
-	const walk = (v: unknown): unknown => {
-		if (v === null || typeof v !== 'object') return v
-		if (seen.has(v as object)) return '[circular]'
-		seen.add(v as object)
-		if (Array.isArray(v)) return v.map(walk)
-		const entries = Object.entries(v as Record<string, unknown>)
-			.filter(([, val]) => typeof val !== 'function')
-			.sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
-			.map(([k, val]) => [k, walk(val)] as const)
-		return Object.fromEntries(entries)
-	}
-	return JSON.stringify(walk(value))
-}
 
 export const computeLlmCacheKey = (
 	tier: LlmTier,
 	model: string,
 	method: 'text' | 'object',
 	options: unknown,
-): string =>
-	sha256Hex(`${tier}|${model}|${method}|${stableStringifyForCache(options)}`)
+): string => sha256Hex(`${tier}|${model}|${method}|${stableStringify(options)}`)
 
 export const isLlmCacheable = (options: unknown): boolean => {
 	if (!options || typeof options !== 'object') return true
@@ -87,7 +66,7 @@ const promptPreview = (options: unknown): string => {
 	if (!options || typeof options !== 'object') return ''
 	const prompt = (options as { prompt?: unknown }).prompt
 	if (typeof prompt === 'string') return prompt.slice(0, 200)
-	return stableStringifyForCache(prompt).slice(0, 200)
+	return stableStringify(prompt).slice(0, 200)
 }
 
 const tokensFromResponse = (response: unknown) => {

@@ -17,6 +17,7 @@
 
 import { Schema } from 'effect'
 
+import { enrichmentOf } from './guard-shapes'
 import { Sourced } from './schemas/_shared'
 
 // The narrow schema the focused pass fills: the employee count alone. Optional,
@@ -24,16 +25,6 @@ import { Sourced } from './schemas/_shared'
 export const SizeRescueSchema = Schema.Struct({
 	size_range: Schema.optionalKey(Sourced(Schema.String)),
 })
-
-const enrichmentOf = (
-	findings: unknown,
-): Record<string, unknown> | undefined => {
-	if (findings === null || typeof findings !== 'object') return undefined
-	const enrichment = (findings as { enrichment?: unknown }).enrichment
-	return enrichment !== null && typeof enrichment === 'object'
-		? (enrichment as Record<string, unknown>)
-		: undefined
-}
 
 // A per-field value counts as present only when it carries a non-empty string
 // value — a missing key, or a `{ value: null }` a guard blanked, is still "empty".

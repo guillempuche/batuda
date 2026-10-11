@@ -24,7 +24,7 @@ import { type RegistryInput, RegistryRouter } from '../../application/ports'
 import { ProviderError } from '../../domain/errors'
 import { RegistryRecord } from '../../domain/types'
 import { keyForSlot } from '../_config'
-import { hardenHttp } from '../_http-harden'
+import { hardenHttp, statusRecoverable } from '../_http-harden'
 
 const BASE_URL = 'https://api.librebor.me/v2'
 
@@ -61,11 +61,6 @@ const SearchResponse = Schema.Struct({
 		Schema.NullOr(Schema.Array(Schema.Struct({ slug: Schema.String }))),
 	),
 })
-
-// 429 + 5xx are transient (retry); 401/402 (bad key / no credit), 404 (not
-// found) and 400 (bad NIF) are terminal for this request.
-const statusRecoverable = (status: number): boolean =>
-	status === 429 || status >= 500
 
 // Only 402 (no credit) means the same answer awaits every later lookup this run
 // makes, which is what the budget needs to hear. 401 is a dead key: terminal

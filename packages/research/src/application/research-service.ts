@@ -1,4 +1,4 @@
-import { createHash, randomUUID } from 'node:crypto'
+import { randomUUID } from 'node:crypto'
 
 import {
 	Cause,
@@ -43,6 +43,7 @@ import {
 	ProviderError,
 	SubjectUnavailable,
 } from '../domain/errors'
+import { sha256Hex, stableStringify } from '../domain/stable-hash'
 import type { ReasonCode, ResolvedPolicy } from '../domain/types'
 import { aboutPageCandidates } from './about-pages'
 import { canAffordAnotherRound, runAgentResearchLoop } from './agent-loop'
@@ -338,9 +339,6 @@ const reasonCodeFor = (cause: Cause.Cause<unknown>): ReasonCode =>
 		? 'subject_unavailable'
 		: 'internal_error'
 
-const sha256Hex = (input: string): string =>
-	createHash('sha256').update(input).digest('hex')
-
 // How a tool result reads as text, before anything trims it. Shared with
 // `boundedToolResult` so the size a log reports and the text it would have
 // stored can never be measuring two different things — a result that is an
@@ -614,14 +612,7 @@ const citedSourceIds = (
 	const rows = (findings as Record<string, unknown>)[listField]
 	if (!Array.isArray(rows)) return out
 	for (const row of rows) {
-		if (row === null || typeof row !== 'object') continue
-		const citations = (row as { citations?: unknown }).citations
-		if (!Array.isArray(citations)) continue
-		for (const citation of citations) {
-			if (citation === null || typeof citation !== 'object') continue
-			const id = (citation as { source_id?: unknown }).source_id
-			if (typeof id === 'string') out.push(id)
-		}
+		if (isPlainObject(row)) out.push(...rowCitedSourceIds(row))
 	}
 	return out
 }
@@ -651,29 +642,6 @@ export const citedUnscrapedSources = (
 		if (out.length >= cap) break
 	}
 	return out
-}
-
-/**
- * Deterministic JSON serializer: sorts object keys and drops function values
- * so two call-sites that pass equivalent hints hash identically regardless of
- * property-declaration order. Plain `JSON.stringify` would preserve insertion
- * order and produce spurious cache misses.
- */
-const stableStringify = (value: unknown): string => {
-	const seen = new WeakSet<object>()
-	const walk = (v: unknown): unknown => {
-		if (v === null || typeof v !== 'object') return v
-		if (seen.has(v as object)) return '[circular]'
-		seen.add(v as object)
-		if (Array.isArray(v)) return v.map(walk)
-		return Object.fromEntries(
-			Object.entries(v as Record<string, unknown>)
-				.filter(([, val]) => typeof val !== 'function')
-				.sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
-				.map(([k, val]) => [k, walk(val)] as const),
-		)
-	}
-	return JSON.stringify(walk(value))
 }
 
 export const normalizeResearchQuery = (query: string): string =>
@@ -3033,6 +3001,15 @@ export class ResearchService extends Context.Service<ResearchService>()(
 						SELECT * FROM research_runs WHERE id = ${researchId}
 					`
 					if (!run) return
+					// The row's columns the run reads throughout, typed once. The policy
+					// was validated and frozen onto the row at create time; it is typed
+					// nullable so the reads that fall back to a zero budget keep doing so.
+					const query = (run as { query: string }).query
+					const organizationId = (run as { organizationId: string })
+						.organizationId
+					const parentId = (run as { parentId: string | null }).parentId
+					const paidPolicy = (run as { paidPolicy: ResolvedPolicy | null })
+						.paidPolicy
 
 					// The run's inputs live on the row so the dispatch consumer can
 					// reconstruct it (including after a restart): segments shape the
@@ -3089,10 +3066,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 					const askedSubjects = context?.subjects ?? []
 					const subjects =
 						askedSubjects.length > 0
-							? yield* snapshotSubjects(
-									(run as { organizationId: string }).organizationId,
-									askedSubjects,
-								)
+							? yield* snapshotSubjects(organizationId, askedSubjects)
 							: []
 					if (subjects.length !== askedSubjects.length) {
 						const read = new Set(subjects.map(s => `${s.table}:${s.id}`))
@@ -3146,7 +3120,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 					const subjectReading = deriveEntityTargets({
 						schemaName,
 						anchorDomain: context?.anchorDomain,
-						query: (run as { query: string }).query,
+						query,
 						subjects: subjectTargets,
 						location: hintPlace,
 					})
@@ -3171,7 +3145,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 						subjectTargets
 							.map(s => s.name)
 							.find((n): n is string => n != null && n.trim() !== '') ??
-						queryName((run as { query: string }).query)
+						queryName(query)
 
 					// Said once an attempt, so a starved market shows up in the telemetry
 					// rather than being guessed at. Counting HOW MANY RUNS goes by the stored
@@ -3198,7 +3172,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 					const anchorHost = deriveAnchorHost({
 						schemaName,
 						anchorDomain: context?.anchorDomain,
-						query: (run as { query: string }).query,
+						query,
 						subjects: subjectTargets,
 					})
 					const anchorInstruction =
@@ -3288,9 +3262,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 							// Stamp this run's cost before the group rolls up, so the parent
 							// sums a child that already knows what it spent.
 							yield* stampRunUsage
-							const parentGroupId = (run as { parentId: string | null })
-								.parentId
-							if (parentGroupId) yield* rollupParentLocked(parentGroupId)
+							if (parentId) yield* rollupParentLocked(parentId)
 						})
 
 					// Build system prompt. The agent sees the same trimmed on-file view
@@ -3306,6 +3278,8 @@ export class ResearchService extends Context.Service<ResearchService>()(
 								recency_days?: number
 								country?: string
 								place?: string
+								min_employees?: number
+								max_employees?: number
 						  }
 						| undefined
 					const hintsContext = hints
@@ -3317,9 +3291,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 						hintsContext,
 						segments,
 						attributes: runAttributes,
-						canPayForTools:
-							((run as { paidPolicy: ResolvedPolicy | null }).paidPolicy
-								?.paidBudgetCents ?? 0) > 0,
+						canPayForTools: (paidPolicy?.paidBudgetCents ?? 0) > 0,
 					})
 
 					// ── Phase 1: LLM research pass ──
@@ -3616,7 +3588,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 					const targetName =
 						typeof runSubjectSnapshot?.['name'] === 'string'
 							? runSubjectSnapshot['name']
-							: (run as { query: string }).query
+							: query
 
 					// Website sanity, and what it remembers between calls.
 					//
@@ -3787,7 +3759,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 							// contacts rescue below so it reads exactly what the broad pass did.
 							const evidenceBlock = `${pagesSection}Research transcript:\n\n${transcript}`
 							const extractionPrompt = buildExtractionPrompt({
-								query: (run as { query: string }).query,
+								query,
 								citationInstruction,
 								evidenceBlock,
 								subjects: subjectsForPrompt(subjects),
@@ -4055,8 +4027,6 @@ export class ResearchService extends Context.Service<ResearchService>()(
 							// whole contract with its neighbours. A link also reports the span
 							// attributes it contributes, so the phase's grounding telemetry is
 							// assembled from the links themselves.
-							const organizationId = (run as { organizationId: string })
-								.organizationId
 							// Every page and passage the run read, for the checks that ask
 							// whether words are on ANY fetched page — a citation's quote, a
 							// fit check's — rather than on a page that grounds on the subject:
@@ -5272,21 +5242,6 @@ export class ResearchService extends Context.Service<ResearchService>()(
 								phase: 2,
 								schema: schemaName,
 							})
-							// Who the critics judge a value against: the target's own name and
-							// domain, from the CRM row when there is one and the request otherwise.
-							const targetSnapshot = subjects[0]?.snapshot as
-								| Record<string, unknown>
-								| undefined
-							const criticTarget = {
-								name:
-									typeof targetSnapshot?.['name'] === 'string'
-										? targetSnapshot['name']
-										: (run as { query: string }).query,
-								domain:
-									typeof targetSnapshot?.['website'] === 'string'
-										? targetSnapshot['website']
-										: entityTargets?.domains[0],
-							}
 							// How many company fields the per-source checks removed. The caller
 							// reports it, so that link hands the count back out through here.
 							let entityFieldsDropped = 0
@@ -5316,7 +5271,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 													extractLlm
 														.generateObject({
 															schema: CriticVerdictsSchema,
-															prompt: criticPrompt(criticTarget, claims),
+															prompt: criticPrompt(rescueTarget, claims),
 														})
 														.pipe(
 															Effect.map(response => ({
@@ -5498,8 +5453,6 @@ export class ResearchService extends Context.Service<ResearchService>()(
 					// (matched by url_hash). Re-running is a no-op via ON CONFLICT.
 					const linkRunSources = (hashes: ReadonlyArray<string>) =>
 						Effect.gen(function* () {
-							const organizationId = (run as { organizationId: string })
-								.organizationId
 							for (const urlHash of hashes) {
 								yield* sql`
 									INSERT INTO research_run_sources (organization_id, research_id, source_id, local_ref, fetched_at, cost_cents)
@@ -5511,13 +5464,9 @@ export class ResearchService extends Context.Service<ResearchService>()(
 							}
 						})
 
-					const organizationId = (run as { organizationId: string })
-						.organizationId
-					const query = (run as { query: string }).query
-
-					// The policy was validated and frozen onto the row at create
-					// time, so it round-trips back here as a ResolvedPolicy.
-					const policy = (run as { paidPolicy: ResolvedPolicy }).paidPolicy
+					// A plain cast, never a default: a run with no policy should break when
+					// the budget reads it, not quietly spend against an invented one.
+					const policy = paidPolicy as ResolvedPolicy
 					// Per-run budget, built from that frozen policy plus the system
 					// ceiling. The tool handlers charge it before each vendor call,
 					// and the loop reads it to halt when spend runs out. The fiber's
@@ -6075,9 +6024,6 @@ export class ResearchService extends Context.Service<ResearchService>()(
 						// company — enrichment or contact discovery — never a scan that
 						// happens to be anchored, whose subject is a starting point for
 						// finding other firms, not the thing being looked up.
-						const registrySnapshot = subjects[0]?.snapshot as
-							| Record<string, unknown>
-							| undefined
 						// A subject whose name went unread is left out here for a reason of
 						// its own, not as one more skipped check: the register is searched
 						// BY that name, and a hit cannot be confirmed against keys that do
@@ -6086,8 +6032,8 @@ export class ResearchService extends Context.Service<ResearchService>()(
 							entityTargets !== null && isEntityGroundedSchema(schemaName)
 								? resolveRegistryCountry({
 										subjectCountry:
-											typeof registrySnapshot?.['country'] === 'string'
-												? registrySnapshot['country']
+											typeof runSubjectSnapshot?.['country'] === 'string'
+												? runSubjectSnapshot['country']
 												: undefined,
 										locationHint: hints?.country ?? hints?.place,
 										// An address the run found points at a country's
@@ -6096,10 +6042,6 @@ export class ResearchService extends Context.Service<ResearchService>()(
 									})
 								: undefined
 						if (registryCountry !== undefined) {
-							const registryQuery =
-								typeof registrySnapshot?.['name'] === 'string'
-									? registrySnapshot['name']
-									: (run as { query: string }).query
 							yield* Effect.gen(function* () {
 								// Paid for under this run's own key for this company and
 								// spelling. The agent looking the same company up the same way
@@ -6111,11 +6053,11 @@ export class ResearchService extends Context.Service<ResearchService>()(
 									'registry',
 									REGISTRY_LOOKUP_COST_CENTS,
 									'registry_lookup',
-									`${researchId}:registry:${registryCountry}:${registryQuery}`,
+									`${researchId}:registry:${registryCountry}:${targetName}`,
 								)(() =>
 									registry.lookup({
 										country: registryCountry,
-										query: registryQuery,
+										query: targetName,
 									}),
 								)
 								// Nothing to seed: either this run already bought the same
@@ -7005,8 +6947,6 @@ export class ResearchService extends Context.Service<ResearchService>()(
 					// asked about whose search found nothing want opposite fixes, and a
 					// single figure covering both cannot tell an operator which they have.
 					let websiteSearchesAsked = 0
-					const gapPolicy = (run as { paidPolicy: ResolvedPolicy | null })
-						.paidPolicy
 					// How many searches the step that confirms the list still has to buy.
 					// It runs last and spends whatever these rounds leave, so its share is
 					// set aside before they spend: a round that took the lot would turn
@@ -7036,7 +6976,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 					const spendableThisRound = (): number =>
 						Math.max(
 							0,
-							(gapPolicy?.budgetCents ?? 0) -
+							(paidPolicy?.budgetCents ?? 0) -
 								cheapSpentCents -
 								gapSpentCents -
 								searchesHeldForConfirming() * SEARCH_COST_CENTS -
@@ -7532,6 +7472,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 						const foldedWebsites = yield* checkWebsites(findings, 'folded')
 						findings = foldedWebsites.check.findings
 						blankedAfterFolds += foldedWebsites.blanked
+						const contactsKept = contactFill(findings)
 						yield* Effect.annotateCurrentSpan({
 							'research.gap_rounds.round': gapRound,
 							'research.per_field_search.fired': perFieldFired,
@@ -7541,8 +7482,8 @@ export class ResearchService extends Context.Service<ResearchService>()(
 							// What only a folded list could show: an address no single
 							// extraction had the evidence to condemn, over every round so far.
 							'research.websites.blanked_folded': blankedAfterFolds,
-							'research.gap_rounds.contacts_kept': contactFill(findings).named,
-							'research.gap_rounds.titled_kept': contactFill(findings).titled,
+							'research.gap_rounds.contacts_kept': contactsKept.named,
+							'research.gap_rounds.titled_kept': contactsKept.titled,
 						})
 						if (pendingGapRound !== null)
 							pendingGapRound.outcome = {
@@ -7700,13 +7641,10 @@ export class ResearchService extends Context.Service<ResearchService>()(
 									: [],
 							)
 
-							const verifyPolicy = (
-								run as { paidPolicy: ResolvedPolicy | null }
-							).paidPolicy
 							const allowance = Math.max(
 								0,
 								Math.floor(
-									((verifyPolicy?.budgetCents ?? 0) -
+									((paidPolicy?.budgetCents ?? 0) -
 										cheapSpentCents -
 										gapSpentCents -
 										VERIFICATION_BUDGET_MARGIN_CENTS) /
@@ -7926,13 +7864,10 @@ export class ResearchService extends Context.Service<ResearchService>()(
 					// later round folds the list again. Only where the caller passed no
 					// size: a size given as a hint was asked to be enforced and already
 					// removed the rows, so marking the survivors would say nothing.
-					const sizeHints = context?.hints as
-						| { min_employees?: number; max_employees?: number }
-						| undefined
 					if (
 						schemaName === 'prospect_scan_v1' &&
-						sizeHints?.min_employees === undefined &&
-						sizeHints?.max_employees === undefined
+						hints?.min_employees === undefined &&
+						hints?.max_employees === undefined
 					) {
 						const sized = markRowsOutsideSize(
 							findings,
@@ -8006,7 +7941,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 								: yield* sql<{ id: string }>`
 										SELECT id FROM companies
 										WHERE id = ${company.id}
-											AND organization_id = ${(run as { organizationId: string }).organizationId}
+											AND organization_id = ${organizationId}
 											AND deleted_at IS NULL
 										LIMIT 1
 									`.pipe(Effect.catchTag('SqlError', () => Effect.succeed([])))
@@ -8061,7 +7996,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 								schemaName,
 								language: briefLang,
 								date: briefDate,
-								request: (run as { query: string }).query,
+								request: query,
 								attributeLabels: runAttributes.map(
 									attribute => attribute.label,
 								),
@@ -8192,8 +8127,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 							sourceCount: sources?.n ?? 0,
 						})
 						yield* stampRunUsage
-						const parentGroupId = (run as { parentId: string | null }).parentId
-						if (parentGroupId) yield* rollupParentLocked(parentGroupId)
+						if (parentId) yield* rollupParentLocked(parentId)
 						return
 					}
 
@@ -8228,8 +8162,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 							reason: 'no_results',
 						})
 						yield* stampRunUsage
-						const parentGroupId = (run as { parentId: string | null }).parentId
-						if (parentGroupId) yield* rollupParentLocked(parentGroupId)
+						if (parentId) yield* rollupParentLocked(parentId)
 						return
 					}
 
@@ -8321,7 +8254,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 					if (finalStatus === 'succeeded') {
 						const cacheKey = computeResearchCacheKey({
 							userId,
-							query: (run as { query: string }).query,
+							query,
 							schemaName,
 							schemaVersion: schemaVersionFor(schemaName),
 							subjects: context?.subjects,
@@ -8334,7 +8267,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 							INSERT INTO research_cache (
 								key_hash, organization_id, user_id, research_id, cached_at, expires_at
 							) VALUES (
-								${cacheKey}, ${(run as { organizationId: string }).organizationId}, ${userId}, ${researchId},
+								${cacheKey}, ${organizationId}, ${userId}, ${researchId},
 								now(), now() + (${`${ttlDays} days`})::interval
 							)
 							ON CONFLICT (organization_id, key_hash) DO UPDATE SET
@@ -8346,7 +8279,6 @@ export class ResearchService extends Context.Service<ResearchService>()(
 					}
 
 					// Merge findings onto parent group row if this is a leaf
-					const parentId = (run as { parentId: string | null }).parentId
 					if (parentId) {
 						yield* mergeToParent(parentId, findings)
 					}
@@ -8682,8 +8614,6 @@ export class ResearchService extends Context.Service<ResearchService>()(
 						// cache check above — a fan-out is not one cacheable result.
 						const selector = input.context?.selector
 						if (selector) {
-							const selectorMax = selectorMaxCompanies
-
 							// Resolve targets from a safe subset of company columns — never
 							// raw SQL, so the filter can't inject. Default to an empty filter
 							// if one is somehow missing, so a malformed selector reaching this
@@ -8716,17 +8646,19 @@ export class ResearchService extends Context.Service<ResearchService>()(
 								SELECT id FROM companies
 								WHERE ${sql.and(conds)}
 								ORDER BY created_at
-								LIMIT ${selectorMax + 1}
+								LIMIT ${selectorMaxCompanies + 1}
 							`
-							const capped = matched.length > selectorMax
-							const targets = capped ? matched.slice(0, selectorMax) : matched
+							const capped = matched.length > selectorMaxCompanies
+							const targets = capped
+								? matched.slice(0, selectorMaxCompanies)
+								: matched
 							if (capped) {
 								yield* Effect.logWarning('research.selector.capped').pipe(
 									Effect.annotateLogs({
 										event: 'research.selector.capped',
 										user_id: userId,
 										matched: matched.length,
-										cap: selectorMax,
+										cap: selectorMaxCompanies,
 									}),
 								)
 							}

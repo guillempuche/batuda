@@ -28,8 +28,6 @@
  * same wrapper serve any caller.
  */
 
-import { createHash } from 'node:crypto'
-
 import { Effect, Layer, Option } from 'effect'
 import { SqlClient } from 'effect/unstable/sql'
 
@@ -41,6 +39,7 @@ import {
 import { canonicalizeUrl } from '../application/source-key'
 import { recordFetchedSource } from '../application/source-record'
 import { ProviderError } from '../domain/errors'
+import { sha256Hex } from '../domain/stable-hash'
 import { ScrapedPage } from '../domain/types'
 import { cacheBypassConfig } from './_config'
 
@@ -53,9 +52,6 @@ interface SourcesCacheHit {
 	readonly contentRef: string | null
 	readonly contentHash: string
 }
-
-const sha256Hex = (input: string): string =>
-	createHash('sha256').update(input).digest('hex')
 
 const extractDomain = (url: string): string => {
 	try {
