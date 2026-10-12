@@ -4,6 +4,7 @@ import { SqlClient } from 'effect/sql'
 
 import { PipelineService } from '../../services/pipeline'
 import { inMcpOrgScope } from '../org-scope'
+import { completeLang } from './_completions'
 import { LangParam, langDirective } from './_lang'
 
 export const DailyBriefingPrompt = McpServer.prompt({
@@ -13,6 +14,7 @@ export const DailyBriefingPrompt = McpServer.prompt({
 	parameters: {
 		lang: LangParam,
 	},
+	completion: { lang: completeLang },
 	content: ({ lang }) =>
 		inMcpOrgScope(
 			Effect.gen(function* () {

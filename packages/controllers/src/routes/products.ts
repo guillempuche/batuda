@@ -7,7 +7,7 @@ import { OrgMiddleware } from '../middleware/org'
 import { SessionMiddleware } from '../middleware/session'
 
 const CreateProductInput = Schema.Struct({
-	slug: Schema.String.pipe(Schema.check(Schema.isPattern(/^[a-z0-9-]+$/))),
+	slug: Schema.String.pipe(Schema.check(Schema.isPattern(/^[a-z0-9-]+$/u))),
 	name: Schema.String.pipe(Schema.check(Schema.isMinLength(1))),
 	type: Schema.String,
 	status: Schema.optional(Schema.String),

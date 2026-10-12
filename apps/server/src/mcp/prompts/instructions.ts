@@ -9,6 +9,7 @@ import {
 } from '@batuda/instructions'
 
 import { inMcpOrgScope } from '../org-scope'
+import { noSuggestions } from './_completions'
 
 // User-controlled entry points (slash commands) for the instruction-template
 // feature — the protocol-standard home for human-invoked actions, distinct from
@@ -100,6 +101,7 @@ export const SaveInstructionPrompt = McpServer.prompt({
 		scope: Schema.Literals(['personal', 'org']),
 	},
 	completion: {
+		name: noSuggestions,
 		scope: (input: string) =>
 			Effect.succeed(
 				(['personal', 'org'] as const).filter(s => s.startsWith(input)),

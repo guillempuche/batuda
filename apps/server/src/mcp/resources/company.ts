@@ -3,7 +3,7 @@ import { McpSchema, McpServer } from 'effect/ai'
 import { SqlClient } from 'effect/sql'
 
 import { textAtTheStart } from '../../lib/search-text'
-import { CompanyService } from '../../services/companies'
+import { companyProfile } from '../company-profile'
 import { inMcpOrgScope } from '../org-scope'
 
 const slugParam = McpSchema.param('slug', Schema.String)
@@ -31,8 +31,7 @@ export const CompanyResource =
 				),
 		},
 		content: Effect.fn(function* (_uri, slug) {
-			const service = yield* CompanyService
-			const data = yield* service.getWithRelations(slug)
+			const data = yield* companyProfile(slug)
 			return JSON.stringify(data, null, 2)
 		}, inMcpOrgScope),
 	})

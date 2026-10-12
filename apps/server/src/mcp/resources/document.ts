@@ -3,6 +3,7 @@ import { McpSchema, McpServer } from 'effect/ai'
 import { SqlClient } from 'effect/sql'
 
 import { inMcpOrgScope } from '../org-scope'
+import { noSuggestions } from '../prompts/_completions'
 
 const docIdParam = McpSchema.param('id', Schema.String)
 
@@ -13,6 +14,7 @@ export const DocumentResource =
 			'Full markdown body of a document by ID, with the CRM records it is filed against.',
 		mimeType: 'application/json',
 		audience: ['assistant'],
+		completion: { id: noSuggestions },
 		content: Effect.fn(function* (_uri, id) {
 			const sql = yield* SqlClient.SqlClient
 			const rows = yield* sql`SELECT * FROM documents WHERE id = ${id} LIMIT 1`

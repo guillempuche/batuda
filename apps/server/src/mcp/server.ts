@@ -32,7 +32,6 @@ import { PipelineHandlersLive, PipelineTools } from './tools/pipeline'
 import { ProductHandlersLive, ProductTools } from './tools/products'
 import { ProposalHandlersLive, ProposalTools } from './tools/proposals'
 import { RecordingHandlersLive, RecordingTools } from './tools/recordings'
-import { RenamedTools, RenamedToolsHandlersLive } from './tools/renamed-tools'
 import {
 	ResearchContactsHandlersLive,
 	ResearchContactsTools,
@@ -48,6 +47,24 @@ import {
 } from './tools/research-registry'
 import { TaskHandlersLive, TaskTools } from './tools/tasks'
 import { TimelineHandlersLive, TimelineTools } from './tools/timeline'
+
+// The resources and prompts, kept apart from the tools so a test can stand up
+// exactly what a client lists without every tool's services behind it.
+export const McpResourcesAndPromptsLive = Layer.mergeAll(
+	CompanyResource,
+	PipelineResource,
+	DocumentResource,
+	ResearchResource,
+	InstructionsResource,
+	TimelineResource,
+	CompanyResearchPrompt,
+	DailyBriefingPrompt,
+	ProposalDraftPrompt,
+	InteractionFollowUpPrompt,
+	ResearchDesignerPrompt,
+	ApplyInstructionPrompt,
+	SaveInstructionPrompt,
+)
 
 export const McpToolsLive = Layer.mergeAll(
 	mcpToolkitSafe(CompanyTools),
@@ -69,20 +86,7 @@ export const McpToolsLive = Layer.mergeAll(
 	mcpToolkitSafe(InstructionsMcpTools),
 	mcpToolkitSafe(TimelineTools),
 	mcpToolkitSafe(CalendarTools),
-	mcpToolkitSafe(RenamedTools),
-	CompanyResource,
-	PipelineResource,
-	DocumentResource,
-	ResearchResource,
-	InstructionsResource,
-	TimelineResource,
-	CompanyResearchPrompt,
-	DailyBriefingPrompt,
-	ProposalDraftPrompt,
-	InteractionFollowUpPrompt,
-	ResearchDesignerPrompt,
-	ApplyInstructionPrompt,
-	SaveInstructionPrompt,
+	McpResourcesAndPromptsLive,
 ).pipe(
 	Layer.provide(CompanyHandlersLive),
 	Layer.provide(ContactHandlersLive),
@@ -103,5 +107,4 @@ export const McpToolsLive = Layer.mergeAll(
 	Layer.provide(InstructionsMcpHandlersLive),
 	Layer.provide(TimelineHandlersLive),
 	Layer.provide(CalendarHandlersLive),
-	Layer.provide(RenamedToolsHandlersLive),
 )

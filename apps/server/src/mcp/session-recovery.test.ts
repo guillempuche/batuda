@@ -1,7 +1,8 @@
 // Pins the recovery that unblocks every MCP client after a server redeploy: a
 // fresh process has an empty in-memory session table, so a client keeps sending
 // a session id it never minted. McpServer answers that unknown `Mcp-Session-Id`
-// with a 404, and a compliant client drops the session and re-`initialize`s.
+// with a 404, and a compliant client drops the id and re-`initialize`s without
+// it.
 //
 // Drives a real McpServer over an in-process HTTP server so a future effect
 // release that changes the unknown-session reply fails here, not in prod.
@@ -53,17 +54,20 @@ describe('the /mcp route recovering an unknown session end to end', () => {
 			body: JSON.stringify(body),
 		})
 
-	const initialize = () =>
-		post({
-			jsonrpc: '2.0',
-			id: 1,
-			method: 'initialize',
-			params: {
-				protocolVersion: '2025-06-18',
-				capabilities: {},
-				clientInfo: { name: 'test', version: '1.0' },
+	const initialize = (sessionId?: string) =>
+		post(
+			{
+				jsonrpc: '2.0',
+				id: 1,
+				method: 'initialize',
+				params: {
+					protocolVersion: '2025-06-18',
+					capabilities: {},
+					clientInfo: { name: 'test', version: '1.0' },
+				},
 			},
-		})
+			sessionId,
+		)
 
 	const callPing = (sessionId: string) =>
 		post(
@@ -121,6 +125,19 @@ describe('the /mcp route recovering an unknown session end to end', () => {
 
 			// THEN the client is told to re-initialize (404), not handed a
 			// hidden-failure 200 or a 5xx
+			expect(res.status).toBe(404)
+		})
+
+		it('should refuse a new start that still carries the old id', async () => {
+			// GIVEN a client that re-initializes but keeps sending the id the old
+			//       process minted
+			const staleSessionId = '00000000-0000-0000-0000-000000000000'
+
+			// WHEN it opens again with that id still attached
+			const res = await initialize(staleSessionId)
+
+			// THEN it gets the same 404 — recovery depends on the client dropping
+			// the id, which is what the clients in use do
 			expect(res.status).toBe(404)
 		})
 

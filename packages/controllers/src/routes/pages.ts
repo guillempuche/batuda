@@ -26,7 +26,7 @@ export const PageSummary = Schema.Struct({
 const CreatePageInput = Schema.Struct({
 	companyId: Schema.optional(Schema.String),
 	slug: Schema.optional(
-		Schema.String.pipe(Schema.check(Schema.isPattern(/^[a-z0-9-]+$/))),
+		Schema.String.pipe(Schema.check(Schema.isPattern(/^[a-z0-9-]+$/u))),
 	),
 	lang: Schema.String,
 	title: Schema.String.pipe(Schema.check(Schema.isMinLength(1))),

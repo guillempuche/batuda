@@ -60,21 +60,39 @@ export const recordCall = (request: HttpServerRequest.HttpServerRequest) => {
 	})
 }
 
+// The JSON-RPC error code a refusal's body carries, when it carries one.
+const refusalCode = (response: HttpServerResponse.HttpServerResponse) => {
+	if (response.body._tag !== 'Uint8Array') return undefined
+	try {
+		const code = JSON.parse(new TextDecoder().decode(response.body.body))?.error
+			?.code
+		return typeof code === 'number' ? code : undefined
+	} catch {
+		return undefined
+	}
+}
+
 /**
  * Writes a line for a call the library refused before any tool ran.
  *
- * Two refusals come back from the library itself, and the line the request
- * leaves says only the status. A revision it does not serve gets a 400 with a
- * JSON-RPC error the client can read; this names the revision, loudly only where
- * a real call was turned down rather than a discovery probe. A request from a
- * browser origin it does not allow gets an empty 403, which a client shows as a
- * silent retry; this names the origin.
+ * The library answers these itself, and the line the request leaves says only
+ * the status, which a client shows as a silent retry. A browser origin it does
+ * not allow gets an empty 403; this names the origin. A revision it does not
+ * serve gets a 400; this names the revision, loudly only where a real call was
+ * turned down rather than a discovery probe. Anything else it refuses — an
+ * Accept that does not name both reply kinds, a content type other than JSON, a
+ * missing or stray session id, a revision that disagrees with the one settled —
+ * gets a line with the status and the JSON-RPC code. A body that does not parse
+ * is answered inside an ordinary 200, so it never reaches here. A session id this process never
+ * issued (after a restart) and a method the route does not serve are the
+ * exchange working as meant, so those are written quietly.
  */
 export const noteRefusal = <E, R>(
 	app: Effect.Effect<HttpServerResponse.HttpServerResponse, E, R>,
 	request: HttpServerRequest.HttpServerRequest,
 ) =>
 	Effect.tap(app, response => {
+		if (response.status < 400) return Effect.void
 		const origin = request.headers['origin']
 		if (response.status === 403 && origin !== undefined)
 			return recordFacts({ 'mcp.origin': bounded(origin) }).pipe(
@@ -89,24 +107,35 @@ export const noteRefusal = <E, R>(
 			)
 		const named = request.headers[PROTOCOL_VERSION_HEADER]
 		if (
-			named === undefined ||
-			response.status !== 400 ||
+			response.status === 400 &&
+			named !== undefined &&
 			// A 400 for a revision served here was refused for some other reason.
-			MCP_PROTOCOLS.some(protocol => protocol.protocolVersion === named)
-		)
-			return Effect.void
-		// A refused discovery probe is the exchange working — that call exists to
-		// ask which revisions a server speaks, so "no" is its ordinary answer. A
-		// refused real call means work the client wanted did not happen, and keeps
-		// the louder level. The method is the caller's own word: fine for choosing
-		// how loudly to write a line, never for deciding what a caller may do. A
-		// client that names no method leaves no way to tell, so it stays a warning.
-		const probing = request.headers[METHOD_HEADER] === 'server/discover'
-		const write = probing ? Effect.logInfo : Effect.logWarning
-		return write('MCP protocol version refused').pipe(
+			!MCP_PROTOCOLS.some(protocol => protocol.protocolVersion === named)
+		) {
+			// A refused discovery probe is the exchange working — that call exists
+			// to ask which revisions a server speaks, so "no" is its ordinary
+			// answer. A refused real call means work the client wanted did not
+			// happen, and keeps the louder level. The method is the caller's own
+			// word: fine for choosing how loudly to write a line, never for
+			// deciding what a caller may do. A client that names no method leaves
+			// no way to tell, so it stays a warning.
+			const probing = request.headers[METHOD_HEADER] === 'server/discover'
+			const write = probing ? Effect.logInfo : Effect.logWarning
+			return write('MCP protocol version refused').pipe(
+				Effect.annotateLogs({
+					event: 'mcp.protocol_version.refused',
+					'mcp.protocol_version.named': bounded(named),
+				}),
+			)
+		}
+		const expected = response.status === 404 || response.status === 405
+		const write = expected ? Effect.logInfo : Effect.logWarning
+		const code = refusalCode(response)
+		return write('MCP request refused').pipe(
 			Effect.annotateLogs({
-				event: 'mcp.protocol_version.refused',
-				'mcp.protocol_version.named': bounded(named),
+				event: 'mcp.request.refused',
+				'http.status': response.status,
+				...(code !== undefined && { 'mcp.error_code': code }),
 			}),
 		)
 	})
@@ -157,9 +186,10 @@ const bearerChallenge = (
 
 // A redeploy starts a fresh process whose in-memory MCP session table is empty,
 // so a client keeps sending a session id the new process never minted. McpServer
-// answers that unknown `Mcp-Session-Id` with a 404 itself (a compliant client
-// then drops the session and re-`initialize`s), so no app-layer recovery is
-// needed here — McpServer stays the sole owner of sessions.
+// answers that unknown `Mcp-Session-Id` with a 404 itself, and a compliant client
+// drops the id and re-`initialize`s without it — an `initialize` that still
+// carries the old id gets the same 404. No app-layer recovery is needed here:
+// McpServer stays the sole owner of sessions.
 
 const McpAuthMiddleware = HttpRouter.middleware(
 	Effect.gen(function* () {

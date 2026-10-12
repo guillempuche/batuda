@@ -94,11 +94,17 @@ export type CompanySort = typeof CompanySort.Type
 // could never be a real address or phone number is turned away where it is typed
 // rather than stored and puzzled over later.
 //
+// A pattern carries the `u` flag wherever it can, because that is what puts it
+// in the schema a client is shown: without it the value is still checked here,
+// but the shape is left out of what an assistant or the API docs can read. One
+// that ignores letter case (`i`, as the website, LinkedIn and Maps ones do)
+// cannot be shown at all, so a caller learns those shapes from a refusal.
+//
 // These belong on what a caller sends, never on the stored row: a row written
 // before these existed still has to be readable, or every list of companies fails
 // on the first bad value somebody saved months ago.
 export const CompanySlug = Schema.String.pipe(
-	Schema.check(Schema.isPattern(/^[a-z0-9]+(?:-[a-z0-9]+)*$/)),
+	Schema.check(Schema.isPattern(/^[a-z0-9]+(?:-[a-z0-9]+)*$/u)),
 )
 
 // A label somebody groups companies by. Anything except a comma, because a
@@ -109,12 +115,12 @@ export const CompanySlug = Schema.String.pipe(
 export const CompanyTag = Schema.String.pipe(
 	Schema.check(
 		Schema.isMinLength(1),
-		Schema.isPattern(/^[^,]+$/),
+		Schema.isPattern(/^[^,]+$/u),
 		// No leading or trailing blanks, and not blank all through. Several tags
 		// travel as one comma-separated value and each is trimmed on the way back,
 		// so a padded tag is offered in the menu under one spelling and asked for
 		// under another, and a blank one asks for nothing at all.
-		Schema.isPattern(/^\S(.*\S)?$/s),
+		Schema.isPattern(/^\S([\s\S]*\S)?$/u),
 	),
 )
 // Raised to capitals as it comes in, because narrowing by a country and counting
@@ -123,13 +129,13 @@ export const CompanyTag = Schema.String.pipe(
 // Spain with a count of its own. Only what a caller sends passes through here —
 // a row already stored is read as written, by the plain string on the row below.
 export const CompanyCountry = Schema.String.pipe(
-	Schema.check(Schema.isPattern(/^[A-Za-z]{2}$/)),
+	Schema.check(Schema.isPattern(/^[A-Za-z]{2}$/u)),
 	// The same shape on the far side of the raising, not only before it. A check
 	// that sits only on the way in leaves the finished type a plain string, and
 	// anything asking "is this a country code?" of a finished value — a guard on
 	// a paid lookup, most of all — quietly answers yes to every word there is.
 	Schema.decodeTo(
-		Schema.String.pipe(Schema.check(Schema.isPattern(/^[A-Z]{2}$/))),
+		Schema.String.pipe(Schema.check(Schema.isPattern(/^[A-Z]{2}$/u))),
 		{
 			decode: SchemaGetter.transform((code: string) => code.toUpperCase()),
 			encode: SchemaGetter.transform((code: string) => code),

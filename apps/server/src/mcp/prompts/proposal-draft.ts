@@ -2,9 +2,13 @@ import { Effect, Schema } from 'effect'
 import { McpServer } from 'effect/ai'
 import { SqlClient } from 'effect/sql'
 
-import { CompanyService } from '../../services/companies'
+import { companyProfile } from '../company-profile'
 import { inMcpOrgScope } from '../org-scope'
-import { completeCompanySlug } from './_completions'
+import {
+	completeCompanySlug,
+	completeLang,
+	noSuggestions,
+} from './_completions'
 import { LangParam, langDirective } from './_lang'
 
 export const ProposalDraftPrompt = McpServer.prompt({
@@ -16,12 +20,15 @@ export const ProposalDraftPrompt = McpServer.prompt({
 		focus: Schema.optional(Schema.String),
 		lang: LangParam,
 	},
-	completion: { slug: completeCompanySlug },
+	completion: {
+		slug: completeCompanySlug,
+		focus: noSuggestions,
+		lang: completeLang,
+	},
 	content: ({ slug, focus, lang }) =>
 		inMcpOrgScope(
 			Effect.gen(function* () {
-				const service = yield* CompanyService
-				const rawData = yield* service.getWithRelations(slug)
+				const rawData = yield* companyProfile(slug)
 				const data = rawData as Record<string, unknown>
 				const sql = yield* SqlClient.SqlClient
 				const products =

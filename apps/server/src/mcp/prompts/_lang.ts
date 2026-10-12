@@ -1,6 +1,9 @@
 import { Schema } from 'effect'
 
-export const LangParam = Schema.optional(Schema.Literals(['ca', 'es', 'en']))
+// The languages the synthesis prompts write in.
+export const LANGS = ['ca', 'es', 'en'] as const
+
+export const LangParam = Schema.optional(Schema.Literals(LANGS))
 
 export const langDirective = (lang?: 'ca' | 'es' | 'en') => {
 	const l = lang ?? 'en'

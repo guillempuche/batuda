@@ -143,7 +143,12 @@ const BoomTool = Tool.make('boom_thing', { success: Schema.Unknown })
 const TaggedTool = Tool.make('tagged_thing', { success: Schema.Unknown })
 const SparseTool = Tool.make('sparse_thing', { success: Schema.Unknown })
 const CountingTool = Tool.make('counting_thing', { success: Schema.Unknown })
+const NamingTool = Tool.make('naming_thing', {
+	parameters: Schema.Struct({ name: Schema.String }),
+	success: Schema.Unknown,
+})
 const SafeTools = Toolkit.make(
+	NamingTool,
 	ListTool,
 	MissTool,
 	RecordTool,
@@ -161,6 +166,7 @@ const SafeHandlersLive = SafeTools.toLayer(
 		one_thing: () => Effect.succeed({ ok: true }),
 		sparse_thing: () => Effect.succeed({ ok: true, note: undefined }),
 		counting_thing: () => Effect.succeed({ total: 3n }),
+		naming_thing: ({ name }) => Effect.succeed({ name }),
 		speaking_thing: () =>
 			Effect.die(new ToolMessage('footer_id is required to update a footer')),
 		tagged_thing: () => Effect.succeed({ _tag: 'suppressed', recipient: 'x' }),
@@ -255,13 +261,16 @@ const readReply = async (res: Response): Promise<RpcReply> => {
 	return JSON.parse(dataLine ? dataLine.replace(/^data:\s*/, '') : text)
 }
 
-const callTool = (name: string): Promise<Response> =>
+const callTool = (
+	name: string,
+	args: Record<string, unknown> = {},
+): Promise<Response> =>
 	post(
 		{
 			jsonrpc: '2.0',
 			id: 2,
 			method: 'tools/call',
-			params: { name, arguments: {} },
+			params: { name, arguments: args },
 		},
 		sessionId,
 	)
@@ -432,6 +441,63 @@ describe('a tool served through mcpToolkitSafe', () => {
 			expect(debug.map(entry => entry.text).join('\n')).toContain(
 				'footer_id is required to update a footer',
 			)
+		})
+	})
+
+	describe('when a client lists the tools', () => {
+		it('should describe each tool’s arguments as closed to keys it does not name', async () => {
+			// WHEN the client asks which tools there are
+			const reply = (await readReply(
+				await post(
+					{ jsonrpc: '2.0', id: 3, method: 'tools/list', params: {} },
+					sessionId,
+				),
+			)) as {
+				result?: {
+					tools?: ReadonlyArray<{
+						name: string
+						inputSchema: Record<string, unknown>
+					}>
+				}
+			}
+
+			// THEN a tool's arguments say no other key belongs — the hint that
+			// keeps a model from inventing arguments
+			const naming = reply.result?.tools?.find(
+				tool => tool.name === 'naming_thing',
+			)
+			expect(naming?.inputSchema['additionalProperties']).toBe(false)
+			expect(naming?.inputSchema['required']).toEqual(['name'])
+		})
+
+		it('should still answer a call that sends a key it does not name', async () => {
+			// GIVEN a client that sends an extra key, as some do
+			// WHEN it calls the tool
+			const reply = await readReply(
+				await callTool('naming_thing', { name: 'acme', extra: 1 }),
+			)
+
+			// THEN the extra key is ignored rather than refused
+			expect(reply.result?.isError).toBeFalsy()
+			expect(reply.result?.structuredContent).toEqual({ name: 'acme' })
+		})
+	})
+
+	describe('when the arguments do not fit the tool', () => {
+		it('should tell the caller what was wrong and not record it as a fault', async () => {
+			logged.length = 0
+
+			// WHEN the client calls a tool without an argument it requires
+			const reply = await readReply(await callTool('naming_thing'))
+
+			// THEN the caller is told which argument was wrong
+			expect(reply.result?.isError).toBe(true)
+			expect(reply.result?.content?.[0]?.text).toContain('name')
+
+			// AND it counts as the call being turned away, not as something that
+			// broke, so the error log keeps holding only what nobody expected
+			expect(factsNow()['mcp.tool.outcome']).toBe('refused')
+			expect(logged.filter(entry => entry.level === 'Error')).toEqual([])
 		})
 	})
 

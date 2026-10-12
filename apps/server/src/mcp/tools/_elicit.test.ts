@@ -68,17 +68,25 @@ describe('canElicit', () => {
 	})
 })
 
-// A client that can be asked, and answers the way the argument says. Only the
-// one call a question makes is built; anything else is a bug in the test.
+// A client that can be asked, and answers the way the argument says — or fails
+// to put the question at all. Only the one call a question makes is built;
+// anything else is a bug in the test.
 const clientAnswering = (
-	answer: { action: 'accept'; content: unknown } | { action: 'decline' },
+	answer:
+		| { action: 'accept'; content: unknown }
+		| { action: 'decline' }
+		| { action: 'cancel' }
+		| 'fails',
 ) =>
 	Layer.mergeAll(
 		Layer.succeed(McpSchema.McpServerClient, {
 			clientId: 1,
 			initializePayload: { capabilities: { elicitation: {} } },
 			getClient: Effect.succeed({
-				elicit: () => Effect.succeed(answer),
+				elicit: () =>
+					answer === 'fails'
+						? Effect.fail(new Error('the client could not show the question'))
+						: Effect.succeed(answer),
 			}),
 		} as never),
 		Layer.succeed(McpSchema.McpRequestContext, {
@@ -103,7 +111,7 @@ describe('requireApproval', () => {
 			// THEN the caller is cleared to act
 			expect(
 				await askFor(
-					clientAnswering({ action: 'accept', content: { confirm: 'yes' } }),
+					clientAnswering({ action: 'accept', content: { confirm: true } }),
 				),
 			).toBe('confirmed')
 		})
@@ -116,18 +124,40 @@ describe('requireApproval', () => {
 			// THEN it is a decision — the caller must not retry or route around it
 			expect(
 				await askFor(
-					clientAnswering({ action: 'accept', content: { confirm: 'no' } }),
+					clientAnswering({ action: 'accept', content: { confirm: false } }),
 				),
 			).toBe('declined')
 		})
 
-		it('should treat dismissing the question as a no', async () => {
-			// GIVEN a client whose person closed the question without answering
+		it('should take turning the question down as a no', async () => {
+			// GIVEN a client whose person refused the question outright
 			// WHEN approval is asked for
-			// THEN nothing was agreed to, so nothing may happen
+			// THEN it is the same decision as answering no
 			expect(await askFor(clientAnswering({ action: 'decline' }))).toBe(
 				'declined',
 			)
+		})
+
+		it('should treat closing the question without choosing as a no', async () => {
+			// GIVEN a client whose person dismissed the question, which the library
+			// reports by interrupting the call
+			// WHEN approval is asked for
+			// THEN nothing was agreed to, so nothing may happen — and it is the
+			// person's doing, not a server fault for the assistant to retry
+			expect(await askFor(clientAnswering({ action: 'cancel' }))).toBe(
+				'declined',
+			)
+		})
+	})
+
+	describe('when the client fails to put the question', () => {
+		it('should say there was nobody to ask, not that somebody said no', async () => {
+			// GIVEN a client that claimed it could ask, then answered the question
+			// with an error instead of showing it
+			// WHEN approval is asked for
+			// THEN nobody decided anything, so the caller is told to look elsewhere
+			// rather than that the answer was no
+			expect(await askFor(clientAnswering('fails'))).toBe('unaskable')
 		})
 	})
 
