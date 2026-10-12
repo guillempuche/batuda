@@ -15,7 +15,7 @@ import {
 	type VisibilityState,
 } from '@tanstack/react-table'
 import { Cause, DateTime, Effect, Option } from 'effect'
-import { AsyncResult } from 'effect/unstable/reactivity'
+import { AsyncResult } from 'effect/reactivity'
 import {
 	AlertTriangle,
 	Archive,

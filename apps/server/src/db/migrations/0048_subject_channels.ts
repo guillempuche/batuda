@@ -1,5 +1,5 @@
 import { Effect } from 'effect'
-import { SqlClient } from 'effect/unstable/sql'
+import { SqlClient } from 'effect/sql'
 
 // A way of reaching somebody could only ever belong to a person, so a company
 // could hold exactly one mailbox, one telephone number, one of each. That fits a

@@ -1,5 +1,5 @@
 import { Cause, Effect, Layer, Logger, References } from 'effect'
-import { HttpServerError, HttpServerRequest } from 'effect/unstable/http'
+import { HttpServerError, HttpServerRequest } from 'effect/http'
 import { describe, expect, it } from 'vitest'
 
 import { boundedCause, recordFacts } from '@batuda/observability'

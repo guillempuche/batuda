@@ -7,8 +7,8 @@ import {
 	HttpMiddleware,
 	HttpRouter,
 	HttpServerResponse,
-} from 'effect/unstable/http'
-import { HttpApiBuilder, HttpApiScalar, OpenApi } from 'effect/unstable/httpapi'
+} from 'effect/http'
+import { HttpApiBuilder, HttpApiScalar, OpenApi } from 'effect/http-api'
 
 import { BookingProviderLive, IcsParserLive } from '@batuda/calendar'
 import { BatudaApi } from '@batuda/controllers'
@@ -168,8 +168,8 @@ const ServicesLive = Layer.mergeAll(
 
 const ServerLive = Layer.unwrap(
 	Effect.gen(function* () {
-		const port = yield* Config.int('PORT')
-		const portlessUrl = yield* Config.string('PORTLESS_URL').pipe(
+		const port = yield* Config.Int('PORT')
+		const portlessUrl = yield* Config.String('PORTLESS_URL').pipe(
 			Config.withDefault(''),
 		)
 		const base = portlessUrl || `http://localhost:${port}`
@@ -216,9 +216,9 @@ const TracerDisabledLive = Layer.succeed(HttpMiddleware.TracerDisabledWhen)(
 )
 
 // Observability and CORS are NOT in this list on purpose: a merge decides no
-// order between router-wide middleware, and these two have to run outside the
-// MCP sign-in check. `withGlobalMiddlewareOrder` explains why and is where that
-// order is pinned and tested.
+// order between router-wide middleware, and observability has to run outside
+// CORS. `withGlobalMiddlewareOrder` explains why and is where that order is
+// pinned and tested.
 const AppLive = withGlobalMiddlewareOrder(
 	Layer.mergeAll(
 		ApiLive,
@@ -231,7 +231,8 @@ const AppLive = withGlobalMiddlewareOrder(
 )
 
 // `CurrentOrg` is request-scoped — provided per request by OrgMiddleware
-// (HTTP), McpAuthMiddleware (MCP tools), `enterOrgScope` (cal.com webhook),
+// (HTTP), per MCP tool call, resource and prompt by the scope sign-in hands
+// over (mcp/org-scope.ts), `enterOrgScope` (cal.com webhook),
 // and inline `Effect.provideService` calls in ResearchEventSinkLive. It
 // surfaces in the program's R only because Tool.make declares
 // `dependencies: [CurrentOrg]` for typing.
@@ -240,7 +241,7 @@ const AppLive = withGlobalMiddlewareOrder(
 // service map once, when the layer is built, and re-injects that snapshot on
 // every tool call — where it OVERRIDES the request's own services rather than
 // deferring to them. A boot-time placeholder would therefore replace the real
-// value McpAuthMiddleware resolved, and every tool would read another
+// value the MCP org scope provides, and every tool would read another
 // organization's rows, or none. Leaving the tag absent at boot keeps it out of
 // the snapshot, so the request's value is what survives.
 //
@@ -260,10 +261,10 @@ const AppLive = withGlobalMiddlewareOrder(
 // from tracing are the ones `TracerDisabledLive` names above; the platform's own
 // wrapping reads that same list.
 const program = HttpRouter.serve(AppLive, {
-	// Disable Effect's built-in request logger: in this version it annotates
-	// `http.url` with the RAW request URL, so a magic-link/reset token in the URL
-	// would export verbatim to OTLP. ObservabilityLive emits a sanitized
-	// completion log (path_pattern, query stripped) in its place.
+	// Disable Effect's built-in request logger: it strips the query string but
+	// keeps the raw path, so a reset token carried in the path would export
+	// verbatim to OTLP. ObservabilityLive emits a sanitized completion log
+	// (path_pattern, query stripped) in its place.
 	disableLogger: true,
 }).pipe(
 	Layer.provide(ServicesLive),

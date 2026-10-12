@@ -1,5 +1,5 @@
 import { Effect } from 'effect'
-import { SqlClient } from 'effect/unstable/sql'
+import { SqlClient } from 'effect/sql'
 import type { ParsedMail } from 'mailparser'
 
 import { clipText } from '@batuda/domain'
@@ -7,6 +7,7 @@ import { NoMatch, ParticipantMatcher } from '@batuda/email/participant-matcher'
 import { EmailReceived, TimelineActivityService } from '@batuda/timeline'
 
 import { asOrg } from './lib/as-org.js'
+import { textArray } from './lib/pg-params'
 import { resolveThreadId } from './threading.js'
 
 // Whether an id is one a conversation can be keyed on.
@@ -305,7 +306,7 @@ export const persistMessage = (args: {
 				${args.parsed.messageId}, ${externalThreadId},
 				${args.isDeliveryNotice === true},
 				${args.parsed.inReplyTo},
-				${storedReferences as unknown as string[]},
+				${textArray(storedReferences)},
 				${args.parsed.subject}, ${args.parsed.receivedAt},
 				${args.parsed.textBody}, ${args.parsed.htmlBody}, ${args.parsed.textPreview},
 				${args.rawRfc822Ref},

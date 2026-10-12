@@ -9,8 +9,8 @@ import { createServer } from 'node:http'
 
 import { NodeHttpServer } from '@effect/platform-node'
 import { Effect, Layer, ManagedRuntime } from 'effect'
-import { HttpRouter, HttpServer } from 'effect/unstable/http'
-import { HttpApi, HttpApiBuilder } from 'effect/unstable/httpapi'
+import { HttpRouter, HttpServer } from 'effect/http'
+import { HttpApi, HttpApiBuilder } from 'effect/http-api'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import {
@@ -165,7 +165,7 @@ describe('the mail routes', () => {
 				return server.address
 			}),
 		)
-		if (address._tag !== 'TcpAddress')
+		if (address._tag === 'UnixPathAddress')
 			throw new Error('expected a TCP address for the test server')
 		baseUrl = `http://127.0.0.1:${address.port}`
 	}, 30_000)

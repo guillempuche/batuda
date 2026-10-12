@@ -1,4 +1,4 @@
-import { Atom } from 'effect/unstable/reactivity'
+import { Atom } from 'effect/reactivity'
 
 import { BatudaApiAtom } from '#/lib/batuda-api-atom'
 

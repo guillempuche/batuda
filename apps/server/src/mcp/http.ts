@@ -2,14 +2,9 @@ import { NodeHttpServerRequest } from '@effect/platform-node'
 import { fromNodeHeaders } from 'better-auth/node'
 import { verifyAccessToken } from 'better-auth/oauth2'
 import { Effect, Layer } from 'effect'
-import { McpServer } from 'effect/unstable/ai'
-import {
-	Headers,
-	HttpRouter,
-	HttpServerRequest,
-	HttpServerResponse,
-} from 'effect/unstable/http'
-import { SqlClient } from 'effect/unstable/sql'
+import { McpServer } from 'effect/ai'
+import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/http'
+import { SqlClient } from 'effect/sql'
 
 import { SessionContext } from '@batuda/controllers'
 import { recordFacts } from '@batuda/observability'
@@ -19,52 +14,20 @@ import { EnvVars } from '../lib/env'
 import { enterOrgScope, enterUserScope } from '../middleware/org'
 import { clientIdentityOf, recordClientSeen } from './client-seen'
 import { CurrentUser } from './current-user'
+import { McpOrgScope } from './org-scope'
+import { MCP_PROTOCOLS } from './protocols'
 import { McpToolsLive } from './server'
 
 const PROTOCOL_VERSION_HEADER = 'mcp-protocol-version'
-const SESSION_ID_HEADER = 'mcp-session-id'
 // Which JSON-RPC call this request carries. A header rather than the body, so it
 // can be read without touching a stream the route still needs — Claude's client
 // sets it, and a client that doesn't simply leaves the field off its line.
 const METHOD_HEADER = 'mcp-method'
 
-// The revision and the method a request names are the caller's own words, so they
-// are cut short before landing on a log line: one client sending something long
-// should not stretch every record it touches.
+// The revision, method and origin a request names are the caller's own words, so
+// they are cut short before landing on a log line: one client sending something
+// long should not stretch every record it touches.
 const bounded = (value: string) => value.slice(0, 64)
-
-// A client opening a connection names the newest protocol revision it speaks,
-// and the route refuses anything past the newest the library knows with an empty
-// 400 — nothing for the client to read, and the older transport it would fall
-// back to answers 405 here. So on the opening request, the one carrying no
-// session yet, the named revision is dropped and the exchange goes ahead, which
-// is what settles the revision both sides use. After that the client has been
-// told which revision it got, so naming another one is its own mistake to fix
-// and the refusal stands. Dropping the revision is only safe where something
-// else can still settle one, which is why a discovery call is excluded below.
-export const withNegotiableProtocolVersion = (
-	request: HttpServerRequest.HttpServerRequest,
-) => {
-	const named = request.headers[PROTOCOL_VERSION_HEADER]
-	if (named === undefined || request.headers[SESSION_ID_HEADER] !== undefined)
-		return Effect.succeed(request)
-	// The opening handshake names its revision in the body as well, so it can
-	// still settle one with the header gone. A discovery call has nothing to fall
-	// back on: unnamed, it sails past the revision check into an RPC layer with no
-	// handler for it, and that crash comes back to the client as a success it
-	// cannot read. Keeping its revision named earns it the same plain refusal an
-	// established connection already gets.
-	if (request.headers[METHOD_HEADER] === 'server/discover')
-		return Effect.succeed(request)
-	return Effect.as(
-		Effect.logInfo('mcp.protocol_version.deferred_to_negotiation').pipe(
-			Effect.annotateLogs({ 'mcp.protocol_version.named': named }),
-		),
-		request.modify({
-			headers: Headers.remove(request.headers, PROTOCOL_VERSION_HEADER),
-		}),
-	)
-}
 
 const jsonRpcError = (
 	status: number,
@@ -85,10 +48,6 @@ const jsonRpcError = (
  * status. Naming the call and the revision it asked for turns that line into an
  * explanation, and it has to be recorded up front — a request refused later
  * never reaches the code that would have known.
- *
- * Read from the request as it arrived, not the one handed onward, so the line
- * says what the client actually asked for even where negotiation drops the
- * revision it named.
  */
 export const recordCall = (request: HttpServerRequest.HttpServerRequest) => {
 	const method = request.headers[METHOD_HEADER]
@@ -102,33 +61,40 @@ export const recordCall = (request: HttpServerRequest.HttpServerRequest) => {
 }
 
 /**
- * Gives a refused revision a reason to read.
+ * Writes a line for a call the library refused before any tool ran.
  *
- * A request naming a revision the library does not know is answered with an
- * empty 400: no body for the client to act on, and a line that says 400 without
- * saying why. This says why in both directions — a line naming the revision,
- * written loudly only where a real call was turned down rather than a discovery
- * probe, and a JSON-RPC error body telling the client what to do instead.
- *
- * Only a response the route RETURNED is looked at, and the one empty 400 the
- * route returns is that refusal — the RPC layer under it returns none. A request
- * the route FAILED on (a broken body, say) also ends in an empty 400, but that
- * one is built further out, past this, so a bad body is never blamed on the
- * revision. The revision is read from the request the route itself saw, since
- * that is what it decided on.
+ * Two refusals come back from the library itself, and the line the request
+ * leaves says only the status. A revision it does not serve gets a 400 with a
+ * JSON-RPC error the client can read; this names the revision, loudly only where
+ * a real call was turned down rather than a discovery probe. A request from a
+ * browser origin it does not allow gets an empty 403, which a client shows as a
+ * silent retry; this names the origin.
  */
-export const explainRefusedVersion = <E, R>(
+export const noteRefusal = <E, R>(
 	app: Effect.Effect<HttpServerResponse.HttpServerResponse, E, R>,
 	request: HttpServerRequest.HttpServerRequest,
 ) =>
-	Effect.flatMap(app, response => {
+	Effect.tap(app, response => {
+		const origin = request.headers['origin']
+		if (response.status === 403 && origin !== undefined)
+			return recordFacts({ 'mcp.origin': bounded(origin) }).pipe(
+				Effect.andThen(
+					Effect.logWarning('MCP origin refused').pipe(
+						Effect.annotateLogs({
+							event: 'mcp.origin.refused',
+							'mcp.origin': bounded(origin),
+						}),
+					),
+				),
+			)
 		const named = request.headers[PROTOCOL_VERSION_HEADER]
 		if (
 			named === undefined ||
 			response.status !== 400 ||
-			response.body._tag !== 'Empty'
+			// A 400 for a revision served here was refused for some other reason.
+			MCP_PROTOCOLS.some(protocol => protocol.protocolVersion === named)
 		)
-			return Effect.succeed(response)
+			return Effect.void
 		// A refused discovery probe is the exchange working — that call exists to
 		// ask which revisions a server speaks, so "no" is its ordinary answer. A
 		// refused real call means work the client wanted did not happen, and keeps
@@ -142,13 +108,6 @@ export const explainRefusedVersion = <E, R>(
 				event: 'mcp.protocol_version.refused',
 				'mcp.protocol_version.named': bounded(named),
 			}),
-			Effect.andThen(
-				jsonRpcError(
-					400,
-					-32000,
-					`Unsupported MCP protocol version: ${bounded(named)}. Open a new connection to settle a supported revision, or send the one this connection settled.`,
-				),
-			),
 		)
 	})
 
@@ -233,19 +192,16 @@ const McpAuthMiddleware = HttpRouter.middleware(
 
 		return httpEffect =>
 			Effect.gen(function* () {
-				const incoming = yield* HttpServerRequest.HttpServerRequest
-				if (!incoming.url.startsWith('/mcp')) {
-					return yield* httpEffect
-				}
-				const req = yield* withNegotiableProtocolVersion(incoming)
-				yield* recordCall(incoming)
+				const req = yield* HttpServerRequest.HttpServerRequest
+				yield* recordCall(req)
 
 				const incomingMessage = NodeHttpServerRequest.toIncomingMessage(req)
 				const headers = fromNodeHeaders(incomingMessage.headers)
 
 				// Shared tail: provide the principal (MCP-only CurrentUser +
 				// controllers-package SessionContext, so service-layer code works
-				// across transports) and enter the org's app_user scope.
+				// across transports) and the way into the org's app_user scope,
+				// which each tool call, resource and prompt enters for itself.
 				const enterScope = (
 					authMethod: 'api_key' | 'oauth' | 'cookie',
 					org: { id: string; name: string; slug: string },
@@ -268,7 +224,7 @@ const McpAuthMiddleware = HttpRouter.middleware(
 					// "disconnection" (silent 401 loop) from Honeycomb alone, present
 					// even if the tool then fails. This lands on the request's line as
 					// well as its span, which works because the observability middleware
-					// is registered ahead of this one and has already opened the record.
+					// wraps every route and has already opened the record.
 					recordFacts({
 						'mcp.auth_method': authMethod,
 						// Named here as well as in `enterOrgScope`, because a call that
@@ -278,6 +234,11 @@ const McpAuthMiddleware = HttpRouter.middleware(
 					}).pipe(
 						Effect.andThen(
 							Effect.gen(function* () {
+								const scope = {
+									org,
+									userId: principal.userId,
+									role: principal.role,
+								}
 								// Read the body only now, once the credential has checked
 								// out, so an unauthenticated caller can never make the
 								// server hold a whole request in memory before its 401.
@@ -299,14 +260,14 @@ const McpAuthMiddleware = HttpRouter.middleware(
 										userId: principal.userId,
 										client: clientIdentityOf(body),
 										userAgent: headers.get('user-agent'),
-									})
+									}).pipe(enterOrgScope(sql, scope))
 								}
-								return yield* explainRefusedVersion(httpEffect, req)
+								return yield* noteRefusal(httpEffect, req).pipe(
+									Effect.provideService(McpOrgScope, {
+										run: enterOrgScope(sql, scope),
+									}),
+								)
 							}).pipe(
-								// The very request the body was read from: a request remembers
-								// its body and a copy does not, so handing the route the other
-								// one leaves it waiting forever on a stream already drained.
-								Effect.provideService(HttpServerRequest.HttpServerRequest, req),
 								Effect.provideService(CurrentUser, {
 									userId: principal.userId,
 									email: principal.email,
@@ -318,11 +279,6 @@ const McpAuthMiddleware = HttpRouter.middleware(
 									email: principal.email,
 									name: principal.name ?? undefined,
 									isAgent: principal.isAgent,
-								}),
-								enterOrgScope(sql, {
-									org,
-									userId: principal.userId,
-									role: principal.role,
 								}),
 							),
 						),
@@ -661,11 +617,26 @@ const McpAuthMiddleware = HttpRouter.middleware(
 				})
 			})
 	}),
-	{ global: true },
 )
 
-export const McpHttpLive = Layer.mergeAll(McpToolsLive, McpAuthMiddleware).pipe(
+// A request carrying an Origin is refused unless that origin is listed, so a
+// person signed in to the app in a browser is let through from the app's own
+// origins; assistants connect without one.
+//
+// Sign-in wraps the routes this layer adds and nothing else, so it runs on
+// exactly the requests the router sends to MCP, however their path is spelled.
+export const McpHttpLive = McpToolsLive.pipe(
 	Layer.provide(
-		McpServer.layerHttp({ name: 'batuda', version: '1.0.0', path: '/mcp' }),
+		Layer.unwrap(
+			Effect.map(EnvVars, env =>
+				McpServer.layerHttp({
+					name: 'batuda',
+					version: '1.0.0',
+					path: '/mcp',
+					protocols: MCP_PROTOCOLS,
+					allowedOrigins: env.ALLOWED_ORIGINS,
+				}),
+			),
+		).pipe(Layer.provide(McpAuthMiddleware.layer)),
 	),
 )

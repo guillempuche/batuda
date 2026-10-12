@@ -10,8 +10,8 @@ process.env['RESEARCH_MAX_LOOP_PROMPT_TOKENS'] ??= '24000'
 import { randomUUID } from 'node:crypto'
 
 import { Effect, Layer, Stream } from 'effect'
-import type { LanguageModel } from 'effect/unstable/ai'
-import { SqlClient } from 'effect/unstable/sql'
+import { LanguageModel } from 'effect/ai'
+import { SqlClient } from 'effect/sql'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import {
@@ -76,9 +76,10 @@ const stubResponse = {
 }
 
 // The three tiers share this zero-cost stub; the `as never` casts match the
-// shipped stub (the real LanguageModel.Service response type is far wider than
+// shipped stub (the real LanguageModel.LanguageModel response type is far wider than
 // what the fiber reads).
-const stubLlm: LanguageModel.Service = {
+const stubLlm: LanguageModel.LanguageModel = {
+	[LanguageModel.TypeId]: LanguageModel.TypeId,
 	generateText: (_options: unknown) => Effect.succeed(stubResponse) as never,
 	generateObject: (_options: unknown) =>
 		Effect.succeed({
@@ -104,7 +105,7 @@ const searchCacheKey = `it-svc-171-${randomUUID()}`
 // transaction. Forked onto the request connection (the bug) this dies on
 // "ROLLBACK TO SAVEPOINT ... in transaction blocks"; on the service's clean
 // connection it commits.
-const agentLlm: LanguageModel.Service = {
+const agentLlm: LanguageModel.LanguageModel = {
 	...stubLlm,
 	generateText: (_options: unknown) =>
 		Effect.gen(function* () {

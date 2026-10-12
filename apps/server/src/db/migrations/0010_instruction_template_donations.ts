@@ -1,5 +1,5 @@
 import { Effect } from 'effect'
-import { SqlClient } from 'effect/unstable/sql'
+import { SqlClient } from 'effect/sql'
 
 // Donating a personal instruction template to the org is admin-gated, so it
 // can't be a direct ownership flip: a member proposes a donation, an admin

@@ -1,7 +1,7 @@
 import { Config, Effect, Schema } from 'effect'
-import { McpSchema, Tool, Toolkit } from 'effect/unstable/ai'
-import type { SqlError } from 'effect/unstable/sql'
-import { SqlClient } from 'effect/unstable/sql'
+import { McpSchema, Tool, Toolkit } from 'effect/ai'
+import type { SqlError } from 'effect/sql'
+import { SqlClient } from 'effect/sql'
 
 import {
 	CurrentOrg,
@@ -25,6 +25,7 @@ import {
 } from '@batuda/domain'
 import { EmailBlocks } from '@batuda/email/schema'
 
+import { textArray } from '../../lib/pg-params'
 import { EmailService, smtpFailureReason } from '../../services/email'
 import {
 	EmailAttachmentStaging,
@@ -44,7 +45,7 @@ import {
 	replyAddressees,
 } from '../../services/recipient-address'
 import { ToolMessage } from '../tool-message'
-import { requireApproval } from './_elicit'
+import { type ApprovalAnswer, requireApproval } from './_elicit'
 import { CompanyIdParam, EmailMessageIdParam, EmailThreadIdParam } from './_ids'
 import {
 	ListResult,
@@ -59,12 +60,14 @@ import {
 // (apps/server/src/mcp/http.ts) provides both alongside CurrentUser, so
 // declaring them here lets the toolkit's static check see them as
 // satisfied requirements rather than free `R` channels.
-// McpServerClient lets the agent-facing tools raise an elicitation (the soft
-// send guardrails in send_email / reply_email); the MCP runtime provides it.
+// McpServerClient and McpRequestContext let the agent-facing tools raise an
+// elicitation (the soft send guardrails in send_email / reply_email); the MCP
+// runtime provides both on every call.
 const REQUEST_DEPENDENCIES = [
 	SessionContext,
 	CurrentOrg,
 	McpSchema.McpServerClient,
+	McpSchema.McpRequestContext,
 ]
 
 // Convert MCP snake_case refs to the service's camelCase StagingRef.
@@ -93,12 +96,9 @@ const toStagingRefs = (
 // is nothing to answer with, and an action says what it could not find. So the
 // reads declare `Schema.NullOr` and the actions raise `dieNotFound`.
 //
-// Answering with nothing is safe here because of ../safe-toolkit.ts, whose
-// `toStructuredContent` leaves structured output off entirely for a null; the
-// library it stands in for would ship `structuredContent: null`, which strict
-// clients reject and which makes the whole tool disappear from view. That file
-// says to re-sync it on an upgrade — the reads here are part of what depends
-// on it.
+// Answering with nothing is safe: the MCP layer leaves structured output off
+// for a null rather than shipping `structuredContent: null`, which strict
+// clients reject and which makes the whole tool disappear from view.
 
 const SendEmailResult = Schema.Union([
 	Schema.Struct({
@@ -166,7 +166,7 @@ const refusalMessage = (reason: 'no_subject' | 'forged_reply'): string =>
 
 const SendEmail = Tool.make('send_email', {
 	description:
-		'Send a new email, starting a new conversation. To answer or follow up on a conversation that already exists use reply_email instead, or a draft carrying thread_link_id — this tool sets no threading headers, so a "Re: " subject here would reach the recipient as a forged reply and is refused. The body is a structured block tree (paragraph / heading / list / quote / divider / image) — not raw html/text. Omit inbox_id to use the mailbox the calling member sends from in the active org — their own default, or the mailbox the team shares when they have set none. Attachments reference staging_ids returned by stage_email_attachment; set inline=true for cid-referenced inline images. Before composing, read the member’s standing email instructions (writing style, sign-off, do/don’t rules) from the batuda://instructions/email resource and write the body to follow them. Returns {_tag:"sent"} on success; {_tag:"suppressed"} if a recipient once hard-bounced or reported spam, which is a hard block on every path; or {_tag:"cancelled"} if an address being written to carries a deliverability verdict of "undeliverable" or "risky" and nobody confirmed it — either the answer was no, or this client cannot put a question to anybody, and the reason says which. Verdicts of "catch_all" and "unknown", and addresses nobody has checked, are not gated. Read `verification` on a contact\'s channels (list_contacts) before composing to see this coming; when a send is stopped, the reason names the exact call that lifts it. Set skip_footer=true to omit the inbox default footer.',
+		'Send a new email, starting a new conversation. To answer or follow up on a conversation that already exists use reply_email instead, or a draft carrying thread_link_id — this tool sets no threading headers, so a "Re: " subject here would reach the recipient as a forged reply and is refused. The body is a structured block tree (paragraph / heading / list / quote / divider / image) — not raw html/text. Omit inbox_id to use the mailbox the calling member sends from in the active org — their own default, or the mailbox the team shares when they have set none. Attachments reference staging_ids returned by stage_email_attachment; set inline=true for cid-referenced inline images. Before composing, read the member’s standing email instructions (writing style, sign-off, do/don’t rules) from the batuda://instructions/email resource and write the body to follow them. Returns {_tag:"sent"} on success; {_tag:"suppressed"} if a recipient once hard-bounced or reported spam, which is a hard block on every path; or {_tag:"cancelled"} if an address being written to carries a deliverability verdict of "undeliverable" or "risky" and nobody confirmed it — the answer was no, nobody answered in time, or this client cannot put a question to anybody, and the reason says which. Verdicts of "catch_all" and "unknown", and addresses nobody has checked, are not gated. Read `verification` on a contact\'s channels (list_contacts) before composing to see this coming; when a send is stopped, the reason names the exact call that lifts it. Set skip_footer=true to omit the inbox default footer.',
 	parameters: Schema.Struct({
 		inbox_id: Schema.optionalKey(Schema.String).annotate({
 			description:
@@ -513,10 +513,10 @@ const ManageEmailInbox = Tool.make('manage_email_inbox', {
 		email: Schema.optionalKey(Schema.String),
 		password: Schema.optionalKey(Schema.String),
 		imap_host: Schema.optionalKey(Schema.String),
-		imap_port: Schema.optionalKey(Schema.Number),
+		imap_port: Schema.optionalKey(Schema.Int),
 		imap_security: Schema.optionalKey(ImapSecurity),
 		smtp_host: Schema.optionalKey(Schema.String),
-		smtp_port: Schema.optionalKey(Schema.Number),
+		smtp_port: Schema.optionalKey(Schema.Int),
 		smtp_security: Schema.optionalKey(SmtpSecurity),
 		username: Schema.optionalKey(Schema.String),
 		display_name: Schema.optionalKey(Schema.NullOr(Schema.String)),
@@ -817,7 +817,7 @@ export const riskyRecipientFor = (
 						ON c.subject_table = 'sites' AND s.id = c.subject_id
 					WHERE c.organization_id = ${orgId}
 						AND c.channel = 'email'
-						AND lower(c.address) = ANY(${addresses})
+						AND lower(c.address) = ANY(${textArray(addresses)})
 						AND (c.verification IS NOT NULL OR c.status = 'valid')
 					ORDER BY lower(c.address), c.verification
 				`
@@ -839,7 +839,7 @@ export const EmailHandlersLive = EmailTools.toLayer(
 		const staging = yield* EmailAttachmentStaging
 		const sql = yield* SqlClient.SqlClient
 		// Soft per-thread send limit for the agent path (humans are never gated).
-		const softThreadLimit = yield* Config.int(
+		const softThreadLimit = yield* Config.Int(
 			'EMAIL_AGENT_SOFT_THREAD_LIMIT',
 		).pipe(Config.withDefault(3))
 
@@ -952,12 +952,14 @@ export const EmailHandlersLive = EmailTools.toLayer(
 			`If you know the address is good, vouch for it: ${vouchCall(risky)}`
 
 		const notSentReason = (
-			answer: 'declined' | 'unaskable',
+			answer: Exclude<ApprovalAnswer, 'confirmed'>,
 			reasons: string,
 		): string =>
 			answer === 'unaskable'
 				? `this client cannot ask anyone to confirm, and ${reasons}`
-				: reasons
+				: answer === 'unanswered'
+					? `nobody answered the question in time, and ${reasons}`
+					: reasons
 
 		return {
 			send_email: params =>

@@ -1,6 +1,6 @@
 import { Effect, Schema } from 'effect'
-import { McpSchema, Tool, Toolkit } from 'effect/unstable/ai'
-import { SqlClient } from 'effect/unstable/sql'
+import { McpSchema, Tool, Toolkit } from 'effect/ai'
+import { SqlClient } from 'effect/sql'
 
 import {
 	CurrentOrg,
@@ -16,7 +16,7 @@ import { ResearchDefaults } from '../../lib/research-defaults'
 import { CompanyService } from '../../services/companies'
 import { Geocoder } from '../../services/geocoder'
 import { resolveResearchProposedUpdate } from '../../services/research-apply'
-import { requireApproval } from './_elicit'
+import { type ApprovalAnswer, requireApproval } from './_elicit'
 import { RESEARCH_ID_SOURCE, SUBJECT_ID_SOURCE } from './_ids'
 import { describedUuid, redactDbErrors, Uuid } from './_research-shared'
 import {
@@ -30,14 +30,15 @@ import {
 	toTruncatable,
 } from './_result'
 
-// McpServerClient is what lets a tool put a question to whoever is on the
-// other end. Four tools here spend money, write to somebody's records, or
-// delete — none of which should happen unasked — so the client belongs in
-// every one of their dependency lists.
+// McpServerClient and McpRequestContext are what let a tool put a question to
+// whoever is on the other end. Four tools here spend money, write to somebody's records, or
+// delete — none of which should happen unasked — so both belong in every one
+// of their dependency lists.
 const REQUEST_DEPENDENCIES = [
 	SessionContext,
 	CurrentOrg,
 	McpSchema.McpServerClient,
+	McpSchema.McpRequestContext,
 ]
 
 // What a tool answers when it could not get a person's say-so. `cancelled`
@@ -63,7 +64,7 @@ const RESEARCH_BUDGET_PAGE =
 // still do it — deliberately naming the app rather than another tool, since
 // pointing the model at a tool turns the gate into a step it routes around.
 const notApproved = (
-	answer: 'declined' | 'unaskable',
+	answer: Exclude<ApprovalAnswer, 'confirmed'>,
 	what: string,
 	where: string,
 ) =>
@@ -72,10 +73,15 @@ const notApproved = (
 				status: 'cancelled' as const,
 				nextStep: `Nothing was changed — the answer was no. Ask again only if they change their mind.`,
 			}
-		: {
-				status: 'confirmation_required' as const,
-				nextStep: `This client has no way to ask anyone to ${what}, so nothing was changed. Tell whoever is reading, and they can do it from ${where}.`,
-			}
+		: answer === 'unanswered'
+			? {
+					status: 'cancelled' as const,
+					nextStep: `Nothing was changed — nobody answered the question in time. Ask again when someone is there to answer.`,
+				}
+			: {
+					status: 'confirmation_required' as const,
+					nextStep: `This client has no way to ask anyone to ${what}, so nothing was changed. Tell whoever is reading, and they can do it from ${where}.`,
+				}
 
 // Whether the thing about to be approved is actually there, established before
 // anybody is asked about it. Without this a person is put in front of "approve
@@ -269,7 +275,7 @@ const DeleteResearch = Tool.make('delete_research', {
 
 const ResolveResearchPaidAction = Tool.make('resolve_research_paid_action', {
 	description:
-		'Resolve a paid-action approval gate on a research run. decision=approve spawns a follow-up run that performs the paid call — money moves, so the person is asked first and nothing is spent until they agree ({status:"cancelled"} if they said no, {status:"confirmation_required"} if this client cannot ask them; relay nextStep rather than retrying). decision=skip dismisses the gate without spending and needs no approval. paid_action_id is the gate id surfaced by the run.',
+		'Resolve a paid-action approval gate on a research run. decision=approve spawns a follow-up run that performs the paid call — money moves, so the person is asked first and nothing is spent until they agree ({status:"cancelled"} if they said no or nobody answered in time, {status:"confirmation_required"} if this client cannot ask them; relay nextStep rather than retrying). decision=skip dismisses the gate without spending and needs no approval. paid_action_id is the gate id surfaced by the run.',
 	parameters: Schema.Struct({
 		id: Schema.String.annotate({ description: RESEARCH_ID_SOURCE }),
 		paid_action_id: Schema.String.annotate({
@@ -307,7 +313,7 @@ const ResolveResearchProposedUpdate = Tool.make(
 	'resolve_research_proposed_update',
 	{
 		description:
-			'Resolve a proposed CRM update from a research run. decision=apply writes the proposed change to the target row. It writes more than the fields named in the proposal: when the row is the company the run was about, the same write also stores what that run produced about the company: its fit judgement, and — only if the run wrote one — its account brief, which replaces the existing brief whole. A run that wrote no brief leaves the existing one untouched. The brief is one shared page with no earlier version kept, so where a run did write one, anything a person had put there is gone — read it first if it matters. It changes the customer\'s own records, so the person is asked first and nothing is written until they agree ({status:"cancelled"} if they said no, {status:"confirmation_required"} if this client cannot ask them; relay nextStep rather than retrying). decision=reject discards the proposal without changing the row and needs no approval.',
+			'Resolve a proposed CRM update from a research run. decision=apply writes the proposed change to the target row. It writes more than the fields named in the proposal: when the row is the company the run was about, the same write also stores what that run produced about the company: its fit judgement, and — only if the run wrote one — its account brief, which replaces the existing brief whole. A run that wrote no brief leaves the existing one untouched. The brief is one shared page with no earlier version kept, so where a run did write one, anything a person had put there is gone — read it first if it matters. It changes the customer\'s own records, so the person is asked first and nothing is written until they agree ({status:"cancelled"} if they said no or nobody answered in time, {status:"confirmation_required"} if this client cannot ask them; relay nextStep rather than retrying). decision=reject discards the proposal without changing the row and needs no approval.',
 		parameters: Schema.Struct({
 			id: Schema.String.annotate({ description: RESEARCH_ID_SOURCE }),
 			proposed_update_id: Schema.String.annotate({
@@ -326,13 +332,13 @@ const ResolveResearchProposedUpdate = Tool.make(
 
 const ResearchPolicy = Tool.make('research_policy', {
 	description:
-		'Get or update research budget limits. action=get returns the active limits: three per-run limits belonging to the calling user (free budget, paid budget, paid-action auto-approve threshold) plus paid_monthly_cap_cents, which is the ORGANIZATION\'s ceiling on paid research spend for the calendar month and applies to everyone in it. action=set upserts the provided fields; unspecified fields keep their current value. Cents-denominated. Raising any limit lets more money be spent without anyone being asked, so the person is asked before a raise takes effect ({status:"cancelled"} if they said no, {status:"confirmation_required"} if this client has no way to ask them — relay nextStep rather than retrying). Lowering a limit, or leaving it where it is, needs no approval.',
+		'Get or update research budget limits. action=get returns the active limits: three per-run limits belonging to the calling user (free budget, paid budget, paid-action auto-approve threshold) plus paid_monthly_cap_cents, which is the ORGANIZATION\'s ceiling on paid research spend for the calendar month and applies to everyone in it. action=set upserts the provided fields; unspecified fields keep their current value. Cents-denominated. Raising any limit lets more money be spent without anyone being asked, so the person is asked before a raise takes effect ({status:"cancelled"} if they said no or nobody answered in time, {status:"confirmation_required"} if this client has no way to ask them — relay nextStep rather than retrying). Lowering a limit, or leaving it where it is, needs no approval.',
 	parameters: Schema.Struct({
 		action: PolicyAction,
-		budget_cents: Schema.optionalKey(Schema.Number),
-		paid_budget_cents: Schema.optionalKey(Schema.Number),
-		auto_approve_paid_cents: Schema.optionalKey(Schema.Number),
-		paid_monthly_cap_cents: Schema.optionalKey(Schema.Number),
+		budget_cents: Schema.optionalKey(Schema.Int),
+		paid_budget_cents: Schema.optionalKey(Schema.Int),
+		auto_approve_paid_cents: Schema.optionalKey(Schema.Int),
+		paid_monthly_cap_cents: Schema.optionalKey(Schema.Int),
 	}),
 	// get → the policy wrapped in an object (a bare null isn't valid MCP output);
 	// set → the upserted policy directly.

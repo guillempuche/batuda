@@ -58,19 +58,19 @@ export function mergeWorktreeOrigin(
 
 export class EnvVars extends Context.Service<EnvVars>()('EnvVars', {
 	make: Effect.gen(function* () {
-		const DATABASE_URL = yield* Config.redacted('DATABASE_URL')
-		const PORT = yield* Config.int('PORT')
-		const NODE_ENV = yield* Config.string('NODE_ENV')
-		const MIN_LOG_LEVEL = yield* Config.string('MIN_LOG_LEVEL')
+		const DATABASE_URL = yield* Config.Redacted('DATABASE_URL')
+		const PORT = yield* Config.Int('PORT')
+		const NODE_ENV = yield* Config.String('NODE_ENV')
+		const MIN_LOG_LEVEL = yield* Config.String('MIN_LOG_LEVEL')
 
-		const BETTER_AUTH_SECRET = yield* Config.redacted('BETTER_AUTH_SECRET')
+		const BETTER_AUTH_SECRET = yield* Config.Redacted('BETTER_AUTH_SECRET')
 
 		// In a dev worktree portless sets PORTLESS_URL to this worktree's own api
 		// host (`<branch>.api.batuda.localhost`); derive the matching origins so the
 		// server's canonical base and the links it mints use the worktree's host,
 		// not the main checkout's. Null off a `batuda.localhost` host (prod), where
 		// the explicit env values below win. Mirrors apps/internal/vite.config.ts.
-		const PORTLESS_URL = yield* Config.string('PORTLESS_URL').pipe(
+		const PORTLESS_URL = yield* Config.String('PORTLESS_URL').pipe(
 			Config.withDefault(''),
 		)
 		const worktreeOrigins = deriveWorktreeOrigins(PORTLESS_URL)
@@ -80,8 +80,8 @@ export class EnvVars extends Context.Service<EnvVars>()('EnvVars', {
 		// portless-derived api origin overrides it.
 		const BETTER_AUTH_BASE_URL =
 			worktreeOrigins?.apiOrigin ??
-			(yield* Config.string('BETTER_AUTH_BASE_URL'))
-		const BETTER_AUTH_INSECURE_COOKIES = yield* Config.boolean(
+			(yield* Config.String('BETTER_AUTH_BASE_URL'))
+		const BETTER_AUTH_INSECURE_COOKIES = yield* Config.Boolean(
 			'BETTER_AUTH_INSECURE_COOKIES',
 		)
 		// Required (no default). Prod: `strict` (Better Auth's tight per-endpoint
@@ -97,25 +97,25 @@ export class EnvVars extends Context.Service<EnvVars>()('EnvVars', {
 		// minutes — the per-call org-membership check is the instant cut-off,
 		// this caps the edges); dev sets it long so local testing isn't
 		// constantly re-authorizing.
-		const OAUTH_ACCESS_TOKEN_TTL_SECONDS = yield* Config.int(
+		const OAUTH_ACCESS_TOKEN_TTL_SECONDS = yield* Config.Int(
 			'OAUTH_ACCESS_TOKEN_TTL_SECONDS',
 		)
 		// Anyone can register an OAuth client (open Dynamic Client Registration),
 		// so abandoned ones get garbage-collected after each registration: a
 		// client older than this many days with no consent is deleted. Required;
 		// prod short, dev long so a client registered while testing survives.
-		const OAUTH_CLIENT_GC_DAYS = yield* Config.int('OAUTH_CLIENT_GC_DAYS')
+		const OAUTH_CLIENT_GC_DAYS = yield* Config.Int('OAUTH_CLIENT_GC_DAYS')
 		// Per-key rate limit for org-scoped API keys — the credential AI/MCP
 		// clients call /mcp with. Required (no default). Prod enables it so a
 		// leaked or runaway key can't hammer the API unthrottled; dev sets
 		// ENABLED=false so local MCP testing (which fans out many tool calls per
 		// turn) never hits a false rejection. MAX requests per WINDOW_SECONDS,
 		// stamped on each key at creation.
-		const API_KEY_RATE_LIMIT_ENABLED = yield* Config.boolean(
+		const API_KEY_RATE_LIMIT_ENABLED = yield* Config.Boolean(
 			'API_KEY_RATE_LIMIT_ENABLED',
 		)
-		const API_KEY_RATE_LIMIT_MAX = yield* Config.int('API_KEY_RATE_LIMIT_MAX')
-		const API_KEY_RATE_LIMIT_WINDOW_SECONDS = yield* Config.int(
+		const API_KEY_RATE_LIMIT_MAX = yield* Config.Int('API_KEY_RATE_LIMIT_MAX')
+		const API_KEY_RATE_LIMIT_WINDOW_SECONDS = yield* Config.Int(
 			'API_KEY_RATE_LIMIT_WINDOW_SECONDS',
 		)
 		// Comma-separated list of trusted origins, each a literal origin
@@ -125,9 +125,9 @@ export class EnvVars extends Context.Service<EnvVars>()('EnvVars', {
 		// origin is listed explicitly. A `*.host` entry fails boot rather than
 		// silently never matching. Same array is reused as Better-Auth
 		// `trustedOrigins`.
-		const allowedOriginsFromEnv = yield* Config.string('ALLOWED_ORIGINS').pipe(
+		const allowedOriginsFromEnv = yield* Config.String('ALLOWED_ORIGINS').pipe(
 			Config.map(s => (s ? s.split(',').map(o => o.trim()) : [])),
-			Config.mapOrFail(patterns => {
+			Config.mapEffect(patterns => {
 				const offending = findWildcardOrigin(patterns)
 				if (offending !== null) {
 					return Effect.fail(
@@ -161,7 +161,7 @@ export class EnvVars extends Context.Service<EnvVars>()('EnvVars', {
 		// origin the app doesn't trust. Decoupled from ALLOWED_ORIGINS ordering
 		// on purpose: reordering that list no longer moves invite links.
 		const APP_PUBLIC_URL =
-			worktreeOrigins?.appOrigin ?? (yield* Config.string('APP_PUBLIC_URL'))
+			worktreeOrigins?.appOrigin ?? (yield* Config.String('APP_PUBLIC_URL'))
 		const publicUrlError = findPublicUrlNotAllowed(
 			APP_PUBLIC_URL,
 			ALLOWED_ORIGINS,
@@ -200,10 +200,10 @@ export class EnvVars extends Context.Service<EnvVars>()('EnvVars', {
 		)
 
 		// Concurrency and safety
-		const RESEARCH_MAX_CONCURRENT_FIBERS_TOTAL = yield* Config.int(
+		const RESEARCH_MAX_CONCURRENT_FIBERS_TOTAL = yield* Config.Int(
 			'RESEARCH_MAX_CONCURRENT_FIBERS_TOTAL',
 		).pipe(Config.withDefault(3))
-		const RESEARCH_MAX_CONCURRENCY_FANOUT = yield* Config.int(
+		const RESEARCH_MAX_CONCURRENCY_FANOUT = yield* Config.Int(
 			'RESEARCH_MAX_CONCURRENCY_FANOUT',
 		).pipe(Config.withDefault(3))
 

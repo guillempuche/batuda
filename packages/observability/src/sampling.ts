@@ -3,7 +3,7 @@ import { Option, type Tracer } from 'effect'
 /**
  * Turns the configured keep rate into a usable share, 0..1.
  *
- * Parsed here rather than with `Config.number` because that fails on anything
+ * Parsed here rather than with `Config.Number` because that fails on anything
  * unparseable, and a failed config stops the process booting — `withDefault`
  * only covers a value that is missing, not one that is malformed. A typo in a
  * knob that merely thins traces must never take the server down, so anything

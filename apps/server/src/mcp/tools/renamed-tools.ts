@@ -1,5 +1,5 @@
 import { Effect, Schema } from 'effect'
-import { McpSchema, Tool, Toolkit } from 'effect/unstable/ai'
+import { McpSchema, Tool, Toolkit } from 'effect/ai'
 
 import { ToolMessage } from '../tool-message'
 

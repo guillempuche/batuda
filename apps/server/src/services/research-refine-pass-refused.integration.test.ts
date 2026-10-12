@@ -9,7 +9,7 @@ process.env['RESEARCH_MAX_LOOP_PROMPT_TOKENS'] ??= '24000'
 import { createHash, randomUUID } from 'node:crypto'
 
 import { Effect, Layer, ManagedRuntime, Stream } from 'effect'
-import type { LanguageModel } from 'effect/unstable/ai'
+import { LanguageModel } from 'effect/ai'
 import pg from 'pg'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
@@ -52,7 +52,8 @@ const usage = {
 // one after it is refused by the provider the way a model's own malformed tool
 // call is refused once its retries are spent.
 let agentCalls = 0
-const agentLlm: LanguageModel.Service = {
+const agentLlm: LanguageModel.LanguageModel = {
+	[LanguageModel.TypeId]: LanguageModel.TypeId,
 	generateText: () =>
 		Effect.suspend(() => {
 			agentCalls += 1
@@ -98,7 +99,8 @@ const agentLlm: LanguageModel.Service = {
 
 // Extractor: an empty list, which is thin enough to earn the refined retry the
 // provider then refuses.
-const extractLlm: LanguageModel.Service = {
+const extractLlm: LanguageModel.LanguageModel = {
+	[LanguageModel.TypeId]: LanguageModel.TypeId,
 	generateText: () => Effect.succeed({ text: '', content: [], usage }) as never,
 	generateObject: () =>
 		Effect.succeed({ usage, value: { prospects: [] } }) as never,
@@ -106,7 +108,8 @@ const extractLlm: LanguageModel.Service = {
 		Stream.succeed({ type: 'text-delta' as const, delta: '' }) as never,
 }
 
-const writerLlm: LanguageModel.Service = {
+const writerLlm: LanguageModel.LanguageModel = {
+	[LanguageModel.TypeId]: LanguageModel.TypeId,
 	generateText: () =>
 		Effect.succeed({
 			text: 'No prospects found.',

@@ -2,7 +2,7 @@ import { createCipheriv, createHash, hkdfSync } from 'node:crypto'
 
 import { Config, Effect } from 'effect'
 
-import { type SeedCtx, seedUuid } from './shared'
+import { type SeedCtx, seedUuid, textArray } from './shared'
 
 interface InboxSpec {
 	readonly email: string
@@ -44,7 +44,7 @@ const TALLER_PRIVATE_INBOX_ID = '88888888-8888-4888-8888-888888888888'
 
 export const seedInboxes = ({ sql, tallerOrgId, restaurantOrgId }: SeedCtx) =>
 	Effect.gen(function* () {
-		const masterKeyB64 = yield* Config.string('EMAIL_CREDENTIAL_KEY')
+		const masterKeyB64 = yield* Config.String('EMAIL_CREDENTIAL_KEY')
 		const masterKey = Buffer.from(masterKeyB64, 'base64')
 		if (masterKey.length !== 32) {
 			return yield* Effect.fail(
@@ -155,7 +155,7 @@ export const seedInboxes = ({ sql, tallerOrgId, restaurantOrgId }: SeedCtx) =>
 		const ownerRows = yield* sql<{
 			id: string
 			email: string
-		}>`SELECT id, email FROM "user" WHERE email = ANY(${ownerEmails as string[]})`
+		}>`SELECT id, email FROM "user" WHERE email = ANY(${textArray(ownerEmails)})`
 		const userIdByEmail = new Map(ownerRows.map(r => [r.email, r.id]))
 
 		const seededInboxes: SeededInbox[] = []

@@ -1,5 +1,5 @@
 import { Duration, Effect, Schedule, Stream } from 'effect'
-import { Atom } from 'effect/unstable/reactivity'
+import { Atom } from 'effect/reactivity'
 
 import type { ResearchRunLive } from '@batuda/controllers'
 

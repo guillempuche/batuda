@@ -1,5 +1,5 @@
 import { Effect } from 'effect'
-import { SqlClient } from 'effect/unstable/sql'
+import { SqlClient } from 'effect/sql'
 
 // Bounding-box search filters companies by a latitude/longitude rectangle. A
 // composite index over the two coordinate columns lets that range scan run

@@ -1,5 +1,5 @@
 import { Effect } from 'effect'
-import { SqlClient } from 'effect/unstable/sql'
+import { SqlClient } from 'effect/sql'
 
 // Why a run ended without usable data — a structured code behind a failed or
 // no_reliable_data run (entity_mismatch, no_sources, internal_error, …) so the UI

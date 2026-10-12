@@ -1,8 +1,8 @@
 import { NodeHttpServerRequest } from '@effect/platform-node'
 import { fromNodeHeaders } from 'better-auth/node'
 import { Context, Data, Effect, Layer } from 'effect'
-import { HttpServerRequest } from 'effect/unstable/http'
-import { SqlClient } from 'effect/unstable/sql'
+import { HttpServerRequest } from 'effect/http'
+import { SqlClient } from 'effect/sql'
 
 import {
 	CurrentOrg,

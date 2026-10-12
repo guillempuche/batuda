@@ -5,7 +5,7 @@ import type { BetterAuthOptions } from 'better-auth'
 import { getMigrations } from 'better-auth/db/migration'
 import { admin, bearer, jwt, openAPI, organization } from 'better-auth/plugins'
 import { Effect } from 'effect'
-import { SqlClient } from 'effect/unstable/sql'
+import { SqlClient } from 'effect/sql'
 import { PostgresDialect } from 'kysely'
 import pg from 'pg'
 

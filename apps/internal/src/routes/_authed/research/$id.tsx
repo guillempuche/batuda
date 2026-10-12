@@ -1,7 +1,7 @@
 import { useLingui } from '@lingui/react/macro'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { Effect } from 'effect'
-import { AsyncResult } from 'effect/unstable/reactivity'
+import { AsyncResult } from 'effect/reactivity'
 import { ArrowLeft } from 'lucide-react'
 import { styled } from 'next-yak'
 

@@ -6,7 +6,7 @@ process.env['DATABASE_URL'] ??=
 process.env['EMAIL_HEALTH_PROBE_INTERVAL_SEC'] ??= '900'
 
 import { Effect, Layer, Logger, References } from 'effect'
-import { SqlClient } from 'effect/unstable/sql'
+import { SqlClient } from 'effect/sql'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { GrantAuthFailed, GrantConnectFailed } from '@batuda/controllers'

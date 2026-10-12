@@ -15,11 +15,7 @@
  */
 
 import { Config, Effect, Redacted, Schema } from 'effect'
-import {
-	HttpClient,
-	HttpClientRequest,
-	HttpClientResponse,
-} from 'effect/unstable/http'
+import { HttpClient, HttpClientRequest, HttpClientResponse } from 'effect/http'
 
 import type { VerificationVerdict } from '@batuda/domain'
 
@@ -74,7 +70,7 @@ export const hunterStatusToVerdict = (
  */
 export const makeHunterClient = (envBase: string, slot: number) =>
 	Effect.gen(function* () {
-		const apiKey = yield* Config.redacted(keyForSlot(envBase, slot))
+		const apiKey = yield* Config.Redacted(keyForSlot(envBase, slot))
 		const client = yield* HttpClient.HttpClient
 		const harden = hardenHttp('hunter')
 		const key = Redacted.value(apiKey)

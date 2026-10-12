@@ -22,7 +22,7 @@
  */
 
 import { Effect } from 'effect'
-import { AiError } from 'effect/unstable/ai'
+import { AiError } from 'effect/ai'
 
 /**
  * Provider error codes meaning "the model wrote a tool call we would not accept".
@@ -104,9 +104,6 @@ export const reclassifyRejectedToolCall =
 								method: err.method,
 								reason: new AiError.ToolParameterValidationError({
 									toolName,
-									// The provider reports what its own check objected to, never
-									// the arguments the model sent, so there are none to carry.
-									toolParams: null,
 									description,
 								}),
 							}),

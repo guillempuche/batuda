@@ -1,5 +1,5 @@
 import { Effect } from 'effect'
-import { SqlClient } from 'effect/unstable/sql'
+import { SqlClient } from 'effect/sql'
 
 // Who owns this lead — the org member responsible for working it through the
 // pipeline. Nullable so a company can sit unassigned, and plain text (a Better

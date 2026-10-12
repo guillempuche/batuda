@@ -1,5 +1,5 @@
 import { Effect } from 'effect'
-import { SqlClient } from 'effect/unstable/sql'
+import { SqlClient } from 'effect/sql'
 
 // Three places kept a free-text box of their own: a contact, a task and a
 // proposal each had `notes`. None of them talked to each other, none could hold

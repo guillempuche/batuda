@@ -12,7 +12,7 @@ import { Config, Console, Effect } from 'effect'
  * Nothing needs it to pass: each test finds its own messages by name.
  */
 export const emailClear = Effect.gen(function* () {
-	const url = yield* Config.string('MAIL_CATCHER_HTTP_URL')
+	const url = yield* Config.String('MAIL_CATCHER_HTTP_URL')
 	yield* Console.log(
 		'Emptying the mail catcher. It is shared, so this discards captured mail for every checkout on this machine.',
 	)

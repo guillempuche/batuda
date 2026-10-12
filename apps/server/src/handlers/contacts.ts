@@ -1,11 +1,12 @@
 import { DateTime, Effect, Schema } from 'effect'
-import { HttpApiBuilder } from 'effect/unstable/httpapi'
-import type { Statement } from 'effect/unstable/sql'
-import { SqlClient } from 'effect/unstable/sql'
+import { HttpApiBuilder } from 'effect/http-api'
+import type { Statement } from 'effect/sql'
+import { SqlClient } from 'effect/sql'
 
 import { BatudaApi, CurrentOrg, NotFound } from '@batuda/controllers'
 import { Contact, ContactChannel, jobTitleOrNothing } from '@batuda/domain'
 
+import { withJsonColumns } from '../lib/pg-params'
 import {
 	pageOf,
 	probeLimit,
@@ -117,7 +118,7 @@ export const ContactsLive = HttpApiBuilder.group(
 							siteId,
 						)
 						const rows = yield* sql`INSERT INTO contacts ${sql.insert({
-							...fields,
+							...withJsonColumns(fields, ['metadata']),
 							role: jobTitleOrNothing(fields.role),
 							siteId: ownedSite ?? null,
 							organizationId: currentOrg.id,
@@ -175,7 +176,7 @@ export const ContactsLive = HttpApiBuilder.group(
 								? {}
 								: { role: jobTitleOrNothing(fields.role) }
 						const rows = yield* sql`
-							UPDATE contacts SET ${sql.update({ ...fields, ...roleChange, ...siteChange, updatedAt: DateTime.toDateUtc(DateTime.nowUnsafe()) })}
+							UPDATE contacts SET ${sql.update({ ...withJsonColumns(fields, ['metadata']), ...roleChange, ...siteChange, updatedAt: DateTime.toDateUtc(DateTime.nowUnsafe()) })}
 							WHERE id = ${_.params.id} RETURNING *
 						`
 						if (channels && channels.length > 0)

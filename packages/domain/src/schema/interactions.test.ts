@@ -3,9 +3,9 @@ import { describe, expect, it } from 'vitest'
 
 import { Interaction } from './interactions'
 
-// A raw interaction row exactly as node-postgres hands it back: TIMESTAMPTZ and
-// DATE columns are JS Date objects (the pg driver parses DATE into a Date, not
-// a "YYYY-MM-DD" string), and camelCased by the client's result transform.
+// A raw interaction row exactly as the driver hands it back: a TIMESTAMPTZ
+// column is a JS Date, a DATE column is a "YYYY-MM-DD" string, and the keys are
+// camelCased by the client's result transform.
 const rawRow = {
 	id: 'int_1',
 	companyId: 'co_1',
@@ -19,22 +19,26 @@ const rawRow = {
 	summary: 'Sent the proposal',
 	outcome: null,
 	nextAction: 'Chase a reply',
-	nextActionAt: new Date('2026-08-01T00:00:00Z'),
+	nextActionAt: '2026-08-01',
 	metadata: null,
 	createdAt: new Date('2026-07-01T10:00:00Z'),
 }
 
 describe('Interaction', () => {
 	describe('when the next_action_at DATE column is populated', () => {
-		it('should decode the JS Date the driver returns, not reject it as a non-string', () => {
-			// GIVEN a raw row whose next_action_at arrives as a JS Date
-			//   (interactions.next_action_at is a DATE column; node-postgres
-			//    parses DATE values into Date objects). Typing it as a plain
-			//    string would 500 the interactions list/create read-back.
+		it('should read the day the driver returns as midnight UTC that day', () => {
+			// GIVEN a raw row whose next_action_at arrives as "YYYY-MM-DD", which
+			//   is how the driver hands over a DATE column. Typing it as a Date
+			//   would 500 the interactions list/create read-back.
 			// WHEN the row is decoded through the domain model
 			const decoded = Schema.decodeUnknownSync(Interaction)(rawRow)
-			// THEN the DATE column lands as a DateTime.Utc instead of failing
+			// THEN the DATE column lands as a DateTime.Utc on that day
 			expect(DateTime.isDateTime(decoded.nextActionAt)).toBe(true)
+			expect(
+				decoded.nextActionAt === null
+					? null
+					: DateTime.formatIso(decoded.nextActionAt),
+			).toBe('2026-08-01T00:00:00.000Z')
 		})
 	})
 

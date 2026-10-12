@@ -1,5 +1,5 @@
 import { Effect } from 'effect'
-import { SqlClient } from 'effect/unstable/sql'
+import { SqlClient } from 'effect/sql'
 
 // "Is this the decision maker" had one right answer in an owner-run business and
 // no right answer anywhere else. In a factory the plant manager, purchasing and

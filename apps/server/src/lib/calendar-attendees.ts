@@ -1,7 +1,9 @@
 import { Effect, Schema } from 'effect'
-import type { SqlClient } from 'effect/unstable/sql'
+import type { SqlClient } from 'effect/sql'
 
 import { CalendarEventAttendee } from '@batuda/domain'
+
+import { textArray } from './pg-params'
 
 const decodeAttendees = Schema.decodeUnknownEffect(
 	Schema.Array(CalendarEventAttendee),
@@ -26,7 +28,7 @@ const attendeesByEvent = (
 			SELECT id, event_id, email, name, contact_id, company_id, rsvp, is_organizer,
 				match_status, match_candidates
 			FROM calendar_event_attendees
-			WHERE event_id = ANY(${eventIds as unknown as string[]})
+			WHERE event_id = ANY(${textArray(eventIds)}::uuid[])
 			ORDER BY is_organizer DESC, email ASC
 		`
 		// The decoded attendee carries no event of its own, so the raw row at

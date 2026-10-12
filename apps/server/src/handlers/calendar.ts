@@ -1,7 +1,7 @@
 import { Cache, DateTime, Duration, Effect, Option, Schema } from 'effect'
-import { HttpApiBuilder } from 'effect/unstable/httpapi'
-import type { Statement } from 'effect/unstable/sql'
-import { SqlClient } from 'effect/unstable/sql'
+import { HttpApiBuilder } from 'effect/http-api'
+import type { Statement } from 'effect/sql'
+import { SqlClient } from 'effect/sql'
 
 import { BookingProvider } from '@batuda/calendar'
 import {
@@ -16,6 +16,7 @@ import {
 import { CalendarEvent, CalendarEventType } from '@batuda/domain'
 
 import { withAttendees } from '../lib/calendar-attendees'
+import { jsonColumn } from '../lib/pg-params'
 import {
 	pageOf,
 	probeLimit,
@@ -206,7 +207,7 @@ export const CalendarLive = HttpApiBuilder.group(
 								company_id: _.payload.companyId ?? null,
 								contact_id: _.payload.contactId ?? null,
 								interaction_id: null,
-								metadata: _.payload.metadata ?? null,
+								metadata: jsonColumn(_.payload.metadata),
 								raw_ics: null,
 							})} RETURNING *
 						`

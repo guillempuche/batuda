@@ -1,30 +1,30 @@
 import { Schema } from 'effect'
 
-export class UserNotFound extends Schema.TaggedErrorClass<UserNotFound>()(
+export class UserNotFound extends Schema.TaggedError<UserNotFound>()(
 	'UserNotFound',
 	{ email: Schema.String },
 ) {}
 
 // `bootstrapFirstAdmin` refuses when any row already exists in "user". Carries
 // the row count so the CLI can explain *why* the bootstrap is a no-op.
-export class UsersAlreadyExist extends Schema.TaggedErrorClass<UsersAlreadyExist>()(
+export class UsersAlreadyExist extends Schema.TaggedError<UsersAlreadyExist>()(
 	'UsersAlreadyExist',
 	{ count: Schema.Number },
 ) {}
 
 // `inviteUser` refuses on duplicate email — the caller should either resend a
 // magic link via a different command or reset the password.
-export class UserAlreadyExists extends Schema.TaggedErrorClass<UserAlreadyExists>()(
+export class UserAlreadyExists extends Schema.TaggedError<UserAlreadyExists>()(
 	'UserAlreadyExists',
 	{ email: Schema.String },
 ) {}
 
-export class MagicLinkFailed extends Schema.TaggedErrorClass<MagicLinkFailed>()(
+export class MagicLinkFailed extends Schema.TaggedError<MagicLinkFailed>()(
 	'MagicLinkFailed',
 	{ email: Schema.String, cause: Schema.String },
 ) {}
 
-export class ApiKeyNotFound extends Schema.TaggedErrorClass<ApiKeyNotFound>()(
+export class ApiKeyNotFound extends Schema.TaggedError<ApiKeyNotFound>()(
 	'ApiKeyNotFound',
 	{ keyId: Schema.String },
 ) {}
@@ -32,7 +32,7 @@ export class ApiKeyNotFound extends Schema.TaggedErrorClass<ApiKeyNotFound>()(
 // Any underlying failure in the Better-Auth adapter or pg pool that isn't
 // already a domain-meaningful error — preserves a human-readable `message` so
 // the CLI can print it without unwrapping nested causes.
-export class AuthConfigError extends Schema.TaggedErrorClass<AuthConfigError>()(
+export class AuthConfigError extends Schema.TaggedError<AuthConfigError>()(
 	'AuthConfigError',
 	{ message: Schema.String },
 ) {}
@@ -40,7 +40,7 @@ export class AuthConfigError extends Schema.TaggedErrorClass<AuthConfigError>()(
 // `inviteAdmin` refuses to claim an org slug that's already in use unless the
 // caller opts in via `--allow-existing-org`. Without the gate, CLI mistakes
 // could attach a new admin to someone else's org.
-export class OrgSlugTaken extends Schema.TaggedErrorClass<OrgSlugTaken>()(
+export class OrgSlugTaken extends Schema.TaggedError<OrgSlugTaken>()(
 	'OrgSlugTaken',
 	{ slug: Schema.String },
 ) {}
@@ -49,7 +49,7 @@ export class OrgSlugTaken extends Schema.TaggedErrorClass<OrgSlugTaken>()(
 // row — handles both the slug-reuse case and the rare race where the user
 // landed in the org via a parallel path (e.g. server `/auth` flow) between
 // our find and write.
-export class AlreadyMember extends Schema.TaggedErrorClass<AlreadyMember>()(
+export class AlreadyMember extends Schema.TaggedError<AlreadyMember>()(
 	'AlreadyMember',
 	{ email: Schema.String, slug: Schema.String },
 ) {}

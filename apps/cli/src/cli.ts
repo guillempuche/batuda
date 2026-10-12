@@ -2,7 +2,7 @@ import { fileURLToPath } from 'node:url'
 
 import { NodeRuntime, NodeServices } from '@effect/platform-node'
 import { Console, Data, Effect, Option, Redacted } from 'effect'
-import { Argument, Command, Flag, Prompt } from 'effect/unstable/cli'
+import { Argument, Command, Flag, Prompt } from 'effect/cli'
 
 import { isLangCode, LANG_CODES, type LangCode } from '@batuda/domain'
 
@@ -64,13 +64,13 @@ import { recoveryHint } from './lib/recovery-hint'
 const seedCommand = Command.make(
 	'seed',
 	{
-		preset: Flag.choice('preset', ['minimal', 'full'] as const).pipe(
+		preset: Flag.Literals('preset', ['minimal', 'full'] as const).pipe(
 			Flag.withDescription(
 				'Data preset: minimal (2 companies) or full (10 companies)',
 			),
 			Flag.withDefault('full' as const),
 		),
-		quiet: Flag.boolean('quiet').pipe(
+		quiet: Flag.Boolean('quiet').pipe(
 			Flag.withDescription(
 				'Skip the dev-server access hints — for seeding a disposable integration DB, where nothing is being served',
 			),
@@ -135,13 +135,13 @@ const worktreeIdentity = (result: EnvFileResult): string =>
 const setupCommand = Command.make(
 	'setup',
 	{
-		update: Flag.boolean('update').pipe(
+		update: Flag.Boolean('update').pipe(
 			Flag.withDescription(
 				'Append missing .env keys from .env.example (no effect on the worktree-managed .env/apps/cli/.env)',
 			),
 			Flag.withDefault(false),
 		),
-		reset: Flag.boolean('reset').pipe(
+		reset: Flag.Boolean('reset').pipe(
 			Flag.withDescription(
 				'Replace .env files entirely from .env.example (no effect on the worktree-managed .env/apps/cli/.env)',
 			),
@@ -269,7 +269,7 @@ const dbCommand = Command.make('db').pipe(
 
 // Shared by every auth command that writes, so a script or agent can run them
 // without a terminal to answer the confirm.
-const confirmHostFlag = Flag.string('confirm-host').pipe(
+const confirmHostFlag = Flag.String('confirm-host').pipe(
 	Flag.withDescription(
 		'Database host this command should run against (e.g. the value shown by `doctor --env cloud`). Replaces the interactive confirm; refuses if it disagrees with DATABASE_URL',
 	),
@@ -279,7 +279,7 @@ const confirmHostFlag = Flag.string('confirm-host').pipe(
 // Shared by the measuring passes, which face the same two setup mistakes: a
 // vendor answering that the change under test had no part in, and an
 // environment quietly pointing the pass at another checkout's database.
-const qualityFlag = Flag.boolean('quality').pipe(
+const qualityFlag = Flag.Boolean('quality').pipe(
 	Flag.withDescription(
 		'Switch the company registers and the enrich, map and verify vendors off for this pass (they are set to none). A register answers with directors and a paid vendor with contact details, so leaving them on feeds the numbers from a source the change under test has nothing to do with — and they do not answer every time, which makes two passes differ for a reason that is not the change',
 	),
@@ -287,13 +287,13 @@ const qualityFlag = Flag.boolean('quality').pipe(
 
 // The same idea, minus the enrichment tier: that tier is what this command
 // measures, so switching it off would measure nothing at all.
-const contactsQualityFlag = Flag.boolean('quality').pipe(
+const contactsQualityFlag = Flag.Boolean('quality').pipe(
 	Flag.withDescription(
 		'Switch the company registers off for this pass (they are set to none). A register answers with directors, so leaving it on feeds the contact numbers from a source the change under test has nothing to do with — and it does not answer every time, which makes two passes differ for a reason that is not the change. The enrich, map and verify vendors are left as configured: the enrichment tier is what this command measures',
 	),
 )
 
-const databaseFromEnvFlag = Flag.boolean('database-from-env').pipe(
+const databaseFromEnvFlag = Flag.Boolean('database-from-env').pipe(
 	Flag.withDescription(
 		"Measure against the DATABASE_URL the environment exported, even when this checkout's .env names another database. Off by default: an environment that ships a connection string of its own otherwise sends the whole pass into somebody else's database, where its runs mix with theirs and the pages it reads back are not its own",
 	),
@@ -306,7 +306,7 @@ export class InvalidLocale extends Data.TaggedError('InvalidLocale')<{
 // The language the new account reads in. Validated here because the list of
 // languages lives in the domain package, which `@batuda/auth` deliberately
 // does not depend on — so this edge is the last place that can check it.
-const localeFlag = Flag.string('locale').pipe(
+const localeFlag = Flag.String('locale').pipe(
 	Flag.withDescription(
 		`Language for their email and first sign-in (${LANG_CODES.join(' | ')}). Omitted leaves it unset.`,
 	),
@@ -329,29 +329,29 @@ const readLocaleFlag = (
 const authCreateKeyCommand = Command.make(
 	'create-key',
 	{
-		email: Flag.string('email').pipe(
+		email: Flag.String('email').pipe(
 			Flag.withDescription('User email that will own the key'),
 			Flag.withDefault('dev@batuda.co'),
 		),
-		name: Flag.string('name').pipe(
+		name: Flag.String('name').pipe(
 			Flag.withDescription('Key name (used for listing/revoking later)'),
 			Flag.withDefault('local-dev'),
 		),
-		prefix: Flag.string('prefix').pipe(
+		prefix: Flag.String('prefix').pipe(
 			Flag.withDescription('Plaintext prefix shown on every generated key'),
 			Flag.withDefault('batuda_'),
 		),
-		expiresIn: Flag.integer('expires-in').pipe(
+		expiresIn: Flag.Int('expires-in').pipe(
 			Flag.withDescription('Expiration in seconds (omit for no expiry)'),
 			Flag.optional,
 		),
-		org: Flag.string('org').pipe(
+		org: Flag.String('org').pipe(
 			Flag.withDescription(
 				'Organization id the key works in. Written onto the key itself and read back on every call made with it, so a key without one reaches no data at all',
 			),
 			Flag.optional,
 		),
-		createdBy: Flag.string('created-by').pipe(
+		createdBy: Flag.String('created-by').pipe(
 			Flag.withDescription(
 				'User id the key acts as. Defaults to the user the key is issued for, which is almost always what is wanted; name another only when the key should act as somebody else',
 			),
@@ -379,17 +379,17 @@ const authCreateKeyCommand = Command.make(
 const authBootstrapCommand = Command.make(
 	'bootstrap',
 	{
-		email: Flag.string('email').pipe(
+		email: Flag.String('email').pipe(
 			Flag.withDescription('Admin email address'),
-			Flag.withFallbackPrompt(Prompt.text({ message: 'Admin email:' })),
+			Flag.withFallbackPrompt(Prompt.String({ message: 'Admin email:' })),
 		),
-		name: Flag.string('name').pipe(
+		name: Flag.String('name').pipe(
 			Flag.withDescription('Admin display name'),
-			Flag.withFallbackPrompt(Prompt.text({ message: 'Admin name:' })),
+			Flag.withFallbackPrompt(Prompt.String({ message: 'Admin name:' })),
 		),
-		password: Flag.redacted('password').pipe(
+		password: Flag.Redacted('password').pipe(
 			Flag.withDescription('Admin password (prompted if omitted)'),
-			Flag.withFallbackPrompt(Prompt.hidden({ message: 'Admin password:' })),
+			Flag.withFallbackPrompt(Prompt.Hidden({ message: 'Admin password:' })),
 		),
 		confirmHost: confirmHostFlag,
 	},
@@ -410,15 +410,15 @@ const authBootstrapCommand = Command.make(
 const authInviteCommand = Command.make(
 	'invite',
 	{
-		email: Flag.string('email').pipe(
+		email: Flag.String('email').pipe(
 			Flag.withDescription('Email address of the user to invite'),
-			Flag.withFallbackPrompt(Prompt.text({ message: 'Invitee email:' })),
+			Flag.withFallbackPrompt(Prompt.String({ message: 'Invitee email:' })),
 		),
-		name: Flag.string('name').pipe(
+		name: Flag.String('name').pipe(
 			Flag.withDescription('Display name'),
-			Flag.withFallbackPrompt(Prompt.text({ message: 'Invitee name:' })),
+			Flag.withFallbackPrompt(Prompt.String({ message: 'Invitee name:' })),
 		),
-		role: Flag.choice('role', ['admin', 'user'] as const).pipe(
+		role: Flag.Literals('role', ['admin', 'user'] as const).pipe(
 			Flag.withDescription('Role to grant'),
 			Flag.withDefault('user' as const),
 		),
@@ -446,25 +446,25 @@ const authInviteCommand = Command.make(
 const authBootstrapOrgCommand = Command.make(
 	'bootstrap-org',
 	{
-		email: Flag.string('email').pipe(
+		email: Flag.String('email').pipe(
 			Flag.withDescription('Admin email address'),
-			Flag.withFallbackPrompt(Prompt.text({ message: 'Admin email:' })),
+			Flag.withFallbackPrompt(Prompt.String({ message: 'Admin email:' })),
 		),
-		name: Flag.string('name').pipe(
+		name: Flag.String('name').pipe(
 			Flag.withDescription('Admin display name'),
-			Flag.withFallbackPrompt(Prompt.text({ message: 'Admin name:' })),
+			Flag.withFallbackPrompt(Prompt.String({ message: 'Admin name:' })),
 		),
-		password: Flag.redacted('password').pipe(
+		password: Flag.Redacted('password').pipe(
 			Flag.withDescription('Admin password (prompted if omitted)'),
-			Flag.withFallbackPrompt(Prompt.hidden({ message: 'Admin password:' })),
+			Flag.withFallbackPrompt(Prompt.Hidden({ message: 'Admin password:' })),
 		),
-		orgName: Flag.string('org-name').pipe(
+		orgName: Flag.String('org-name').pipe(
 			Flag.withDescription('Organization display name'),
-			Flag.withFallbackPrompt(Prompt.text({ message: 'Organization name:' })),
+			Flag.withFallbackPrompt(Prompt.String({ message: 'Organization name:' })),
 		),
-		orgSlug: Flag.string('org-slug').pipe(
+		orgSlug: Flag.String('org-slug').pipe(
 			Flag.withDescription('Organization URL slug (lowercase, kebab-case)'),
-			Flag.withFallbackPrompt(Prompt.text({ message: 'Organization slug:' })),
+			Flag.withFallbackPrompt(Prompt.String({ message: 'Organization slug:' })),
 		),
 		confirmHost: confirmHostFlag,
 	},
@@ -487,23 +487,23 @@ const authBootstrapOrgCommand = Command.make(
 const authInviteAdminCommand = Command.make(
 	'invite-admin',
 	{
-		email: Flag.string('email').pipe(
+		email: Flag.String('email').pipe(
 			Flag.withDescription('Email address of the admin to invite'),
-			Flag.withFallbackPrompt(Prompt.text({ message: 'Admin email:' })),
+			Flag.withFallbackPrompt(Prompt.String({ message: 'Admin email:' })),
 		),
-		name: Flag.string('name').pipe(
+		name: Flag.String('name').pipe(
 			Flag.withDescription('Display name'),
-			Flag.withFallbackPrompt(Prompt.text({ message: 'Admin name:' })),
+			Flag.withFallbackPrompt(Prompt.String({ message: 'Admin name:' })),
 		),
-		orgName: Flag.string('org-name').pipe(
+		orgName: Flag.String('org-name').pipe(
 			Flag.withDescription('Organization display name'),
-			Flag.withFallbackPrompt(Prompt.text({ message: 'Organization name:' })),
+			Flag.withFallbackPrompt(Prompt.String({ message: 'Organization name:' })),
 		),
-		orgSlug: Flag.string('org-slug').pipe(
+		orgSlug: Flag.String('org-slug').pipe(
 			Flag.withDescription('Organization URL slug (lowercase, kebab-case)'),
-			Flag.withFallbackPrompt(Prompt.text({ message: 'Organization slug:' })),
+			Flag.withFallbackPrompt(Prompt.String({ message: 'Organization slug:' })),
 		),
-		allowExistingOrg: Flag.boolean('allow-existing-org').pipe(
+		allowExistingOrg: Flag.Boolean('allow-existing-org').pipe(
 			Flag.withDescription(
 				'Reuse an existing org with this slug; otherwise the command aborts',
 			),
@@ -541,7 +541,7 @@ const authListUsersCommand = Command.make(
 const authListKeysCommand = Command.make(
 	'list-keys',
 	{
-		email: Flag.string('email').pipe(
+		email: Flag.String('email').pipe(
 			Flag.withDescription('Scope the listing to a single user'),
 			Flag.optional,
 		),
@@ -555,11 +555,11 @@ const authListKeysCommand = Command.make(
 const authPromoteCommand = Command.make(
 	'promote',
 	{
-		email: Flag.string('email').pipe(
+		email: Flag.String('email').pipe(
 			Flag.withDescription('User to promote'),
-			Flag.withFallbackPrompt(Prompt.text({ message: 'Email:' })),
+			Flag.withFallbackPrompt(Prompt.String({ message: 'Email:' })),
 		),
-		role: Flag.choice('role', ['admin', 'user'] as const).pipe(
+		role: Flag.Literals('role', ['admin', 'user'] as const).pipe(
 			Flag.withDescription('Target role'),
 			Flag.withDefault('admin' as const),
 		),
@@ -579,9 +579,9 @@ const authPromoteCommand = Command.make(
 const authDemoteCommand = Command.make(
 	'demote',
 	{
-		email: Flag.string('email').pipe(
+		email: Flag.String('email').pipe(
 			Flag.withDescription('User to demote'),
-			Flag.withFallbackPrompt(Prompt.text({ message: 'Email:' })),
+			Flag.withFallbackPrompt(Prompt.String({ message: 'Email:' })),
 		),
 		confirmHost: confirmHostFlag,
 	},
@@ -601,9 +601,9 @@ const authDemoteCommand = Command.make(
 const authRevokeKeyCommand = Command.make(
 	'revoke-key',
 	{
-		keyId: Flag.string('key-id').pipe(
+		keyId: Flag.String('key-id').pipe(
 			Flag.withDescription('The id of the API key to revoke'),
-			Flag.withFallbackPrompt(Prompt.text({ message: 'Key id:' })),
+			Flag.withFallbackPrompt(Prompt.String({ message: 'Key id:' })),
 		),
 		confirmHost: confirmHostFlag,
 	},
@@ -617,13 +617,13 @@ const authRevokeKeyCommand = Command.make(
 const authResetPasswordCommand = Command.make(
 	'reset-password',
 	{
-		email: Flag.string('email').pipe(
+		email: Flag.String('email').pipe(
 			Flag.withDescription('User whose password to reset'),
-			Flag.withFallbackPrompt(Prompt.text({ message: 'Email:' })),
+			Flag.withFallbackPrompt(Prompt.String({ message: 'Email:' })),
 		),
-		password: Flag.redacted('password').pipe(
+		password: Flag.Redacted('password').pipe(
 			Flag.withDescription('New password (prompted if omitted)'),
-			Flag.withFallbackPrompt(Prompt.hidden({ message: 'New password:' })),
+			Flag.withFallbackPrompt(Prompt.Hidden({ message: 'New password:' })),
 		),
 		confirmHost: confirmHostFlag,
 	},
@@ -641,7 +641,7 @@ const authResetPasswordCommand = Command.make(
 const authSessionsCommand = Command.make(
 	'sessions',
 	{
-		email: Flag.string('email').pipe(
+		email: Flag.String('email').pipe(
 			Flag.withDescription('Scope the listing to a single user'),
 			Flag.optional,
 		),
@@ -682,7 +682,7 @@ const servicesUpCommand = Command.make('up', {}, () =>
 const servicesDownCommand = Command.make(
 	'down',
 	{
-		force: Flag.boolean('force').pipe(
+		force: Flag.Boolean('force').pipe(
 			Flag.withDescription(
 				'Stop the shared stack even from inside a worktree (affects every worktree)',
 			),
@@ -752,13 +752,13 @@ const worktreeDownCommand = Command.make('down', {}, () =>
 const worktreeDoneCommand = Command.make(
 	'done',
 	{
-		force: Flag.boolean('force').pipe(
+		force: Flag.Boolean('force').pipe(
 			Flag.withDescription(
 				'Push past every refusal: in a linked worktree uncommitted changes are deleted with the directory, in the main checkout they come across to main with you where git can carry them, and the branch is deleted even when main carries no copy of its work',
 			),
 			Flag.withDefault(false),
 		),
-		stash: Flag.boolean('stash').pipe(
+		stash: Flag.Boolean('stash').pipe(
 			Flag.withDescription(
 				'Stash uncommitted changes before cleanup. They go back where they came from — but a linked worktree is deleted by this command, so there they stay stashed and are named for you to apply',
 			),
@@ -779,7 +779,7 @@ const worktreeDoneCommand = Command.make(
 const worktreePruneCommand = Command.make(
 	'prune',
 	{
-		yes: Flag.boolean('yes').pipe(
+		yes: Flag.Boolean('yes').pipe(
 			Flag.withDescription(
 				'Actually drop the orphans (without it, prune only lists them)',
 			),
@@ -826,7 +826,7 @@ const worktreeDoctorCommand = Command.make(
 const worktreeWatchCommand = Command.make(
 	'watch',
 	{
-		stop: Flag.boolean('stop').pipe(
+		stop: Flag.Boolean('stop').pipe(
 			Flag.withDescription(
 				'Close this worktree’s watch window (leaves other worktrees’ windows open)',
 			),
@@ -878,15 +878,15 @@ const calendarSeedCommand = Command.make('seed', {}, () =>
 const calendarSimulateWebhookCommand = Command.make(
 	'simulate-webhook',
 	{
-		trigger: Flag.choice('trigger', SIMULATE_TRIGGERS).pipe(
+		trigger: Flag.Literals('trigger', SIMULATE_TRIGGERS).pipe(
 			Flag.withDescription('Cal.com webhook trigger to simulate'),
 			Flag.withDefault('BOOKING_CREATED' as const),
 		),
-		url: Flag.string('url').pipe(
+		url: Flag.String('url').pipe(
 			Flag.withDescription('Target webhook URL'),
 			Flag.withDefault('http://localhost:3010/webhooks/calcom'),
 		),
-		icalUid: Flag.string('ical-uid').pipe(
+		icalUid: Flag.String('ical-uid').pipe(
 			Flag.withDescription(
 				'Override the iCalUID (handy to chain CREATED → CANCELLED on the same row)',
 			),
@@ -920,40 +920,40 @@ const calendarCommand = Command.make('calendar').pipe(
 const emailInjectCommand = Command.make(
 	'inject',
 	{
-		to: Flag.string('to').pipe(
+		to: Flag.String('to').pipe(
 			Flag.withDescription('Recipient address (must match a seeded inbox)'),
 			Flag.withFallbackPrompt(
-				Prompt.text({ message: 'To (a seeded inbox address):' }),
+				Prompt.String({ message: 'To (a seeded inbox address):' }),
 			),
 		),
-		from: Flag.string('from').pipe(
+		from: Flag.String('from').pipe(
 			Flag.withDescription('Sender address (any value works locally)'),
 			// The catcher accepts any sender, so there is nothing here only a person
 			// could answer — and asking would leave a script or an agent waiting
 			// forever at a prompt it cannot see.
 			Flag.withDefault('dev@batuda.test'),
 		),
-		subject: Flag.string('subject').pipe(
+		subject: Flag.String('subject').pipe(
 			Flag.withDescription('Subject line'),
-			Flag.withFallbackPrompt(Prompt.text({ message: 'Subject:' })),
+			Flag.withFallbackPrompt(Prompt.String({ message: 'Subject:' })),
 		),
-		text: Flag.string('text').pipe(
+		text: Flag.String('text').pipe(
 			Flag.withDescription('Plain-text body'),
 			Flag.optional,
 		),
-		html: Flag.string('html').pipe(
+		html: Flag.String('html').pipe(
 			Flag.withDescription('HTML body (sets Content-Type: text/html)'),
 			Flag.optional,
 		),
-		inReplyTo: Flag.string('in-reply-to').pipe(
+		inReplyTo: Flag.String('in-reply-to').pipe(
 			Flag.withDescription('Message-Id this reply targets (chains threading)'),
 			Flag.optional,
 		),
-		host: Flag.string('smtp-host').pipe(
+		host: Flag.String('smtp-host').pipe(
 			Flag.withDescription('Mail catcher SMTP host'),
 			Flag.withDefault('localhost'),
 		),
-		port: Flag.integer('smtp-port').pipe(
+		port: Flag.Int('smtp-port').pipe(
 			Flag.withDescription('Mail catcher SMTP port'),
 			Flag.withDefault(1025),
 		),
@@ -988,7 +988,7 @@ const emailClearCommand = Command.make('clear', {}, () => emailClear).pipe(
 const emailBackfillBodiesCommand = Command.make(
 	'backfill-bodies',
 	{
-		dryRun: Flag.boolean('dry-run').pipe(
+		dryRun: Flag.Boolean('dry-run').pipe(
 			Flag.withDescription(
 				'List the messages that would be filled in, without writing anything',
 			),
@@ -1019,19 +1019,19 @@ const emailCommand = Command.make('email').pipe(
 const researchProbeCommand = Command.make(
 	'probe',
 	{
-		baseUrl: Flag.string('base-url').pipe(
+		baseUrl: Flag.String('base-url').pipe(
 			Flag.withDescription('OpenAI-compatible endpoint to probe'),
 			Flag.withDefault('https://api.tokenfactory.nebius.com/v1'),
 		),
 		// The key is named, never pasted: pnpm echoes its arguments, so a key
 		// written on the command line ends up in logs and shell history.
-		apiKeyEnv: Flag.string('api-key-env').pipe(
+		apiKeyEnv: Flag.String('api-key-env').pipe(
 			Flag.withDescription(
 				'Name of the environment variable holding the API key (defaults to RESEARCH_LLM_AGENT_API_KEY)',
 			),
 			Flag.withDefault('RESEARCH_LLM_AGENT_API_KEY'),
 		),
-		models: Flag.string('models').pipe(
+		models: Flag.String('models').pipe(
 			Flag.withDescription('Comma-separated model ids to probe'),
 			Flag.withDefault(
 				'openai/gpt-oss-120b,Qwen/Qwen3-235B-A22B-Instruct-2507,deepseek-ai/DeepSeek-V4-Pro,zai-org/GLM-5.2',
@@ -1070,10 +1070,10 @@ const researchProbeConfigCommand = Command.make('probe-config', {}, () =>
 const researchCapCommand = Command.make(
 	'cap',
 	{
-		org: Flag.string('org').pipe(
+		org: Flag.String('org').pipe(
 			Flag.withDescription('Organization id the ceiling belongs to'),
 		),
-		cents: Flag.integer('cents').pipe(
+		cents: Flag.Int('cents').pipe(
 			Flag.withDescription(
 				'New ceiling in cents per calendar month; omit to read the current one',
 			),
@@ -1093,59 +1093,59 @@ const researchCapCommand = Command.make(
 const researchEvalCommand = Command.make(
 	'eval',
 	{
-		org: Flag.string('org').pipe(
+		org: Flag.String('org').pipe(
 			Flag.withDescription('Organization id to run the research under'),
 		),
-		user: Flag.string('user').pipe(
+		user: Flag.String('user').pipe(
 			Flag.withDescription('User id the runs are attributed to'),
 		),
-		golden: Flag.string('golden').pipe(
+		golden: Flag.String('golden').pipe(
 			Flag.withDescription('Path to the golden-set JSON file'),
 		),
-		schema: Flag.string('schema').pipe(
+		schema: Flag.String('schema').pipe(
 			Flag.withDescription('Research output schema to run'),
 			Flag.withDefault('company_enrichment_v1'),
 		),
-		language: Flag.string('language').pipe(
+		language: Flag.String('language').pipe(
 			Flag.withDescription(
 				"Language hint for the runs (e.g. es, ca, en) — carried into the search so it looks in the target's own language, for testing non-English targets",
 			),
 			Flag.optional,
 		),
-		concurrency: Flag.integer('concurrency').pipe(
+		concurrency: Flag.Int('concurrency').pipe(
 			Flag.withDescription(
 				'How many runs to execute at once. One by default: runs competing for the same providers slow each other into timeouts, and a run that times out scores as empty — which reads as a quality drop that no change caused',
 			),
 			Flag.withDefault(1),
 		),
-		runs: Flag.integer('runs').pipe(
+		runs: Flag.Int('runs').pipe(
 			Flag.withDescription(
 				"How many times to run each company, averaging the rates over them. More than one runs the whole set that many times over, and every round asks the providers again instead of reading the last round's answer — so it costs about as many times a single pass as the number you give",
 			),
 			Flag.withDefault(1),
 		),
-		out: Flag.string('out').pipe(
+		out: Flag.String('out').pipe(
 			Flag.withDescription('Write the full JSON report to this path'),
 			Flag.optional,
 		),
-		byBucket: Flag.boolean('by-bucket').pipe(
+		byBucket: Flag.Boolean('by-bucket').pipe(
 			Flag.withDescription(
 				'Also print the metrics broken out by size/reach bucket and by country, so a regression in one segment is not averaged away',
 			),
 		),
-		dryRun: Flag.boolean('dry-run').pipe(
+		dryRun: Flag.Boolean('dry-run').pipe(
 			Flag.withDescription(
 				'Check everything a pass needs and spend nothing: that the database is local, that no part of the pipeline would answer with canned data, that every golden row parses, and that this machine can reach each vendor a pass would go to. The reachability check sends no key, so it costs nothing and a vendor that turns it away still counts as reached. Prints how many runs would execute',
 			),
 		),
-		priceFrom: Flag.string('price-from').pipe(
+		priceFrom: Flag.String('price-from').pipe(
 			Flag.withDescription(
 				"Report JSON from an earlier pass, used to price a --dry-run from that pass's measured cost per run rather than a guess. A folder such as eval/reports/golden is read too, taking the newest report in it",
 			),
 			Flag.optional,
 		),
 		quality: qualityFlag,
-		baseline: Flag.boolean('baseline').pipe(
+		baseline: Flag.Boolean('baseline').pipe(
 			Flag.withDescription(
 				'Also file a copy of the report under eval/reports/<golden-stem>/<date>-<commit>.json and print the path, so a later pass can be read against this one and a dry run priced from it. The filed copy carries the rates, the breakdowns and the counts and cost of each run — never anything a run read off the pages of a company',
 			),
@@ -1196,40 +1196,40 @@ const researchEvalCommand = Command.make(
 const researchEvalContactsCommand = Command.make(
 	'eval-contacts',
 	{
-		org: Flag.string('org').pipe(
+		org: Flag.String('org').pipe(
 			Flag.withDescription('Organization id to run discovery under'),
 		),
-		user: Flag.string('user').pipe(
+		user: Flag.String('user').pipe(
 			Flag.withDescription('User id the runs are attributed to'),
 		),
-		golden: Flag.string('golden').pipe(
+		golden: Flag.String('golden').pipe(
 			Flag.withDescription('Path to the contact golden-set JSON file'),
 		),
-		concurrency: Flag.integer('concurrency').pipe(
+		concurrency: Flag.Int('concurrency').pipe(
 			Flag.withDescription(
 				'How many companies to discover at once. One by default, so a vendor answering slower under load cannot be read as worse enrichment',
 			),
 			Flag.withDefault(1),
 		),
-		runs: Flag.integer('runs').pipe(
+		runs: Flag.Int('runs').pipe(
 			Flag.withDescription(
 				'How many times to run each company; discovery is largely deterministic, so 1 is usually enough',
 			),
 			Flag.withDefault(1),
 		),
-		enrich: Flag.string('enrich').pipe(
+		enrich: Flag.String('enrich').pipe(
 			Flag.withDescription(
 				'Override RESEARCH_PROVIDER_ENRICH for this run, e.g. "hunter" or "hunter,fullenrich"',
 			),
 			Flag.optional,
 		),
-		enrichMode: Flag.string('enrich-mode').pipe(
+		enrichMode: Flag.String('enrich-mode').pipe(
 			Flag.withDescription(
 				'Override RESEARCH_ENRICH_MODE: fallback (stop at the first vendor with people) or union (run all + dedupe)',
 			),
 			Flag.optional,
 		),
-		out: Flag.string('out').pipe(
+		out: Flag.String('out').pipe(
 			Flag.withDescription('Write the full JSON report to this path'),
 			Flag.optional,
 		),
@@ -1270,20 +1270,20 @@ const researchEvalContactsCommand = Command.make(
 const researchEvalInvarianceCommand = Command.make(
 	'eval-invariance',
 	{
-		org: Flag.string('org').pipe(
+		org: Flag.String('org').pipe(
 			Flag.withDescription('Organization id to run the research under'),
 		),
-		user: Flag.string('user').pipe(
+		user: Flag.String('user').pipe(
 			Flag.withDescription('User id the runs are attributed to'),
 		),
-		golden: Flag.string('golden').pipe(
+		golden: Flag.String('golden').pipe(
 			Flag.withDescription('Path to the golden-set JSON file'),
 		),
-		schema: Flag.string('schema').pipe(
+		schema: Flag.String('schema').pipe(
 			Flag.withDescription('Research output schema to run'),
 			Flag.withDefault('company_enrichment_v1'),
 		),
-		concurrency: Flag.integer('concurrency').pipe(
+		concurrency: Flag.Int('concurrency').pipe(
 			Flag.withDescription(
 				'How many companies to evaluate at once. One by default, so two wordings are compared under the same conditions rather than one of them under load',
 			),
@@ -1310,7 +1310,7 @@ const researchEvalInvarianceCommand = Command.make(
 const researchFarmReplayCommand = Command.make(
 	'farm-replay',
 	{
-		corpus: Flag.string('corpus').pipe(
+		corpus: Flag.String('corpus').pipe(
 			Flag.withDescription(
 				'Path to the labelled corpus of scan rows to grade against; a relative path is read from the repo root (JSON; see eval/farm-replay.example.json for the shape)',
 			),
@@ -1330,13 +1330,13 @@ const researchFarmReplayCommand = Command.make(
 const researchKindReaskCommand = Command.make(
 	'kind-reask',
 	{
-		rows: Flag.string('rows').pipe(
+		rows: Flag.String('rows').pipe(
 			Flag.withDescription(
 				'Path to the labelled rows, grouped per run; a relative path is read from the repo root (JSON; see eval/kind-rows.example.json for the shape)',
 			),
 			Flag.withDefault('eval/kind-rows.json'),
 		),
-		asks: Flag.integer('asks').pipe(
+		asks: Flag.Int('asks').pipe(
 			Flag.withDescription(
 				'How many times to ask the whole file. The answers are a model’s and differ a little each time, so three askings of unchanged code give the range a change has to move a count outside of',
 			),
@@ -1381,7 +1381,7 @@ const researchCommand = Command.make('research').pipe(
 // prompt nothing will ever answer. `optional` stays outermost either way, so a
 // provided `data <entity>` skips the prompt and Esc lands on the overview.
 const dataEntityArg = (() => {
-	const base = Argument.choice('entity', ENTITY_NAMES).pipe(
+	const base = Argument.Literals('entity', ENTITY_NAMES).pipe(
 		Argument.withDescription(
 			'Seeded entity to list; omit (or Esc the prompt) for an overview',
 		),
@@ -1389,7 +1389,7 @@ const dataEntityArg = (() => {
 	return process.stdin.isTTY
 		? base.pipe(
 				Argument.withFallbackPrompt(
-					Prompt.select({
+					Prompt.Select({
 						message: 'Which entity? (Esc for the overview)',
 						choices: ENTITY_NAMES.map(name => ({ title: name, value: name })),
 					}),
@@ -1403,7 +1403,7 @@ const dataCommand = Command.make(
 	'data',
 	{
 		entity: dataEntityArg,
-		json: Flag.boolean('json').pipe(
+		json: Flag.Boolean('json').pipe(
 			Flag.withDescription('Print JSON instead of a table'),
 			Flag.withDefault(false),
 		),
@@ -1419,7 +1419,7 @@ const dataCommand = Command.make(
 const companiesBackfillGeocodeCommand = Command.make(
 	'backfill-geocode',
 	{
-		dryRun: Flag.boolean('dry-run').pipe(
+		dryRun: Flag.Boolean('dry-run').pipe(
 			Flag.withDescription('List what would be geocoded without writing'),
 			Flag.withDefault(false),
 		),
@@ -1466,7 +1466,7 @@ const isMain =
 	typeof import.meta?.url === 'string' &&
 	process.argv[1] === fileURLToPath(import.meta.url)
 
-// Format tagged errors as `Tag(field=…)`. `Schema.TaggedErrorClass` instances
+// Format tagged errors as `Tag(field=…)`. `Schema.TaggedError` instances
 // extend the native `Error`, so schema fields that collide with built-ins
 // (`message`) land as non-enumerable own properties — `Object.entries` drops
 // them. `core.Error#toJSON` exposes the original construction args through a
@@ -1508,8 +1508,8 @@ const reportError = (e: unknown) => {
 if (isMain) {
 	// Parse `--env local|cloud` (default local), strip the flag + pnpm's `--`
 	// separator, and populate process.env via dotenv BEFORE Effect Config
-	// resolves any variable. Every subsequent `Config.redacted('DATABASE_URL')`
-	// / `Config.string(...)` read hits a fully-loaded process.env.
+	// resolves any variable. Every subsequent `Config.Redacted('DATABASE_URL')`
+	// / `Config.String(...)` read hits a fully-loaded process.env.
 	loadEnv()
 
 	const program = Command.run(batuda, { version: '0.0.1' }).pipe(

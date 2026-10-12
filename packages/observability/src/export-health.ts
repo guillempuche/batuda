@@ -1,5 +1,5 @@
 import { Clock, Duration, Effect } from 'effect'
-import { HttpClient, HttpClientError } from 'effect/unstable/http'
+import { HttpClient, HttpClientError } from 'effect/http'
 
 /**
  * The three kinds of telemetry, each posted to its own path under the base URL.

@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto'
 import path from 'node:path'
 
 import { Context, DateTime, Effect, Layer, Schedule } from 'effect'
-import { SqlClient } from 'effect/unstable/sql'
+import { SqlClient } from 'effect/sql'
 
 import { BadRequest, CurrentOrg } from '@batuda/controllers'
 
@@ -75,7 +75,8 @@ interface StagingRow {
 	readonly storageKey: string
 	readonly filename: string
 	readonly contentType: string
-	readonly sizeBytes: number
+	// A BIGINT column, which the driver hands over as a bigint.
+	readonly sizeBytes: bigint
 	readonly isInline: boolean
 	readonly cid: string | null
 	readonly sentAt: Date | null

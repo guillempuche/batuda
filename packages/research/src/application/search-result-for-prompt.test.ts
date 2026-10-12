@@ -1,4 +1,4 @@
-import { Prompt, Response } from 'effect/unstable/ai'
+import { Prompt, Response } from 'effect/ai'
 import { describe, expect, it } from 'vitest'
 
 import {

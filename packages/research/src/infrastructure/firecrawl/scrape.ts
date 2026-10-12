@@ -3,7 +3,7 @@
  * `/v2/scrape` API. Firecrawl fetches the URL on its own infra, so this
  * adapter makes no arbitrary outbound request itself (no SSRF surface here).
  *
- * Follows the `brave/search.ts` template (Config.redacted key → HttpClient →
+ * Follows the `brave/search.ts` template (Config.Redacted key → HttpClient →
  * Schema-decoded body → ProviderError), plus the shared `hardenHttp` wrapper
  * for timeout + recoverable-only retry.
  *
@@ -11,11 +11,7 @@
  */
 
 import { Config, Effect, Option, Redacted, Schema } from 'effect'
-import {
-	HttpClient,
-	HttpClientRequest,
-	HttpClientResponse,
-} from 'effect/unstable/http'
+import { HttpClient, HttpClientRequest, HttpClientResponse } from 'effect/http'
 
 import { type ScrapeInput, ScrapeProvider } from '../../application/ports'
 import { ProviderError, UnsupportedSite } from '../../domain/errors'
@@ -127,7 +123,7 @@ const isUnsupportedSiteBody = (body: string): boolean => {
 
 export const makeFirecrawlScrape = (slot: number) =>
 	Effect.gen(function* () {
-		const apiKey = yield* Config.redacted(
+		const apiKey = yield* Config.Redacted(
 			keyForSlot('RESEARCH_API_KEY_SCRAPE', slot),
 		)
 		const client = yield* HttpClient.HttpClient

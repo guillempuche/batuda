@@ -9,7 +9,7 @@ import {
 	Option,
 	Schema,
 } from 'effect'
-import { SqlClient } from 'effect/unstable/sql'
+import { SqlClient } from 'effect/sql'
 
 import {
 	BookingFailed,

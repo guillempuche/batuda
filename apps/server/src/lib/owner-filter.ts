@@ -1,4 +1,4 @@
-import type { SqlClient, Statement } from 'effect/unstable/sql'
+import type { SqlClient, Statement } from 'effect/sql'
 
 /**
  * Whose companies to look at, as both the company list and the conversation

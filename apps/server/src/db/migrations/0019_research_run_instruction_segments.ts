@@ -1,5 +1,5 @@
 import { Effect } from 'effect'
-import { SqlClient } from 'effect/unstable/sql'
+import { SqlClient } from 'effect/sql'
 
 // The resolved standing-instruction text segments that shape a run's phase-1
 // prompt. Captured when the run is created so they stay fixed for the whole run

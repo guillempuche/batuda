@@ -1,5 +1,5 @@
 import { Effect } from 'effect'
-import { SqlClient } from 'effect/unstable/sql'
+import { SqlClient } from 'effect/sql'
 
 // Two companies could not be told they belong together. A holding and the firms
 // it owns, a franchisor and its franchisees, a company and the one that bought

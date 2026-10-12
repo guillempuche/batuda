@@ -11,8 +11,8 @@ process.env['RESEARCH_HEARTBEAT_INTERVAL_SEC'] ??= '3600'
 process.env['RESEARCH_ORPHAN_SWEEP_INTERVAL_SEC'] ??= '3600'
 
 import { Effect, Layer } from 'effect'
-import type { LanguageModel } from 'effect/unstable/ai'
-import { SqlClient } from 'effect/unstable/sql'
+import { LanguageModel } from 'effect/ai'
+import { SqlClient } from 'effect/sql'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import {
@@ -35,7 +35,8 @@ import { enterOrgScope } from '../middleware/org.js'
 // the database and nothing else, so a stub that is called at all is the failure
 // this suite wants to hear about.
 const unreached = 'live snapshot must not reach a provider or a model'
-const dyingLlm: LanguageModel.Service = {
+const dyingLlm: LanguageModel.LanguageModel = {
+	[LanguageModel.TypeId]: LanguageModel.TypeId,
 	generateText: () => Effect.die(unreached) as never,
 	generateObject: () => Effect.die(unreached) as never,
 	streamText: () => Effect.die(unreached) as never,

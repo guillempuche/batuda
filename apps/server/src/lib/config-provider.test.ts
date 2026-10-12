@@ -14,7 +14,7 @@ import { resolveConfigEnv } from './config-provider.js'
 // provider exists. The one rule with teeth: in production a missing file must
 // throw — prod must never quietly boot on env-only config — while dev with no
 // file just reads the process env. Every value in the file is a JSON string so
-// the numeric/boolean entries survive for Config.int / Config.boolean to parse.
+// the numeric/boolean entries survive for Config.Int / Config.Boolean to parse.
 
 const PRODUCTION = 'production'
 const DEVELOPMENT = 'development'
@@ -75,7 +75,7 @@ describe('resolveConfigEnv', () => {
 			expect(resolved?.['RESEARCH_PROVIDER_SEARCH']).toBe('firecrawl')
 		})
 
-		it('should keep every value a string so Config.int/boolean can parse them', () => {
+		it('should keep every value a string so Config.Int/boolean can parse them', () => {
 			// WHEN the loader resolves the config env
 			const resolved = resolveConfigEnv(dir, PRODUCTION)
 			// THEN no JSON coercion happened — the numeric and boolean entries stay
@@ -150,21 +150,21 @@ describe('config provider composition (fromUnknown under env)', () => {
 			// THEN fromUnknown returns the file value, proving the key is not split on `_`
 			expect(
 				Effect.runSync(
-					Config.string('RESEARCH_PROVIDER_SEARCH').parse(composed),
+					Config.String('RESEARCH_PROVIDER_SEARCH').parse(composed),
 				),
 			).toBe('firecrawl')
 		})
 
 		it('should coerce the string values into their typed Config form', () => {
 			// GIVEN the file stores everything as strings ("600", "false")
-			// WHEN Config.int / Config.boolean read them
+			// WHEN Config.Int / Config.Boolean read them
 			// THEN the typed parsers coerce the strings — so the all-strings file is correct
 			expect(
-				Effect.runSync(Config.int('API_KEY_RATE_LIMIT_MAX').parse(file)),
+				Effect.runSync(Config.Int('API_KEY_RATE_LIMIT_MAX').parse(file)),
 			).toBe(600)
 			expect(
 				Effect.runSync(
-					Config.boolean('BETTER_AUTH_INSECURE_COOKIES').parse(file),
+					Config.Boolean('BETTER_AUTH_INSECURE_COOKIES').parse(file),
 				),
 			).toBe(false)
 		})
@@ -176,7 +176,7 @@ describe('config provider composition (fromUnknown under env)', () => {
 			// WHEN read through orElse(env, file)
 			// THEN the environment value wins — the file is only a fallback
 			expect(
-				Effect.runSync(Config.string('ALLOWED_ORIGINS').parse(composed)),
+				Effect.runSync(Config.String('ALLOWED_ORIGINS').parse(composed)),
 			).toBe('https://env.example')
 		})
 	})

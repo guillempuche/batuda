@@ -1,6 +1,6 @@
 import { Cause, Effect, Exit, Schema } from 'effect'
-import { Tool } from 'effect/unstable/ai'
-import { SqlError } from 'effect/unstable/sql'
+import { Tool } from 'effect/ai'
+import { SqlError } from 'effect/sql'
 import { describe, expect, it } from 'vitest'
 
 import { TERMINAL_RESEARCH_STATUSES } from '@batuda/domain'

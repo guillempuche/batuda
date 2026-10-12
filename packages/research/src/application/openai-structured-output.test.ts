@@ -1,6 +1,6 @@
 import { Effect, Ref } from 'effect'
-import type { LanguageModel } from 'effect/unstable/ai'
-import { OpenAiStructuredOutput, Tool } from 'effect/unstable/ai'
+import type { LanguageModel } from 'effect/ai'
+import { OpenAiStructuredOutput, Tool } from 'effect/ai'
 import { describe, expect, it } from 'vitest'
 
 import { ProviderError } from '../domain/errors'
@@ -159,7 +159,7 @@ describe('schemaRegistry', () => {
 // answers, so the composed model only completes when every tool is clean.
 const strictProviderSlot = (
 	reachedRef: Ref.Ref<boolean>,
-): LanguageModel.Service =>
+): LanguageModel.LanguageModel =>
 	({
 		generateText: () =>
 			Effect.gen(function* () {
@@ -182,9 +182,9 @@ const strictProviderSlot = (
 			}),
 		generateObject: () => Effect.succeed({}),
 		streamText: () => Effect.succeed({}),
-	}) as unknown as LanguageModel.Service
+	}) as unknown as LanguageModel.LanguageModel
 
-const blippingSlot = (): LanguageModel.Service =>
+const blippingSlot = (): LanguageModel.LanguageModel =>
 	({
 		generateText: () =>
 			Effect.fail(
@@ -196,7 +196,7 @@ const blippingSlot = (): LanguageModel.Service =>
 			),
 		generateObject: () => Effect.succeed({}),
 		streamText: () => Effect.succeed({}),
-	}) as unknown as LanguageModel.Service
+	}) as unknown as LanguageModel.LanguageModel
 
 describe('LLM fallback with the real toolkit', () => {
 	describe('when the primary slot fails and the fallback is a strict provider', () => {

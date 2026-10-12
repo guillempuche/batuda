@@ -1,5 +1,5 @@
 import { Effect } from 'effect'
-import { SqlClient } from 'effect/unstable/sql'
+import { SqlClient } from 'effect/sql'
 
 // A trust threshold for applying research findings without a human: a run's
 // eligible proposals (a verified, machine-checkable value) whose confidence is

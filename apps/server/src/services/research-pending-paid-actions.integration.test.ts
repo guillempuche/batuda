@@ -14,7 +14,7 @@
 import { randomUUID } from 'node:crypto'
 
 import { Effect } from 'effect'
-import { SqlClient } from 'effect/unstable/sql'
+import { SqlClient } from 'effect/sql'
 import pg from 'pg'
 import { beforeAll, describe, expect, it } from 'vitest'
 

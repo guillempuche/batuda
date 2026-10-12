@@ -4,7 +4,7 @@
  * about page the homepage never links. Firecrawl walks the site on its own
  * infra, so this adapter makes no arbitrary outbound request itself.
  *
- * Follows the `firecrawl/scrape.ts` template (Config.redacted key →
+ * Follows the `firecrawl/scrape.ts` template (Config.Redacted key →
  * HttpClient → Schema-decoded body → ProviderError), plus the shared
  * `hardenHttp` wrapper for timeout + recoverable-only retry.
  *
@@ -12,11 +12,7 @@
  */
 
 import { Config, Effect, Redacted, Schema } from 'effect'
-import {
-	HttpClient,
-	HttpClientRequest,
-	HttpClientResponse,
-} from 'effect/unstable/http'
+import { HttpClient, HttpClientRequest, HttpClientResponse } from 'effect/http'
 
 import { MapProvider, type SiteMapInput } from '../../application/ports'
 import { ProviderError } from '../../domain/errors'
@@ -44,11 +40,11 @@ export const makeFirecrawlMap = (slot: number) =>
 		// discovery separately, and otherwise reuse the scrape key — so turning
 		// discovery on never means provisioning a second copy of a secret that is
 		// already deployed, and forgetting to cannot stop the server booting.
-		const apiKey = yield* Config.redacted(
+		const apiKey = yield* Config.Redacted(
 			keyForSlot('RESEARCH_API_KEY_MAP', slot),
 		).pipe(
 			Config.orElse(() =>
-				Config.redacted(keyForSlot('RESEARCH_API_KEY_SCRAPE', slot)),
+				Config.Redacted(keyForSlot('RESEARCH_API_KEY_SCRAPE', slot)),
 			),
 		)
 		const client = yield* HttpClient.HttpClient

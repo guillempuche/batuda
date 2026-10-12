@@ -14,8 +14,8 @@
 import { randomUUID } from 'node:crypto'
 
 import { Cause, Effect, Layer, ManagedRuntime, Stream } from 'effect'
-import { FetchHttpClient } from 'effect/unstable/http'
-import { SqlClient } from 'effect/unstable/sql'
+import { FetchHttpClient } from 'effect/http'
+import { SqlClient } from 'effect/sql'
 import pg from 'pg'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 

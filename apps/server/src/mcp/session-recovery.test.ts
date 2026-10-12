@@ -10,9 +10,11 @@ import { createServer } from 'node:http'
 
 import { NodeHttpServer } from '@effect/platform-node'
 import { Effect, Layer, ManagedRuntime, Schema } from 'effect'
-import { McpServer, Tool, Toolkit } from 'effect/unstable/ai'
-import { HttpRouter, HttpServer } from 'effect/unstable/http'
+import { McpServer, Tool, Toolkit } from 'effect/ai'
+import { HttpRouter, HttpServer } from 'effect/http'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+
+import { MCP_PROTOCOLS } from './protocols'
 
 describe('the /mcp route recovering an unknown session end to end', () => {
 	const Ping = Tool.make('ping', { success: Schema.String })
@@ -24,7 +26,12 @@ describe('the /mcp route recovering an unknown session end to end', () => {
 	const McpHttpLive = McpServer.toolkit(PingTools).pipe(
 		Layer.provide(PingHandlersLive),
 		Layer.provide(
-			McpServer.layerHttp({ name: 'test', version: '1.0.0', path: '/mcp' }),
+			McpServer.layerHttp({
+				name: 'test',
+				version: '1.0.0',
+				path: '/mcp',
+				protocols: MCP_PROTOCOLS,
+			}),
 		),
 	)
 
@@ -78,7 +85,7 @@ describe('the /mcp route recovering an unknown session end to end', () => {
 				return server.address
 			}),
 		)
-		if (address._tag !== 'TcpAddress')
+		if (address._tag === 'UnixPathAddress')
 			throw new Error('expected a TCP address for the test server')
 		baseUrl = `http://127.0.0.1:${address.port}`
 	}, 30_000)

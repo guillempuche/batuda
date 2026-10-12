@@ -1,5 +1,5 @@
 import { DateTime, Effect } from 'effect'
-import type { SqlClient, SqlError } from 'effect/unstable/sql'
+import type { SqlClient, SqlError } from 'effect/sql'
 
 import { BadRequest } from '@batuda/controllers'
 import {
@@ -9,6 +9,7 @@ import {
 } from '@batuda/domain'
 
 import { pgErrorCode } from '../lib/pg-error'
+import { jsonColumn, textArray } from '../lib/pg-params'
 
 // The shape a bulk channel write takes. `kind` and `value` are the names the
 // outside world uses; storage calls them `channel` and `address`. The two are
@@ -76,13 +77,26 @@ const SOCIAL_PROFILES_FIELDS = new Set(['socialProfiles', 'social_profiles'])
 const isPlainObject = (value: unknown): value is Record<string, unknown> =>
 	typeof value === 'object' && value !== null && !Array.isArray(value)
 
+// The company columns that hold a list of words. Typed on the way in, so a
+// caller clearing one with an empty list is not refused for it.
+const TEXT_LIST_COLUMNS = new Set(['tags', 'productsFit'])
+
+// A column value in the form the driver binds: a list of words as `text[]`,
+// the free-form metadata as JSON text, and a date-time as a Date.
+export const toCompanyColumn = (key: string, value: unknown): unknown => {
+	if (TEXT_LIST_COLUMNS.has(key) && Array.isArray(value))
+		return textArray(value)
+	if (key === 'metadata') return jsonColumn(value)
+	return DateTime.isDateTime(value) ? DateTime.toDateUtc(value) : value
+}
+
 /**
  * Separate a company's write into the columns it really has and the ways of
- * reaching it, which live elsewhere now.
+ * reaching it, which are channel rows of their own, and put each column's value
+ * in the form the driver binds.
  *
  * Doing it here rather than at each entry point means the HTTP routes, both MCP
- * tools and the research apply path all behave the same, and none of them has to
- * know that these five stopped being columns.
+ * tools and the research apply path all behave the same.
  */
 export const splitCompanyChannelFields = (
 	data: Record<string, unknown>,
@@ -115,7 +129,7 @@ export const splitCompanyChannelFields = (
 			continue
 		}
 		if (!(COMPANY_CHANNEL_FIELDS as ReadonlyArray<string>).includes(key)) {
-			columns[key] = value
+			columns[key] = toCompanyColumn(key, value)
 			continue
 		}
 		// A blank is a caller clearing the field, which is a removal rather than a
@@ -745,7 +759,7 @@ export const suppressedAmong = (
 			FROM channels
 			WHERE organization_id = ${orgId}
 				AND channel = 'email'
-				AND lower(address) = ANY(${normalised})
+				AND lower(address) = ANY(${textArray(normalised)})
 				AND status IN ('bounced', 'complained')
 			ORDER BY lower(address), status_updated_at DESC NULLS LAST
 		`

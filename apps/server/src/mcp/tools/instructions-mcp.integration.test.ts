@@ -10,8 +10,8 @@
 import { randomUUID } from 'node:crypto'
 
 import { Effect, Layer, ManagedRuntime, Stream } from 'effect'
-import type { Tool } from 'effect/unstable/ai'
-import { SqlClient } from 'effect/unstable/sql'
+import type { Tool } from 'effect/ai'
+import { SqlClient } from 'effect/sql'
 import pg from 'pg'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 

@@ -1,5 +1,5 @@
 import { Effect } from 'effect'
-import { SqlClient } from 'effect/unstable/sql'
+import { SqlClient } from 'effect/sql'
 
 // How many rounds of work a run has got through, refreshed while it works. A run
 // takes minutes, and until it reaches a checkpoint the only thing that moves on

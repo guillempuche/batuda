@@ -4,6 +4,7 @@ import { ProviderError, RejectedToolCall } from '../domain/errors'
 import {
 	correctionForFailedRound,
 	rejectedToolCallCorrection,
+	unknownToolCorrection,
 } from './tool-call-correction'
 import { researchToolkit, toolParametersWireFormat } from './tools'
 
@@ -208,6 +209,52 @@ describe('correctionForFailedRound', () => {
 			expect(
 				correctionForFailedRound(rejected('unknown'), 0, 2),
 			).toBeUndefined()
+		})
+	})
+
+	describe('when the model called a tool this pass did not offer', () => {
+		it('should name the tools it may call instead', () => {
+			// GIVEN a scan pass that offers two tools, and a model that called a
+			//       third
+			const notOffered = new RejectedToolCall(
+				{ provider: 'groq', message: "Tool 'registry_lookup' not found" },
+				'registry_lookup',
+				"Tool 'registry_lookup' not found. Available tools: web_search, scrape_page",
+				['web_search', 'scrape_page'],
+			)
+
+			// WHEN the run fiber asks whether there is anything to say
+			const correction = correctionForFailedRound(notOffered, 0, 2)
+
+			// THEN the correction names the pass's own tools, which is the one
+			// thing that changes the call the model writes next
+			expect(correction?.toolName).toBe('registry_lookup')
+			expect(correction?.text).toContain('web_search, scrape_page')
+		})
+	})
+})
+
+describe('unknownToolCorrection', () => {
+	describe('when the pass offers some tools', () => {
+		it('should say the named tool does not exist and list the real ones', () => {
+			// GIVEN a model that invented a tool name
+			// WHEN the correction is written
+			const text = unknownToolCorrection('web_lookup', ['web_search'])
+
+			// THEN it names both the mistake and what to call instead
+			expect(text).toContain('There is no web_lookup tool')
+			expect(text).toContain('Call only web_search')
+		})
+	})
+
+	describe('when the pass offers no tool at all', () => {
+		it('should tell the model to answer without one', () => {
+			// GIVEN a pass whose model may call nothing
+			// WHEN the correction is written
+			const text = unknownToolCorrection('web_search', [])
+
+			// THEN it does not list an empty set of tools to call
+			expect(text).toContain('Answer without calling one')
 		})
 	})
 })

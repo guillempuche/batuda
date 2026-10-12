@@ -4,7 +4,7 @@ import {
 	type HttpClientError,
 	type HttpClientRequest,
 	HttpClientResponse,
-} from 'effect/unstable/http'
+} from 'effect/http'
 import { describe, expect, it } from 'vitest'
 
 import {

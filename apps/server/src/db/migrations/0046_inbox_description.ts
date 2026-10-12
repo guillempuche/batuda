@@ -1,5 +1,5 @@
 import { Effect } from 'effect'
-import { SqlClient } from 'effect/unstable/sql'
+import { SqlClient } from 'effect/sql'
 
 // A mailbox now says what it is for in whatever words fit, and who may touch it
 // follows from who owns it.

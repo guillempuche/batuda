@@ -8,7 +8,7 @@ import {
 import { EditorContent, useEditor } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import { DateTime, Schema } from 'effect'
-import { AsyncResult } from 'effect/unstable/reactivity'
+import { AsyncResult } from 'effect/reactivity'
 import { ArrowLeft, Eye, Globe, Save } from 'lucide-react'
 import { styled } from 'next-yak'
 import { useCallback, useMemo, useState } from 'react'

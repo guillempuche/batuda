@@ -1,43 +1,26 @@
 import { Cause, Context, Effect, Layer, Option, Sink, Stream } from 'effect'
-import {
-	AiError,
-	McpSchema,
-	McpServer,
-	Tool,
-	type Toolkit,
-} from 'effect/unstable/ai'
+import { AiError, McpSchema, McpServer, Tool, type Toolkit } from 'effect/ai'
 
 import { recordFacts } from '@batuda/observability'
 
+import { inMcpOrgScope } from './org-scope'
 import { isToolMessage } from './tool-message'
 
 // A copy of the library's toolkit registration, registering into the same shared
-// server registry, so the two things below can be handled in our own code rather
-// than by patching the dependency. Re-sync with the vendored effect source on an
-// upgrade.
-//
-// The answer a tool gives: the library passes it to the client as-is whenever it
-// is an object, but the MCP revision served here accepts only a plain record
-// there. Nothing and a list both count as objects, so a tool that finds nothing,
-// or answers with a list, ships something strict clients reject — and the tool
-// vanishes from view. `toStructuredContent` below is the fix.
-//
-// The text a failure carries: left to the library every failure reads as one
-// fixed sentence, so tools mark the ones whose wording is meant for the
-// assistant and `clientFacingMessage` lets those through. See ./tool-message.
+// server registry, so the text a failure carries can be handled in our own code
+// rather than by patching the dependency. Left to the library, every failure a
+// tool doesn't declare in its schema reads as one fixed sentence; tools here mark
+// the ones whose wording is meant for the assistant and `clientFacingMessage`
+// lets those through. See ./tool-message. Re-sync with the vendored effect
+// source on an upgrade.
 
-// Coerce a handler result into a value the MCP spec accepts as structured
-// output. A record passes through; an array is wrapped so it stays reachable;
-// anything else (null, a scalar) can't be a record, so we omit structured
-// output — the field is optional and the value still rides in the text block.
-export const toStructuredContent = (
-	value: unknown,
-): Record<string, unknown> | undefined => {
-	if (Array.isArray(value)) return { items: value }
-	if (value !== null && typeof value === 'object')
-		return value as Record<string, unknown>
-	return undefined
-}
+// Request services come from each call, never from the context the toolkit was
+// built in, so a handler registered during a request can't answer with another
+// request's client.
+const omitRequestServices = Context.omit(
+	McpSchema.McpRequestContext,
+	McpSchema.McpServerClient,
+)
 
 // The tag on an answer that names what kind of answer it is — `suppressed`,
 // `cancelled`, and the rest. Read generically: any tool may adopt the shape,
@@ -83,9 +66,12 @@ const registerToolkitSafe = <Tools extends Record<string, Tool.Any>>(
 		const built = yield* toolkit as unknown as Effect.Effect<
 			Toolkit.WithHandler<Tools>,
 			never,
-			Exclude<Tool.HandlersFor<Tools>, McpSchema.McpServerClient>
+			Exclude<
+				Tool.HandlersFor<Tools>,
+				McpSchema.McpServerClient | McpSchema.McpRequestContext
+			>
 		>
-		const services = yield* Effect.context<never>()
+		const services = omitRequestServices(yield* Effect.context<never>())
 		for (const tool of Object.values(built.tools)) {
 			const annotations = tool.annotations
 			const mcpTool = new McpSchema.Tool({
@@ -105,6 +91,12 @@ const registerToolkitSafe = <Tools extends Record<string, Tool.Any>>(
 				},
 				_meta: Context.getOrUndefined(annotations, Tool.Meta),
 			})
+			// Every problem with the arguments in one answer, so a caller fixes them
+			// in one round. Unknown keys are ignored, as clients already send some.
+			const decodeOptions = {
+				onExcessProperty: 'ignore',
+				errors: 'all',
+			} as const
 			yield* registry.addTool({
 				tool: mcpTool,
 				annotations,
@@ -113,113 +105,131 @@ const registerToolkitSafe = <Tools extends Record<string, Tool.Any>>(
 				// front and there is nothing left to observe. It also keeps a fault
 				// raised while shaping inside the same catch.
 				handle: payload =>
-					built.handle(tool.name as keyof Tools, payload).pipe(
-						Stream.unwrap,
-						Stream.run(Sink.last()),
-						Effect.flatMap(Effect.fromOption),
-						Effect.provide(services as Context.Context<never>),
-						// Which tool ran and how it went, onto the record the request
-						// already opens. A refused call is a JSON-RPC error inside a
-						// perfectly good HTTP response, so the only other line the
-						// work leaves says 200, where a refusal reads the same as an
-						// answer — and a client turns a refusal into a silent retry,
-						// so this is where it becomes visible at all. A request
-						// carrying several calls refines the same line rather than
-						// adding one, so the last call wins, as elsewhere on the
-						// record.
-						Effect.tap((result: { readonly encodedResult: unknown }) =>
-							recordFacts({
-								'mcp.tool': tool.name,
-								'mcp.tool.outcome': 'ok',
-								// Most refusals a caller cares about come back as an
-								// ordinary answer carrying a tag — a suppressed
-								// recipient, a send nobody confirmed — so the outcome
-								// alone would count them as ok. The tag rides along
-								// rather than being classified here, which would put
-								// one domain's vocabulary inside a wrapper that serves
-								// every tool.
-								...(answerTag(result.encodedResult) !== undefined && {
-									'mcp.tool.answer': answerTag(result.encodedResult),
+					built
+						.handle(
+							tool.name as keyof Tools,
+							payload ?? {},
+							undefined,
+							decodeOptions,
+						)
+						.pipe(
+							Stream.unwrap,
+							Stream.run(Sink.last()),
+							Effect.flatMap(Effect.fromOption),
+							Effect.provide(services as Context.Context<never>),
+							// Its own org transaction, open for exactly as long as the call:
+							// a call that fails rolls back alone, before the catch below
+							// answers it, and one that waits on a person's answer keeps
+							// its scope until it is done.
+							inMcpOrgScope,
+							// Which tool ran and how it went, onto the record the request
+							// already opens. A refused call is a JSON-RPC error inside a
+							// perfectly good HTTP response, so the only other line the
+							// work leaves says 200, where a refusal reads the same as an
+							// answer — and a client turns a refusal into a silent retry,
+							// so this is where it becomes visible at all. A request
+							// carrying several calls refines the same line rather than
+							// adding one, so the last call wins, as elsewhere on the
+							// record.
+							Effect.tap((result: { readonly encodedResult: unknown }) =>
+								recordFacts({
+									'mcp.tool': tool.name,
+									'mcp.tool.outcome': 'ok',
+									// Most refusals a caller cares about come back as an
+									// ordinary answer carrying a tag — a suppressed
+									// recipient, a send nobody confirmed — so the outcome
+									// alone would count them as ok. The tag rides along
+									// rather than being classified here, which would put
+									// one domain's vocabulary inside a wrapper that serves
+									// every tool.
+									...(answerTag(result.encodedResult) !== undefined && {
+										'mcp.tool.answer': answerTag(result.encodedResult),
+									}),
 								}),
+							),
+							Effect.map((result: { readonly encodedResult: unknown }) => {
+								// The answer as it goes out on the wire. An encoded answer can
+								// still carry a key set to undefined, which the result shape
+								// refuses as not JSON, or a bigint a raw count came back as;
+								// a tool that answers with nothing at all serializes to no
+								// text, and the shape requires one. A value that is not an
+								// object is left out of structured output by the protocol
+								// layer for each revision, and still arrives in the text.
+								const text =
+									JSON.stringify(result.encodedResult, (_key, value) =>
+										typeof value === 'bigint' ? Number(value) : value,
+									) ?? 'null'
+								return new McpSchema.CallToolResult({
+									isError: false,
+									structuredContent: JSON.parse(text),
+									content: [{ type: 'text', text }],
+								})
 							}),
-						),
-						Effect.map((result: { readonly encodedResult: unknown }) => {
-							const structured = toStructuredContent(result.encodedResult)
-							return new McpSchema.CallToolResult({
-								isError: false,
-								structuredContent: structured,
-								content: [
-									{
-										type: 'text',
-										// A tool that answers with nothing at all serializes to
-										// no text, and the result shape requires one.
-										text:
-											JSON.stringify(structured ?? result.encodedResult) ??
-											'null',
-									},
-								],
-							})
-						}),
-						// Named, so one line says which tool failed. A failure the tool
-						// meant to give is written at debug instead, so the error log
-						// keeps holding only what nobody expected.
-						// A pure interrupt is a client that hung up or a shutdown,
-						// not a fault of the tool's — recording it as one would put
-						// every dropped connection in the channel reserved for what
-						// nobody intended. The request record next door skips them
-						// for the same reason.
-						Effect.tapCause(cause =>
-							Cause.hasInterruptsOnly(cause)
-								? Effect.void
-								: Effect.andThen(
-										recordFacts({
-											'mcp.tool': tool.name,
-											// A refusal is the tool answering; a fault is nobody's
-											// intention. Telling them apart on the record is what
-											// makes "which tools are turning callers away" a
-											// question anybody can ask.
-											'mcp.tool.outcome': isExpectedFailure(cause)
-												? 'refused'
-												: 'failed',
-										}),
-										(isExpectedFailure(cause)
-											? Effect.logDebug(cause)
-											: Effect.logError(cause)
-										).pipe(Effect.annotateLogs({ 'mcp.tool': tool.name })),
-									),
-						),
-						Effect.catch(error =>
-							Effect.succeed(
-								new McpSchema.CallToolResult({
-									isError: true,
-									content: [{ type: 'text', text: clientFacingMessage(error) }],
-								}),
+							// Named, so one line says which tool failed. A failure the tool
+							// meant to give is written at debug instead, so the error log
+							// keeps holding only what nobody expected.
+							// A pure interrupt is a client that hung up or a shutdown,
+							// not a fault of the tool's — recording it as one would put
+							// every dropped connection in the channel reserved for what
+							// nobody intended. The request record next door skips them
+							// for the same reason.
+							Effect.tapCause(cause =>
+								Cause.hasInterruptsOnly(cause)
+									? Effect.void
+									: Effect.andThen(
+											recordFacts({
+												'mcp.tool': tool.name,
+												// A refusal is the tool answering; a fault is nobody's
+												// intention. Telling them apart on the record is what
+												// makes "which tools are turning callers away" a
+												// question anybody can ask.
+												'mcp.tool.outcome': isExpectedFailure(cause)
+													? 'refused'
+													: 'failed',
+											}),
+											(isExpectedFailure(cause)
+												? Effect.logDebug(cause)
+												: Effect.logError(cause)
+											).pipe(Effect.annotateLogs({ 'mcp.tool': tool.name })),
+										),
+							),
+							Effect.catch(error =>
+								Effect.succeed(
+									new McpSchema.CallToolResult({
+										isError: true,
+										content: [
+											{ type: 'text', text: clientFacingMessage(error) },
+										],
+									}),
+								),
+							),
+							Effect.catchDefect(defect =>
+								Effect.succeed(
+									new McpSchema.CallToolResult({
+										isError: true,
+										content: [
+											{ type: 'text', text: clientFacingMessage(defect) },
+										],
+									}),
+								),
 							),
 						),
-						Effect.catchDefect(defect =>
-							Effect.succeed(
-								new McpSchema.CallToolResult({
-									isError: true,
-									content: [
-										{ type: 'text', text: clientFacingMessage(defect) },
-									],
-								}),
-							),
-						),
-					),
 			})
 		}
 	})
 
 // Drop-in replacement for `McpServer.toolkit` that registers a toolkit's tools
-// with the structured-output fix above.
+// with the failure wording above.
 export const mcpToolkitSafe = <Tools extends Record<string, Tool.Any>>(
 	toolkit: Toolkit.Toolkit<Tools>,
 ): Layer.Layer<
 	never,
 	never,
 	| Tool.HandlersFor<Tools>
-	| Exclude<Tool.HandlerServices<Tools>, McpSchema.McpServerClient>
+	| Exclude<
+			Tool.HandlerServices<Tools>,
+			McpSchema.McpServerClient | McpSchema.McpRequestContext
+	  >
 > =>
 	Layer.effectDiscard(registerToolkitSafe(toolkit)).pipe(
 		Layer.provide(McpServer.McpServer.layer),

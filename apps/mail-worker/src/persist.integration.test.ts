@@ -37,6 +37,7 @@ const PgLive = PgClient.layerConfig({
 	transformResultNames: Config.succeed(snakeToCamel),
 	transformQueryNames: Config.succeed(camelToSnake),
 	transformJson: Config.succeed(false),
+	prepare: Config.succeed(false),
 })
 
 // Run an Effect that needs SqlClient + ParticipantMatcher.

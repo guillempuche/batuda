@@ -13,8 +13,8 @@ import { createServer } from 'node:http'
 
 import { NodeHttpServer } from '@effect/platform-node'
 import { Effect, Layer, ManagedRuntime } from 'effect'
-import { HttpRouter, HttpServer } from 'effect/unstable/http'
-import { HttpApi, HttpApiBuilder } from 'effect/unstable/httpapi'
+import { HttpRouter, HttpServer } from 'effect/http'
+import { HttpApi, HttpApiBuilder } from 'effect/http-api'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import {
@@ -100,7 +100,8 @@ beforeAll(async () => {
 			return server.address
 		}),
 	)
-	if (address._tag !== 'TcpAddress') throw new Error('expected a TCP address')
+	if (address._tag === 'UnixPathAddress')
+		throw new Error('expected a TCP address')
 	baseUrl = `http://127.0.0.1:${address.port}`
 })
 

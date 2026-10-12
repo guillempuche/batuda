@@ -1,5 +1,5 @@
 import { Effect } from 'effect'
-import { SqlClient } from 'effect/unstable/sql'
+import { SqlClient } from 'effect/sql'
 
 // How strongly a completed run's fetched evidence was about the company it
 // researched: 'strong' | 'weak' | 'absent' | null. Only a strong match proceeds;

@@ -1,4 +1,4 @@
-import { HttpApi, OpenApi } from 'effect/unstable/httpapi'
+import { HttpApi, OpenApi } from 'effect/http-api'
 
 import { ApiKeysGroup } from './routes/api-keys'
 import { AuthGroup } from './routes/auth'

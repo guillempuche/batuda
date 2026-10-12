@@ -1,4 +1,4 @@
-import { Atom } from 'effect/unstable/reactivity'
+import { Atom } from 'effect/reactivity'
 
 import type { AttentionFilter, AttributeOp, CompanySort } from '@batuda/domain'
 

@@ -1,5 +1,5 @@
 import { Effect } from 'effect'
-import { SqlClient } from 'effect/unstable/sql'
+import { SqlClient } from 'effect/sql'
 
 // A liveness timestamp, refreshed periodically while a run is active. A stale
 // beat — not the run's age — is what marks a run as crashed, so a legitimately

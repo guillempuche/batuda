@@ -1,8 +1,9 @@
 import { Effect, Schema } from 'effect'
-import { McpServer } from 'effect/unstable/ai'
-import { SqlClient } from 'effect/unstable/sql'
+import { McpServer } from 'effect/ai'
+import { SqlClient } from 'effect/sql'
 
 import { CompanyService } from '../../services/companies'
+import { inMcpOrgScope } from '../org-scope'
 import { completeCompanySlug } from './_completions'
 import { LangParam, langDirective } from './_lang'
 
@@ -17,15 +18,16 @@ export const ProposalDraftPrompt = McpServer.prompt({
 	},
 	completion: { slug: completeCompanySlug },
 	content: ({ slug, focus, lang }) =>
-		Effect.gen(function* () {
-			const service = yield* CompanyService
-			const rawData = yield* service.getWithRelations(slug)
-			const data = rawData as Record<string, unknown>
-			const sql = yield* SqlClient.SqlClient
-			const products =
-				yield* sql`SELECT * FROM products WHERE status = 'active'`
+		inMcpOrgScope(
+			Effect.gen(function* () {
+				const service = yield* CompanyService
+				const rawData = yield* service.getWithRelations(slug)
+				const data = rawData as Record<string, unknown>
+				const sql = yield* SqlClient.SqlClient
+				const products =
+					yield* sql`SELECT * FROM products WHERE status = 'active'`
 
-			return `${langDirective(lang)}
+				return `${langDirective(lang)}
 
 You are drafting a sales proposal for ${data['name']}.
 
@@ -43,5 +45,6 @@ Produce:
 3. Pricing and terms based on available products
 4. Implementation timeline
 5. Next steps`
-		}),
+			}),
+		),
 })

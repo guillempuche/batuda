@@ -9,13 +9,14 @@ process.env['DATABASE_URL'] ??=
 	'postgresql://batuda:batuda@localhost:5433/batuda'
 
 import { Effect, Layer } from 'effect'
-import { SqlClient } from 'effect/unstable/sql'
+import { SqlClient } from 'effect/sql'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 
 import { CurrentOrg, SessionContext } from '@batuda/controllers'
 import { TimelineActivityService } from '@batuda/timeline'
 
 import { PgLive } from '../db/client.js'
+import { textArray } from '../lib/pg-params'
 import { enterOrgScope } from '../middleware/org.js'
 import { CalendarService } from './calendar.js'
 import { CredentialCrypto } from './credential-crypto.js'
@@ -207,7 +208,7 @@ const seedThreadToReplyTo = () =>
 					subject, received_at, recipients, attachments,
 					status, status_updated_at, direction, raw_rfc822_ref
 				) VALUES (
-					${ORG}, ${inboxId}, 'INBOX', ${PARENT_MESSAGE_ID}, ${PARENT_MESSAGE_ID}, ${[] as string[]},
+					${ORG}, ${inboxId}, 'INBOX', ${PARENT_MESSAGE_ID}, ${PARENT_MESSAGE_ID}, ${textArray([])},
 					'Quote for the booking module', now(),
 					${JSON.stringify({ to: ['client@example.com'], cc: [], bcc: [] })}::jsonb,
 					'[]'::jsonb, 'normal', now(), 'inbound', 'sentinel'

@@ -1,5 +1,5 @@
 import { Config, Context, Effect, Layer, Schedule } from 'effect'
-import { SqlClient } from 'effect/unstable/sql'
+import { SqlClient } from 'effect/sql'
 
 import { StorageProvider } from './storage-provider'
 
@@ -27,7 +27,7 @@ export class ResearchRetention extends Context.Service<ResearchRetention>()(
 		make: Effect.gen(function* () {
 			const sql = yield* SqlClient.SqlClient
 			const storage = yield* StorageProvider
-			const retentionDays = yield* Config.int('RESEARCH_RETENTION_DAYS').pipe(
+			const retentionDays = yield* Config.Int('RESEARCH_RETENTION_DAYS').pipe(
 				Config.withDefault(90),
 			)
 
@@ -152,7 +152,7 @@ export class ResearchRetention extends Context.Service<ResearchRetention>()(
 	static readonly sweepDaemonLayer = Layer.effectDiscard(
 		Effect.gen(function* () {
 			const retention = yield* ResearchRetention
-			const intervalSec = yield* Config.int(
+			const intervalSec = yield* Config.Int(
 				'RESEARCH_RETENTION_SWEEP_INTERVAL_SEC',
 			).pipe(Config.withDefault(3600))
 			yield* Effect.logInfo('research retention sweep started').pipe(

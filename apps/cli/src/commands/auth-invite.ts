@@ -43,11 +43,11 @@ export const authInvite = (input: AuthInviteInput) =>
 		// reached rather than by a flag someone may have left off.
 		const canDeliverHere = isLocalDatabase()
 
-		const baseURL = yield* Config.string('BETTER_AUTH_BASE_URL').pipe(
+		const baseURL = yield* Config.String('BETTER_AUTH_BASE_URL').pipe(
 			Config.withDefault('https://api.batuda.localhost'),
 		)
 		// Where the person actually signs in — the app, not the API.
-		const appUrl = yield* Config.string('APP_PUBLIC_URL').pipe(
+		const appUrl = yield* Config.String('APP_PUBLIC_URL').pipe(
 			Config.withDefault('https://batuda.localhost'),
 		)
 

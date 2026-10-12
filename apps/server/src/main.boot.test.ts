@@ -14,7 +14,7 @@
 
 import { type ChildProcess, spawn } from 'node:child_process'
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
-import { createServer } from 'node:net'
+import { connect, createServer } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -293,5 +293,50 @@ describe('apps/server program boot', () => {
 		)
 		const body = (await res.json()) as { error?: { code?: number } }
 		expect(body.error?.code).toBe(-32001)
+	})
+
+	it('should hold every spelling of the /mcp path to sign-in', async () => {
+		// GIVEN request lines the router reads as /mcp although they do not say
+		// "/mcp": any letter case, doubled slashes, escapes, a `;`, a leading `*`,
+		// and a full address with or without a query in front of the path. Sent
+		// over a bare socket, since fetch would tidy each one before sending it.
+		const spellings = [
+			'/MCP',
+			'//mcp',
+			'/%6Dcp',
+			'/mcp;x',
+			'*mcp',
+			'http://x/mcp',
+			'http://x?/mcp',
+			'http://x;/mcp',
+		]
+		const body = JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'initialize' })
+		const statusOf = (target: string) =>
+			new Promise<string>((resolve, reject) => {
+				const socket = connect(PORT, '127.0.0.1')
+				let reply = ''
+				socket.on('data', chunk => {
+					reply += String(chunk)
+				})
+				socket.on('end', () => resolve(reply.split(' ', 2)[1] ?? ''))
+				socket.on('error', reject)
+				// Written rather than ended: closing our side straight away would let
+				// the socket give up on a reply that takes more than a moment. The
+				// request asks the server to close once it answers, which ends it.
+				socket.write(
+					`POST ${target} HTTP/1.1\r\nHost: localhost\r\n` +
+						'Content-Type: application/json\r\n' +
+						'Accept: application/json, text/event-stream\r\n' +
+						`Content-Length: ${body.length}\r\nConnection: close\r\n\r\n${body}`,
+				)
+			})
+
+		// WHEN each is sent with no credentials
+		const answers = await Promise.all(
+			spellings.map(async target => [target, await statusOf(target)]),
+		)
+
+		// THEN each is refused as unsigned, rather than reaching the MCP server
+		expect(answers).toEqual(spellings.map(target => [target, '401']))
 	})
 })

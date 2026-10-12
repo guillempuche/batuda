@@ -11,8 +11,8 @@ process.env['RESEARCH_HEARTBEAT_INTERVAL_SEC'] ??= '1'
 process.env['RESEARCH_ORPHAN_SWEEP_INTERVAL_SEC'] ??= '3600'
 
 import { Effect, Layer, Stream } from 'effect'
-import type { LanguageModel } from 'effect/unstable/ai'
-import { SqlClient } from 'effect/unstable/sql'
+import { LanguageModel } from 'effect/ai'
+import { SqlClient } from 'effect/sql'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import {
@@ -97,7 +97,8 @@ const pricedResponse = {
 	},
 }
 
-const stubLlm: LanguageModel.Service = {
+const stubLlm: LanguageModel.LanguageModel = {
+	[LanguageModel.TypeId]: LanguageModel.TypeId,
 	generateText: (_options: unknown) =>
 		Effect.succeed(stubResponseBase) as never,
 	generateObject: (_options: unknown) =>
@@ -117,12 +118,12 @@ const stubLlm: LanguageModel.Service = {
 // through the whole window left the meter empty; and a run whose every tier
 // answered at once was already finished by the time it was read. Spending first
 // and stalling second is the only arrangement that gives both.
-const agentLlm: LanguageModel.Service = {
+const agentLlm: LanguageModel.LanguageModel = {
 	...stubLlm,
 	generateText: (_options: unknown) => Effect.succeed(pricedResponse) as never,
 }
 
-const extractLlm: LanguageModel.Service = {
+const extractLlm: LanguageModel.LanguageModel = {
 	...stubLlm,
 	generateObject: (_options: unknown) =>
 		Effect.sleep('10 seconds').pipe(

@@ -1,5 +1,5 @@
 /**
- * Reliability harness for tier-level `LanguageModel.Service` instances.
+ * Reliability harness for tier-level `LanguageModel.LanguageModel` instances.
  *
  * `hardenLanguageModel` wraps `generateText` / `generateObject` with:
  *   - `Effect.timeout(<per-tier>)` — bounded latency per call. Each tier passes
@@ -44,8 +44,7 @@
  */
 
 import { Cause, Duration, Effect, Schedule } from 'effect'
-import type { LanguageModel } from 'effect/unstable/ai'
-import { AiError } from 'effect/unstable/ai'
+import { AiError, LanguageModel } from 'effect/ai'
 
 import { endsBeforeJsonCloses } from '../domain/cut-off-reply'
 import {
@@ -124,17 +123,34 @@ const isCutOffReply = (err: unknown): boolean =>
 	cutOffReplyText(err) !== undefined
 
 // The tool a call named and what was wrong with it, when the failure is the
-// model having written that call with arguments the tool does not take. Both the
-// mistake we catch ourselves and the one a provider catches first arrive here as
-// the same reason, because `_tool-call-rejection` has already made them the
-// same. The objection is read off the reason rather than the error's `message`,
-// which opens with the module and method that raised it.
+// model having written a call the tool would not take: arguments it does not
+// accept, or a tool it was never given. Both the argument mistake we catch
+// ourselves and the one a provider catches first arrive here as the same
+// reason, because `_tool-call-rejection` has already made them the same; an
+// unknown name is refused by the provider client while it reads the reply. The
+// objection is read off the reason rather than the error's `message`, which
+// opens with the module and method that raised it.
 const rejectedToolCall = (
 	err: unknown,
-): { readonly toolName: string; readonly mistake: string } | undefined =>
-	err instanceof AiError.AiError && err.reason._tag === REJECTED_TOOL_CALL
-		? { toolName: err.reason.toolName, mistake: err.reason.description }
-		: undefined
+):
+	| {
+			readonly toolName: string
+			readonly mistake: string
+			readonly availableTools?: ReadonlyArray<string>
+	  }
+	| undefined => {
+	if (!(err instanceof AiError.AiError)) return undefined
+	const reason = err.reason
+	if (reason._tag === REJECTED_TOOL_CALL)
+		return { toolName: reason.toolName, mistake: reason.description }
+	if (reason._tag === 'ToolNotFoundError')
+		return {
+			toolName: reason.toolName,
+			mistake: reason.message,
+			availableTools: reason.availableTools,
+		}
+	return undefined
+}
 
 // Read the true shape of a failure before it collapses into a ProviderError
 // (only provider + message + recoverable). `Effect.timeout` raises a bare
@@ -190,6 +206,7 @@ const toProviderError = (
 			{ provider, message: info.message },
 			rejected.toolName,
 			rejected.mistake,
+			rejected.availableTools,
 		)
 	return new ProviderError({
 		provider,
@@ -349,7 +366,7 @@ const noteFinishReason = (
 
 /**
  * Wrap a single-tier LanguageModel with timeout + retry + error mapping.
- * The result still conforms to `LanguageModel.Service`, but its failure
+ * The result still conforms to `LanguageModel.LanguageModel`, but its failure
  * channel is `ProviderError` instead of `AiError`.
  *
  * Each call is wrapped in an `llm.call` span so retries appear as nested
@@ -357,10 +374,10 @@ const noteFinishReason = (
  * pattern.
  */
 export const hardenLanguageModel = (
-	inner: LanguageModel.Service,
+	inner: LanguageModel.LanguageModel,
 	provider: string,
 	opts?: HardenOptions,
-): LanguageModel.Service => {
+): LanguageModel.LanguageModel => {
 	const tier = opts?.tier
 	const wrap = harden(provider, opts?.timeout ?? DEFAULT_TIMEOUT, tier)
 	const spanAttributes: Record<string, string> = {
@@ -392,10 +409,11 @@ export const hardenLanguageModel = (
 			}),
 		)
 	return {
+		[LanguageModel.TypeId]: LanguageModel.TypeId,
 		generateText,
 		generateObject,
 		streamText: inner.streamText,
-	} as unknown as LanguageModel.Service
+	} as unknown as LanguageModel.LanguageModel
 }
 
 /**
@@ -407,8 +425,8 @@ export const hardenLanguageModel = (
  * alone (no fallback) is returned unchanged for zero runtime overhead.
  */
 export const withFallbackLanguageModel = (
-	slots: ReadonlyArray<LanguageModel.Service>,
-): LanguageModel.Service => {
+	slots: ReadonlyArray<LanguageModel.LanguageModel>,
+): LanguageModel.LanguageModel => {
 	const [head, ...tail] = slots
 	if (head === undefined) {
 		throw new Error('withFallbackLanguageModel: requires at least one slot')
@@ -416,7 +434,9 @@ export const withFallbackLanguageModel = (
 	if (tail.length === 0) return head
 
 	const cascade = <A, R>(
-		invoke: (svc: LanguageModel.Service) => Effect.Effect<A, ProviderError, R>,
+		invoke: (
+			svc: LanguageModel.LanguageModel,
+		) => Effect.Effect<A, ProviderError, R>,
 	): Effect.Effect<A, ProviderError, R> =>
 		tail.reduce<Effect.Effect<A, ProviderError, R>>(
 			(acc, svc) =>
@@ -458,8 +478,9 @@ export const withFallbackLanguageModel = (
 				>,
 		)
 	return {
+		[LanguageModel.TypeId]: LanguageModel.TypeId,
 		generateText,
 		generateObject,
 		streamText: head.streamText,
-	} as unknown as LanguageModel.Service
+	} as unknown as LanguageModel.LanguageModel
 }

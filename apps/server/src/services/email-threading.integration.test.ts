@@ -11,12 +11,13 @@ process.env['DATABASE_URL'] ??=
 	'postgresql://batuda:batuda@localhost:5433/batuda'
 
 import { Cause, Effect, Exit, Layer, Logger, References } from 'effect'
-import { SqlClient } from 'effect/unstable/sql'
+import { SqlClient } from 'effect/sql'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 
 import type { CurrentOrg, SessionContext } from '@batuda/controllers'
 
 import { PgLive } from '../db/client.js'
+import { textArray } from '../lib/pg-params'
 import { EmailService } from './email.js'
 import { makeOrgRuntime, scopedAsOrg } from './email-harness.js'
 import type { OutboundMessage } from './mail-transport.js'
@@ -188,7 +189,7 @@ const seedThread = (opts: {
 					) VALUES (
 						${org}, ${org === ORG ? (message.inboxId ?? inboxId) : null}, 'INBOX',
 						${message.messageId}, ${rootId},
-						${(message.references ?? []) as unknown as string[]},
+						${textArray(message.references ?? [])},
 						${message.subject},
 						COALESCE(
 							${message.receivedAt ?? null}::timestamptz,

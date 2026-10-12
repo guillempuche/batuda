@@ -1,5 +1,5 @@
 import { Effect } from 'effect'
-import { SqlClient } from 'effect/unstable/sql'
+import { SqlClient } from 'effect/sql'
 
 // A research run that fetched no page fails closed to `no_reliable_data` rather
 // than reporting success with ungrounded findings. The status check has to admit

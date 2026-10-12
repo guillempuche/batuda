@@ -6,7 +6,7 @@ process.env['DATABASE_URL'] ??=
 import { randomUUID } from 'node:crypto'
 
 import { Effect } from 'effect'
-import { SqlClient } from 'effect/unstable/sql'
+import { SqlClient } from 'effect/sql'
 import { afterEach, describe, expect, it } from 'vitest'
 
 import { foldLabel, slugFromLabel } from '@batuda/domain'

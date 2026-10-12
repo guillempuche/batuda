@@ -9,7 +9,8 @@ process.env['RESEARCH_MAX_LOOP_PROMPT_TOKENS'] ??= '24000'
 import { randomUUID } from 'node:crypto'
 
 import { Effect, Layer, Result, Stream } from 'effect'
-import { SqlClient } from 'effect/unstable/sql'
+import { LanguageModel } from 'effect/ai'
+import { SqlClient } from 'effect/sql'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import {
@@ -56,7 +57,8 @@ const finalRound = {
 	usage: { inputTokens: 1, outputTokens: 1, totalTokens: 2 },
 }
 
-const capturingAgentLlm = {
+const capturingAgentLlm: LanguageModel.LanguageModel = {
+	[LanguageModel.TypeId]: LanguageModel.TypeId,
 	generateText: (options: unknown) => {
 		prompts.push(JSON.stringify(options))
 		return Effect.succeed({
@@ -70,7 +72,8 @@ const capturingAgentLlm = {
 		Stream.succeed({ type: 'text-delta' as const, delta: '' }) as never,
 }
 
-const quietLlm = {
+const quietLlm: LanguageModel.LanguageModel = {
+	[LanguageModel.TypeId]: LanguageModel.TypeId,
 	generateText: (_options: unknown) =>
 		Effect.succeed({ ...finalRound, text: '' }) as never,
 	generateObject: (_options: unknown) =>

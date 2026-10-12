@@ -1,9 +1,15 @@
 import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3'
 import { Config, Effect, Redacted } from 'effect'
-import type { SqlClient } from 'effect/unstable/sql'
+import type { SqlClient } from 'effect/sql'
 
 import type { SeededInbox } from './inboxes'
-import { ONE_PIXEL_PNG, SEED_REFERENCE, seedUuid, TINY_PDF } from './shared'
+import {
+	ONE_PIXEL_PNG,
+	SEED_REFERENCE,
+	seedUuid,
+	TINY_PDF,
+	textArray,
+} from './shared'
 
 // Direct INSERTs keep the seed fast and deterministic — no SMTP round-trip or
 // worker IMAP tick needed to materialize fixtures.
@@ -56,13 +62,13 @@ export const seedDemoEmails = (
 	seededInboxes: ReadonlyArray<SeededInbox>,
 ) =>
 	Effect.gen(function* () {
-		const seedStorageEndpoint = yield* Config.string('STORAGE_ENDPOINT')
-		const seedStorageRegion = yield* Config.string('STORAGE_REGION')
-		const seedStorageAccessKeyId = yield* Config.string('STORAGE_ACCESS_KEY_ID')
-		const seedStorageSecretAccessKey = yield* Config.redacted(
+		const seedStorageEndpoint = yield* Config.String('STORAGE_ENDPOINT')
+		const seedStorageRegion = yield* Config.String('STORAGE_REGION')
+		const seedStorageAccessKeyId = yield* Config.String('STORAGE_ACCESS_KEY_ID')
+		const seedStorageSecretAccessKey = yield* Config.Redacted(
 			'STORAGE_SECRET_ACCESS_KEY',
 		)
-		const seedStorageBucket = yield* Config.string('STORAGE_BUCKET')
+		const seedStorageBucket = yield* Config.String('STORAGE_BUCKET')
 		const seedS3 = new S3Client({
 			endpoint: seedStorageEndpoint,
 			region: seedStorageRegion,
@@ -141,7 +147,7 @@ export const seedDemoEmails = (
 					threadKey: args.threadRootMessageId,
 					isDeliveryNotice: args.isDeliveryNotice ?? false,
 					inReplyTo: args.inReplyTo ?? null,
-					references: args.references ?? [],
+					references: textArray(args.references ?? []),
 					direction: args.direction ?? 'inbound',
 					folder: args.folder ?? 'INBOX',
 					rawRfc822Ref,
@@ -551,9 +557,9 @@ export const seedDemoEmails = (
 					organizationId: tallerHuman.orgId,
 					inboxId: tallerHuman.id,
 					mode: 'reply',
-					toAddresses: ['pep@calpepfonda.cat'],
-					ccAddresses: [],
-					bccAddresses: [],
+					toAddresses: textArray(['pep@calpepfonda.cat']),
+					ccAddresses: textArray([]),
+					bccAddresses: textArray([]),
 					subject: 'Re: Quote for the booking module',
 					inReplyTo: m1Id,
 					threadLinkId: m1ThreadLinkId,

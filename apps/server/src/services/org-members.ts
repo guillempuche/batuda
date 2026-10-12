@@ -1,5 +1,5 @@
 import { Effect } from 'effect'
-import type { SqlClient } from 'effect/unstable/sql'
+import type { SqlClient } from 'effect/sql'
 
 import { BadRequest, CurrentOrg } from '@batuda/controllers'
 

@@ -7,7 +7,7 @@
 import { Buffer } from 'node:buffer'
 
 import { Effect, Layer } from 'effect'
-import { SqlClient } from 'effect/unstable/sql'
+import { SqlClient } from 'effect/sql'
 import type { ImapFlow } from 'imapflow'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 

@@ -1,5 +1,5 @@
 import { Schema } from 'effect'
-import { Model } from 'effect/unstable/schema'
+import { Model } from 'effect/schema'
 
 export const InteractionId = Schema.String.pipe(Schema.brand('InteractionId'))
 
@@ -26,9 +26,9 @@ export class Interaction extends Model.Class<Interaction>('Interaction')({
 	//         | meeting_scheduled | proposal_requested
 
 	nextAction: Schema.NullOr(Schema.String),
-	// A DATE column; node-postgres parses it into a JS Date, so read it as a
-	// date-time and emit an ISO string on the wire.
-	nextActionAt: Schema.NullOr(Schema.DateTimeUtcFromDate),
+	// A DATE column, which the driver hands over as "YYYY-MM-DD"; read as midnight
+	// UTC that day and emitted as an ISO string on the wire.
+	nextActionAt: Schema.NullOr(Schema.DateTimeUtcFromString),
 
 	metadata: Schema.NullOr(Schema.Unknown),
 	createdAt: Model.DateTimeInsertFromDate,

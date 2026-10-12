@@ -1,12 +1,12 @@
 import { Cause, ConfigProvider, Effect, Exit, Fiber, Option } from 'effect'
-import { TestClock } from 'effect/testing'
 import {
 	HttpClient,
 	type HttpClientError,
 	type HttpClientRequest,
 	type HttpClientResponse,
 	HttpClientResponse as HttpClientResponseNs,
-} from 'effect/unstable/http'
+} from 'effect/http'
+import { TestClock } from 'effect/testing'
 import { describe, expect, it } from 'vitest'
 
 import { ProviderError } from '../../domain/errors'

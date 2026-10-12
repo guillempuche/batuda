@@ -1,11 +1,11 @@
 import { OpenAiClient, OpenAiLanguageModel } from '@effect/ai-openai-compat'
 import { Cause, Effect, Exit, Layer, Option } from 'effect'
-import { AiError } from 'effect/unstable/ai'
+import { AiError } from 'effect/ai'
 import {
 	HttpClient,
 	type HttpClientError,
 	HttpClientResponse as HttpClientResponseNs,
-} from 'effect/unstable/http'
+} from 'effect/http'
 import { describe, expect, it } from 'vitest'
 
 import { normalizeVendorReply, tolerateVendorReplyShape } from './_reply-shape'

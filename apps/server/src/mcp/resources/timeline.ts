@@ -1,8 +1,9 @@
 import { Effect, Schema } from 'effect'
-import { McpSchema, McpServer } from 'effect/unstable/ai'
-import { SqlClient } from 'effect/unstable/sql'
+import { McpSchema, McpServer } from 'effect/ai'
+import { SqlClient } from 'effect/sql'
 
 import { companyVisible } from '../../services/company-liveness'
+import { inMcpOrgScope } from '../org-scope'
 
 const companyIdParam = McpSchema.param('companyId', Schema.String)
 
@@ -23,5 +24,5 @@ export const TimelineResource =
 				LIMIT 100
 			`
 			return JSON.stringify(rows, null, 2)
-		}),
+		}, inMcpOrgScope),
 	})

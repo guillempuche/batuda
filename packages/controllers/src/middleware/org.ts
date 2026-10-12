@@ -1,4 +1,4 @@
-import { HttpApiMiddleware, HttpApiSchema } from 'effect/unstable/httpapi'
+import { HttpApiMiddleware, HttpApiSchema } from 'effect/http-api'
 
 import { CurrentOrg } from '@batuda/domain'
 

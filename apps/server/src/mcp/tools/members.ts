@@ -1,6 +1,6 @@
 import { Effect, Schema } from 'effect'
-import { Tool, Toolkit } from 'effect/unstable/ai'
-import { SqlClient, type Statement } from 'effect/unstable/sql'
+import { Tool, Toolkit } from 'effect/ai'
+import { SqlClient, type Statement } from 'effect/sql'
 
 import { CurrentOrg } from '@batuda/controllers'
 

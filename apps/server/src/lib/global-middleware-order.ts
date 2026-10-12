@@ -19,15 +19,14 @@ import { ObservabilityLive } from './observability-middleware'
  * The order matters because a middleware that answers a caller itself, without
  * passing the request on, hides everything registered after it:
  *
- * - **Observability outermost.** The MCP sign-in check refuses a caller
- *   directly, so anything after it never runs for a refusal — and a refused MCP
- *   connection would leave no record of the request at all. That is the case an
- *   MCP client shows as a silent retry loop rather than a visible error, so it
- *   is the one that most needs a record.
- * - **CORS above the sign-in check.** Otherwise a refusal is answered before
- *   CORS can add its headers, and a browser client cannot read the challenge
- *   telling it how to authenticate — nor can a preflight, which carries no
- *   credentials and would be refused rather than answered.
+ * - **Observability outermost.** CORS answers a browser's preflight itself, so
+ *   with observability below it a preflight would leave no record at all.
+ * - **CORS above whatever the caller passes in.** A router-wide middleware that
+ *   refuses a caller would otherwise answer before CORS could add its headers,
+ *   and a browser client could not read why it was refused.
+ *
+ * The MCP sign-in check is not among them: it wraps only the MCP routes, so it
+ * runs inside all of these whatever order they register in.
  *
  * This lives apart from `main.ts` so the ordering can be tested: importing
  * `main.ts` starts the server, so a test can only reach the arrangement if the

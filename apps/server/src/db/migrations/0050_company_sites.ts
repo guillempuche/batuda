@@ -1,5 +1,5 @@
 import { Effect } from 'effect'
-import { SqlClient } from 'effect/unstable/sql'
+import { SqlClient } from 'effect/sql'
 
 // A company was one place: one address, one pair of coordinates, one pin on the
 // map. That describes a single-site business, and stops describing a company the

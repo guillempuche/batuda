@@ -1,28 +1,26 @@
 import { Schema } from 'effect'
 
-export class NotFound extends Schema.TaggedErrorClass<NotFound>()('NotFound', {
+export class NotFound extends Schema.TaggedError<NotFound>()('NotFound', {
 	entity: Schema.String,
 	id: Schema.String,
 }) {}
 
-export class BadRequest extends Schema.TaggedErrorClass<BadRequest>()(
-	'BadRequest',
-	{ message: Schema.String },
-) {}
+export class BadRequest extends Schema.TaggedError<BadRequest>()('BadRequest', {
+	message: Schema.String,
+}) {}
 
-export class Unauthorized extends Schema.TaggedErrorClass<Unauthorized>()(
+export class Unauthorized extends Schema.TaggedError<Unauthorized>()(
 	'Unauthorized',
 	{ message: Schema.String },
 ) {}
 
-export class Conflict extends Schema.TaggedErrorClass<Conflict>()('Conflict', {
+export class Conflict extends Schema.TaggedError<Conflict>()('Conflict', {
 	message: Schema.String,
 }) {}
 
-export class Forbidden extends Schema.TaggedErrorClass<Forbidden>()(
-	'Forbidden',
-	{ message: Schema.String },
-) {}
+export class Forbidden extends Schema.TaggedError<Forbidden>()('Forbidden', {
+	message: Schema.String,
+}) {}
 
 export const EmailSendErrorKind = Schema.Literals([
 	'suppressed',
@@ -32,7 +30,7 @@ export const EmailSendErrorKind = Schema.Literals([
 ])
 export type EmailSendErrorKind = typeof EmailSendErrorKind.Type
 
-export class EmailSendError extends Schema.TaggedErrorClass<EmailSendError>()(
+export class EmailSendError extends Schema.TaggedError<EmailSendError>()(
 	'EmailSendError',
 	{
 		message: Schema.String,
@@ -41,7 +39,7 @@ export class EmailSendError extends Schema.TaggedErrorClass<EmailSendError>()(
 	},
 ) {}
 
-export class EmailSuppressed extends Schema.TaggedErrorClass<EmailSuppressed>()(
+export class EmailSuppressed extends Schema.TaggedError<EmailSuppressed>()(
 	'EmailSuppressed',
 	{
 		contactId: Schema.NullOr(Schema.String),
@@ -51,10 +49,9 @@ export class EmailSuppressed extends Schema.TaggedErrorClass<EmailSuppressed>()(
 	},
 ) {}
 
-export class EmailError extends Schema.TaggedErrorClass<EmailError>()(
-	'EmailError',
-	{ message: Schema.String },
-) {}
+export class EmailError extends Schema.TaggedError<EmailError>()('EmailError', {
+	message: Schema.String,
+}) {}
 
 /**
  * A message that was not put on the wire because of the shape it was in, not
@@ -65,7 +62,7 @@ export class EmailError extends Schema.TaggedErrorClass<EmailError>()(
  * writes the wording in their language and telemetry can count the reasons
  * apart. Returned as 400.
  */
-export class EmailNotSendable extends Schema.TaggedErrorClass<EmailNotSendable>()(
+export class EmailNotSendable extends Schema.TaggedError<EmailNotSendable>()(
 	'EmailNotSendable',
 	{ reason: Schema.Literals(['no_subject', 'forged_reply']) },
 ) {}
@@ -89,7 +86,7 @@ export const noDefaultInboxReasons = [
 ] as const
 export type NoDefaultInboxReason = (typeof noDefaultInboxReasons)[number]
 
-export class NoDefaultInbox extends Schema.TaggedErrorClass<NoDefaultInbox>()(
+export class NoDefaultInbox extends Schema.TaggedError<NoDefaultInbox>()(
 	'NoDefaultInbox',
 	{
 		reason: Schema.Literals(noDefaultInboxReasons),
@@ -98,7 +95,7 @@ export class NoDefaultInbox extends Schema.TaggedErrorClass<NoDefaultInbox>()(
 ) {}
 
 /** Inbox row exists but is `active=false`. Returned as 409. */
-export class InboxInactive extends Schema.TaggedErrorClass<InboxInactive>()(
+export class InboxInactive extends Schema.TaggedError<InboxInactive>()(
 	'InboxInactive',
 	{ inboxId: Schema.String },
 ) {}
@@ -119,7 +116,7 @@ export const GrantFailureReason = Schema.Literals([
 export type GrantFailureReason = typeof GrantFailureReason.Type
 
 /** IMAP/SMTP probe rejected the credentials. Returned as 409. */
-export class GrantAuthFailed extends Schema.TaggedErrorClass<GrantAuthFailed>()(
+export class GrantAuthFailed extends Schema.TaggedError<GrantAuthFailed>()(
 	'GrantAuthFailed',
 	{
 		inboxId: Schema.String,
@@ -129,7 +126,7 @@ export class GrantAuthFailed extends Schema.TaggedErrorClass<GrantAuthFailed>()(
 ) {}
 
 /** IMAP/SMTP probe could not reach the server. Returned as 409. */
-export class GrantConnectFailed extends Schema.TaggedErrorClass<GrantConnectFailed>()(
+export class GrantConnectFailed extends Schema.TaggedError<GrantConnectFailed>()(
 	'GrantConnectFailed',
 	{
 		inboxId: Schema.String,
@@ -139,7 +136,7 @@ export class GrantConnectFailed extends Schema.TaggedErrorClass<GrantConnectFail
 ) {}
 
 /** Inbox grant is in a non-`connected` state. Returned as 409. */
-export class GrantUnavailable extends Schema.TaggedErrorClass<GrantUnavailable>()(
+export class GrantUnavailable extends Schema.TaggedError<GrantUnavailable>()(
 	'GrantUnavailable',
 	{
 		inboxId: Schema.String,
@@ -160,7 +157,7 @@ export const StorageErrorOperation = Schema.Literals([
 ])
 export type StorageErrorOperation = typeof StorageErrorOperation.Type
 
-export class StorageError extends Schema.TaggedErrorClass<StorageError>()(
+export class StorageError extends Schema.TaggedError<StorageError>()(
 	'StorageError',
 	{
 		message: Schema.String,
@@ -176,7 +173,7 @@ export class StorageError extends Schema.TaggedErrorClass<StorageError>()(
 // definitions for 409 responses.
 
 /** Pre-run estimate exceeds available budget. Returned as 409. */
-export class InsufficientBudget extends Schema.TaggedErrorClass<InsufficientBudget>()(
+export class InsufficientBudget extends Schema.TaggedError<InsufficientBudget>()(
 	'InsufficientBudget',
 	{
 		estimatedCents: Schema.Number,
@@ -186,7 +183,7 @@ export class InsufficientBudget extends Schema.TaggedErrorClass<InsufficientBudg
 ) {}
 
 /** Fan-out exceeds confirm threshold. Returned as 409 with preview. */
-export class ConfirmRequired extends Schema.TaggedErrorClass<ConfirmRequired>()(
+export class ConfirmRequired extends Schema.TaggedError<ConfirmRequired>()(
 	'ConfirmRequired',
 	{
 		estimatedCostCents: Schema.Number,
@@ -219,7 +216,7 @@ export const attributeRejectedReasons = [
 ] as const
 export type AttributeRejectedReason = (typeof attributeRejectedReasons)[number]
 
-export class AttributeRejected extends Schema.TaggedErrorClass<AttributeRejected>()(
+export class AttributeRejected extends Schema.TaggedError<AttributeRejected>()(
 	'AttributeRejected',
 	{
 		reason: Schema.Literals(attributeRejectedReasons),
@@ -232,7 +229,7 @@ export class AttributeRejected extends Schema.TaggedErrorClass<AttributeRejected
  * belonging to someone else. Starting the run anyway would silently apply
  * different instructions than the caller asked for, so it is refused outright.
  */
-export class UnknownStack extends Schema.TaggedErrorClass<UnknownStack>()(
+export class UnknownStack extends Schema.TaggedError<UnknownStack>()(
 	'UnknownStack',
 	{
 		stack: Schema.String,

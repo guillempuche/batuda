@@ -1,9 +1,10 @@
 import { Effect, Stream } from 'effect'
-import { LanguageModel } from 'effect/unstable/ai'
-import { SqlClient } from 'effect/unstable/sql'
+import { LanguageModel } from 'effect/ai'
+import { SqlClient } from 'effect/sql'
 import { describe, expect, it } from 'vitest'
 
 import { makeUsageMeter, UsageMeter } from '../application/usage-meter'
+import { sha256Hex, stableStringify } from '../domain/stable-hash'
 import {
 	computeLlmCacheKey,
 	isLlmCacheable,
@@ -40,6 +41,18 @@ describe('llm cache key computation', () => {
 		// THEN every variation produces a distinct key
 		const keys = new Set([agentText, agentObj, extractText, modelSwap])
 		expect(keys.size).toBe(4)
+	})
+
+	it('should not match a reply stored before the AI library upgrade', () => {
+		// GIVEN the key an older release computed for the same call, which had
+		//       no stored-reply shape in it
+		const opts = { prompt: 'x', temperature: 0 }
+		const olderKey = sha256Hex(`agent|m1|text|${stableStringify(opts)}`)
+
+		// WHEN the key is computed now
+		// THEN it differs, so a row written in the old reply shape is never
+		//      replayed into the new response classes
+		expect(computeLlmCacheKey('agent', 'm1', 'text', opts)).not.toBe(olderKey)
 	})
 
 	it('should skip the cache when temperature is non-zero', () => {
@@ -252,7 +265,7 @@ describe('counting what a model call consumed', () => {
 				generateText: () => Effect.succeed(answer),
 				generateObject: () => Effect.succeed(answer),
 				streamText: () => Stream.empty,
-			} as unknown as LanguageModel.Service
+			} as unknown as LanguageModel.LanguageModel
 			const cached = yield* makeCachedLanguageModel(
 				inner,
 				'agent',

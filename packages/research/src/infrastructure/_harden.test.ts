@@ -9,9 +9,9 @@ import {
 	Ref,
 	References,
 } from 'effect'
+import type { LanguageModel } from 'effect/ai'
+import { AiError } from 'effect/ai'
 import { TestClock } from 'effect/testing'
-import type { LanguageModel } from 'effect/unstable/ai'
-import { AiError } from 'effect/unstable/ai'
 import { describe, expect, it } from 'vitest'
 
 import {
@@ -34,7 +34,7 @@ type Outcome = Effect.Effect<{ text: string; usage: unknown }, AiError.AiError>
 const makeStubLm = (
 	counterRef: Ref.Ref<number>,
 	impl: (attempt: number) => Outcome,
-): LanguageModel.Service =>
+): LanguageModel.LanguageModel =>
 	({
 		generateText: () =>
 			Effect.gen(function* () {
@@ -43,13 +43,13 @@ const makeStubLm = (
 			}),
 		generateObject: () => Effect.succeed({}),
 		streamText: () => Effect.succeed({}),
-	}) as unknown as LanguageModel.Service
+	}) as unknown as LanguageModel.LanguageModel
 
 const makeTaggedStub = (
 	tag: string,
 	callsRef: Ref.Ref<ReadonlyArray<string>>,
 	outcome: (() => Outcome) | 'fail',
-): LanguageModel.Service =>
+): LanguageModel.LanguageModel =>
 	({
 		generateText: () =>
 			Effect.gen(function* () {
@@ -59,7 +59,7 @@ const makeTaggedStub = (
 			}),
 		generateObject: () => Effect.succeed({}),
 		streamText: () => Effect.succeed({}),
-	}) as unknown as LanguageModel.Service
+	}) as unknown as LanguageModel.LanguageModel
 
 const emptyRequest = {
 	method: 'POST' as const,
@@ -128,7 +128,7 @@ const BROKEN_REPLY = '{"enrichment": {"industry": {"value": "a" "b"}}}'
 const makeObjectStub = (
 	counterRef: Ref.Ref<number>,
 	impl: (attempt: number) => Effect.Effect<unknown, AiError.AiError>,
-): LanguageModel.Service =>
+): LanguageModel.LanguageModel =>
 	({
 		generateText: () => Effect.succeed({}),
 		generateObject: () =>
@@ -137,7 +137,7 @@ const makeObjectStub = (
 				return yield* impl(n)
 			}),
 		streamText: () => Effect.succeed({}),
-	}) as unknown as LanguageModel.Service
+	}) as unknown as LanguageModel.LanguageModel
 
 const mkRateLimitError = (retryAfter: Duration.Duration): AiError.AiError =>
 	new AiError.AiError({
@@ -202,7 +202,7 @@ const failureOf = (exit: Exit.Exit<unknown, unknown>): unknown =>
 	Exit.isFailure(exit) ? Cause.squash(exit.cause) : undefined
 
 const invokeGenerateText = (
-	svc: LanguageModel.Service,
+	svc: LanguageModel.LanguageModel,
 ): Effect.Effect<unknown, unknown, never> =>
 	(
 		svc.generateText as unknown as (
@@ -211,7 +211,7 @@ const invokeGenerateText = (
 	)({ prompt: 'hi' })
 
 const invokeGenerateObject = (
-	svc: LanguageModel.Service,
+	svc: LanguageModel.LanguageModel,
 ): Effect.Effect<unknown, unknown, never> =>
 	(
 		svc.generateObject as unknown as (
@@ -219,12 +219,12 @@ const invokeGenerateObject = (
 		) => Effect.Effect<unknown, unknown, never>
 	)({ prompt: 'hi', schema: {} })
 
-const makeObjectFailingLm = (fail: unknown): LanguageModel.Service =>
+const makeObjectFailingLm = (fail: unknown): LanguageModel.LanguageModel =>
 	({
 		generateText: () => Effect.succeed({}),
 		generateObject: () => Effect.fail(fail),
 		streamText: () => Effect.succeed({}),
-	}) as unknown as LanguageModel.Service
+	}) as unknown as LanguageModel.LanguageModel
 
 describe('hardenLanguageModel', () => {
 	it('should return the successful response after transient failures under its retry budget', async () => {
@@ -540,6 +540,39 @@ describe('hardenLanguageModel', () => {
 		expect((failure as RejectedToolCall).mistake).not.toContain('OpenAiClient')
 	})
 
+	it('should carry the tools a pass offers when the model names another', async () => {
+		// GIVEN a provider client that refuses a call to a tool the request did
+		// not offer, the way it reads a reply before any toolkit runs
+		const attemptsRef = Ref.makeUnsafe(0)
+		const stub = makeStubLm(attemptsRef, () =>
+			Effect.fail(
+				new AiError.AiError({
+					module: 'OpenAiLanguageModel',
+					method: 'makeResponse',
+					reason: new AiError.ToolNotFoundError({
+						toolName: 'registry_lookup',
+						availableTools: ['web_search', 'scrape_page'],
+					}),
+				}),
+			),
+		)
+		const hardened = hardenLanguageModel(stub, 'groq')
+
+		// WHEN generateText is invoked
+		const exit = await runWithVirtualClock(() => invokeGenerateText(hardened))
+
+		// THEN the failure is a refused tool call naming the tool it asked for
+		// and the ones it could have, so the run can correct the model rather
+		// than end
+		const failure = failureOf(exit)
+		expect(isRejectedToolCall(failure)).toBe(true)
+		expect((failure as RejectedToolCall).toolName).toBe('registry_lookup')
+		expect((failure as RejectedToolCall).availableTools).toEqual([
+			'web_search',
+			'scrape_page',
+		])
+	})
+
 	it('should sleep for the RateLimitError retryAfter before re-attempting', async () => {
 		// GIVEN a stub LM that fails twice with a 7-second retryAfter hint then succeeds
 		// AND a harness whose default jittered-exponential backoff would normally fire at ~500ms/~1s
@@ -596,7 +629,7 @@ describe('hardenLanguageModel', () => {
 				Effect.sleep('5 hours').pipe(Effect.as({ text: 'never', usage: {} })),
 			generateObject: () => Effect.succeed({}),
 			streamText: () => Effect.succeed({}),
-		} as unknown as LanguageModel.Service
+		} as unknown as LanguageModel.LanguageModel
 		// AND a harness with a 1-second timeout override
 		const hardened = hardenLanguageModel(neverSvc, 'together', {
 			timeout: '1 second',
@@ -621,7 +654,7 @@ describe('hardenLanguageModel', () => {
 				Effect.sleep('5 hours').pipe(Effect.as({ text: 'never', usage: {} })),
 			generateObject: () => Effect.succeed({}),
 			streamText: () => Effect.succeed({}),
-		} as unknown as LanguageModel.Service
+		} as unknown as LanguageModel.LanguageModel
 		const hardened = hardenLanguageModel(neverSvc, 'custom', {
 			timeout: '1 second',
 		})
@@ -800,7 +833,7 @@ describe('withFallbackLanguageModel', () => {
 				}),
 			generateObject: () => Effect.succeed({}),
 			streamText: () => Effect.succeed({}),
-		} as unknown as LanguageModel.Service
+		} as unknown as LanguageModel.LanguageModel
 		const slot0 = hardenLanguageModel(wedgedSvc, 'nebius', {
 			timeout: '1 second',
 		})

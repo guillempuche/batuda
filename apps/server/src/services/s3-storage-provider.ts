@@ -26,11 +26,11 @@ export const S3StorageProviderLive = Layer.effect(
 		// database connection reads its own url — nothing else uses these.
 		// All required, no defaults: the same code serves MinIO in development
 		// and Cloudflare R2 in production, and only these change between them.
-		const endpoint = yield* Config.string('STORAGE_ENDPOINT')
-		const region = yield* Config.string('STORAGE_REGION')
-		const accessKeyId = yield* Config.string('STORAGE_ACCESS_KEY_ID')
-		const secretAccessKey = yield* Config.redacted('STORAGE_SECRET_ACCESS_KEY')
-		const bucket = yield* Config.string('STORAGE_BUCKET')
+		const endpoint = yield* Config.String('STORAGE_ENDPOINT')
+		const region = yield* Config.String('STORAGE_REGION')
+		const accessKeyId = yield* Config.String('STORAGE_ACCESS_KEY_ID')
+		const secretAccessKey = yield* Config.Redacted('STORAGE_SECRET_ACCESS_KEY')
+		const bucket = yield* Config.String('STORAGE_BUCKET')
 
 		// `forcePathStyle: true` keeps a single code path working for both
 		// MinIO (which only speaks path-style: `http://host/bucket/key`) and

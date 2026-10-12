@@ -46,7 +46,7 @@ export const providerListConfig = <const V extends ReadonlyArray<string>>(
  * it opened are the evidence its findings cite, not merely something kept to save a
  * fetch later.
  */
-export const cacheBypassConfig = Config.boolean('RESEARCH_CACHE_BYPASS').pipe(
+export const cacheBypassConfig = Config.Boolean('RESEARCH_CACHE_BYPASS').pipe(
 	Config.withDefault(false),
 )
 

@@ -1,5 +1,5 @@
 import { Effect, Schema } from 'effect'
-import { McpSchema, McpServer } from 'effect/unstable/ai'
+import { McpSchema, McpServer } from 'effect/ai'
 
 import { CurrentOrg, SessionContext } from '@batuda/controllers'
 import {
@@ -9,6 +9,8 @@ import {
 	listTemplates,
 	resolveInstructions,
 } from '@batuda/instructions'
+
+import { inMcpOrgScope } from '../org-scope'
 
 const agentParam = McpSchema.param('agent', Schema.String)
 
@@ -76,5 +78,5 @@ export const InstructionsResource =
 				null,
 				2,
 			)
-		}),
+		}, inMcpOrgScope),
 	})

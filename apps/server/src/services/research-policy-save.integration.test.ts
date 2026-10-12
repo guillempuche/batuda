@@ -9,8 +9,8 @@ process.env['RESEARCH_MAX_LOOP_PROMPT_TOKENS'] ??= '24000'
 process.env['RESEARCH_ORPHAN_SWEEP_INTERVAL_SEC'] ??= '3600'
 
 import { Effect, Layer, Stream } from 'effect'
-import type { LanguageModel } from 'effect/unstable/ai'
-import { SqlClient } from 'effect/unstable/sql'
+import { LanguageModel } from 'effect/ai'
+import { SqlClient } from 'effect/sql'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import {
@@ -40,7 +40,8 @@ import { PgLive } from '../db/client.js'
 // No research job runs here, so the language-model and provider ports are never
 // called; the stubs exist only so the service layer builds.
 
-const stubLlm: LanguageModel.Service = {
+const stubLlm: LanguageModel.LanguageModel = {
+	[LanguageModel.TypeId]: LanguageModel.TypeId,
 	generateText: (_options: unknown) => Effect.die('llm not exercised') as never,
 	generateObject: (_options: unknown) =>
 		Effect.die('llm not exercised') as never,

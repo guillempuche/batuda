@@ -1,12 +1,13 @@
 import { DateTime, Effect, Schema } from 'effect'
-import { HttpApiBuilder } from 'effect/unstable/httpapi'
-import type { Statement } from 'effect/unstable/sql'
-import { SqlClient } from 'effect/unstable/sql'
+import { HttpApiBuilder } from 'effect/http-api'
+import type { Statement } from 'effect/sql'
+import { SqlClient } from 'effect/sql'
 
 import { BatudaApi, CurrentOrg, NotFound } from '@batuda/controllers'
 import { Proposal } from '@batuda/domain'
 import { ProposalEvent, TimelineActivityService } from '@batuda/timeline'
 
+import { withJsonColumns } from '../lib/pg-params'
 import {
 	pageOf,
 	probeLimit,
@@ -102,7 +103,7 @@ export const ProposalsLive = HttpApiBuilder.group(
 					Effect.gen(function* () {
 						const currentOrg = yield* CurrentOrg
 						const rows = yield* sql`INSERT INTO proposals ${sql.insert({
-							..._.payload,
+							...withJsonColumns(_.payload, ['lineItems', 'metadata']),
 							organizationId: currentOrg.id,
 						})} RETURNING *`
 						yield* Effect.logInfo('Proposal created').pipe(
@@ -151,7 +152,11 @@ export const ProposalsLive = HttpApiBuilder.group(
 						}
 
 						const rows = yield* sql`
-							UPDATE proposals SET ${sql.update({ ..._.payload, ...stamps, updatedAt: now })}
+							UPDATE proposals SET ${sql.update({
+								...withJsonColumns(_.payload, ['lineItems', 'metadata']),
+								...stamps,
+								updatedAt: now,
+							})}
 							WHERE id = ${_.params.id} RETURNING *
 						`
 

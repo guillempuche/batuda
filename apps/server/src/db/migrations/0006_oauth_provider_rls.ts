@@ -1,5 +1,5 @@
 import { Effect } from 'effect'
-import { SqlClient } from 'effect/unstable/sql'
+import { SqlClient } from 'effect/sql'
 
 // The `@better-auth/oauth-provider` + `jwt` plugins (added for the OAuth MCP
 // path) create `oauthClient`, `oauthAccessToken`, `oauthRefreshToken`,

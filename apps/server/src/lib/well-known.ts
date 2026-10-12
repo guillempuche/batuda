@@ -5,11 +5,7 @@ import {
 import { NodeHttpServerRequest } from '@effect/platform-node'
 import { fromNodeHeaders } from 'better-auth/node'
 import { Effect, Layer } from 'effect'
-import {
-	HttpRouter,
-	HttpServerRequest,
-	HttpServerResponse,
-} from 'effect/unstable/http'
+import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/http'
 
 import { Auth } from './auth'
 import { EnvVars } from './env'

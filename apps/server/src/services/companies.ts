@@ -1,6 +1,6 @@
 import { Context, DateTime, Effect, Layer, Schema } from 'effect'
-import type { Statement } from 'effect/unstable/sql'
-import { SqlClient } from 'effect/unstable/sql'
+import type { Statement } from 'effect/sql'
+import { SqlClient } from 'effect/sql'
 
 import {
 	BadRequest,
@@ -20,6 +20,7 @@ import {
 import type { AttributeFilter } from '@batuda/instructions'
 
 import { ownerCondition } from '../lib/owner-filter'
+import { jsonColumn, textArray } from '../lib/pg-params'
 import { textAnywhere } from '../lib/search-text'
 import {
 	type CountMode,
@@ -286,7 +287,7 @@ const companyConditions = (
 		// whose values narrow rather than widen.
 		const tags = asked(filters.tags)
 		if (tags !== undefined && lifted !== 'tags')
-			conditions.push(sql`tags @> ${tags}::text[]`)
+			conditions.push(sql`tags @> ${textArray(tags)}`)
 		if (
 			filters.metadataKey !== undefined &&
 			filters.metadataValue !== undefined
@@ -352,9 +353,9 @@ const attributeInsertColumns = (
 	merge === undefined
 		? {}
 		: {
-				attributes: merge.entries,
+				attributes: jsonColumn(merge.entries),
 				...(Object.keys(merge.provenance).length > 0
-					? { fieldProvenance: merge.provenance }
+					? { fieldProvenance: jsonColumn(merge.provenance) }
 					: {}),
 			}
 

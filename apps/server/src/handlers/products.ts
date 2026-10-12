@@ -1,9 +1,11 @@
 import { DateTime, Effect, Schema } from 'effect'
-import { HttpApiBuilder } from 'effect/unstable/httpapi'
-import { SqlClient } from 'effect/unstable/sql'
+import { HttpApiBuilder } from 'effect/http-api'
+import { SqlClient } from 'effect/sql'
 
 import { BatudaApi, CurrentOrg } from '@batuda/controllers'
 import { Product } from '@batuda/domain'
+
+import { withJsonColumns } from '../lib/pg-params'
 
 const decodeProduct = Schema.decodeUnknownEffect(Product)
 const decodeProducts = Schema.decodeUnknownEffect(Schema.Array(Product))
@@ -25,7 +27,7 @@ export const ProductsLive = HttpApiBuilder.group(
 					Effect.gen(function* () {
 						const currentOrg = yield* CurrentOrg
 						const rows = yield* sql`INSERT INTO products ${sql.insert({
-							..._.payload,
+							...withJsonColumns(_.payload, ['metadata']),
 							organizationId: currentOrg.id,
 						})} RETURNING *`
 						yield* Effect.logInfo('Product created').pipe(
@@ -42,7 +44,10 @@ export const ProductsLive = HttpApiBuilder.group(
 				.handle('update', _ =>
 					Effect.gen(function* () {
 						const rows = yield* sql`
-							UPDATE products SET ${sql.update({ ..._.payload, updatedAt: DateTime.toDateUtc(DateTime.nowUnsafe()) })}
+							UPDATE products SET ${sql.update({
+								...withJsonColumns(_.payload, ['metadata']),
+								updatedAt: DateTime.toDateUtc(DateTime.nowUnsafe()),
+							})}
 							WHERE id = ${_.params.id} RETURNING *
 						`
 						yield* Effect.logInfo('Product updated').pipe(

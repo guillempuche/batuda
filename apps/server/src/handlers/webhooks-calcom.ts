@@ -1,9 +1,9 @@
 import { createHmac, timingSafeEqual } from 'node:crypto'
 
 import { Config, Effect, Exit, Option, Redacted } from 'effect'
-import { HttpServerResponse } from 'effect/unstable/http'
-import { HttpApiBuilder } from 'effect/unstable/httpapi'
-import { SqlClient } from 'effect/unstable/sql'
+import { HttpServerResponse } from 'effect/http'
+import { HttpApiBuilder } from 'effect/http-api'
+import { SqlClient } from 'effect/sql'
 
 import { BatudaApi } from '@batuda/controllers'
 
@@ -41,7 +41,7 @@ export const CalcomWebhookLive = HttpApiBuilder.group(
 			// "explicit env vars — no silent bypass" policy: refuse to verify
 			// rather than accept anything.
 			const secretOpt = yield* Config.option(
-				Config.redacted('CALENDAR_WEBHOOK_SECRET'),
+				Config.Redacted('CALENDAR_WEBHOOK_SECRET'),
 			)
 
 			return handlers.handleRaw(

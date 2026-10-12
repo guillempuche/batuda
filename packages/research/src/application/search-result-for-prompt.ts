@@ -15,7 +15,7 @@
  * instead of opening the pages, should keep most of what they said, while a list
  * of twenty is where the cutting is needed.
  */
-import type { Response } from 'effect/unstable/ai'
+import type { Response } from 'effect/ai'
 
 import { isPlainObject } from './guard-shapes'
 

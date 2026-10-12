@@ -8,11 +8,7 @@
 import { createHmac, randomUUID } from 'node:crypto'
 
 import { Config, Console, Effect, Redacted } from 'effect'
-import {
-	FetchHttpClient,
-	HttpClient,
-	HttpClientRequest,
-} from 'effect/unstable/http'
+import { FetchHttpClient, HttpClient, HttpClientRequest } from 'effect/http'
 
 export const SIMULATE_TRIGGERS = [
 	'BOOKING_CREATED',
@@ -89,7 +85,7 @@ const buildEnvelope = (trigger: SimulateTrigger, icalUid: string) => ({
 
 export const calendarSimulateWebhook = (args: SimulateArgs) =>
 	Effect.gen(function* () {
-		const secret = yield* Config.redacted('CALENDAR_WEBHOOK_SECRET')
+		const secret = yield* Config.Redacted('CALENDAR_WEBHOOK_SECRET')
 		const icalUid = args.icalUid ?? `sim-${randomUUID()}@calendar.batuda`
 		const envelope = buildEnvelope(args.trigger, icalUid)
 		const body = JSON.stringify(envelope)

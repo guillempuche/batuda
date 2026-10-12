@@ -1,5 +1,5 @@
 import { Effect } from 'effect'
-import { SqlClient } from 'effect/unstable/sql'
+import { SqlClient } from 'effect/sql'
 
 // Multi-channel contacts. The `contacts` row keeps its scalar `email` — the
 // canonical send address the outbound email path reads — alongside the older

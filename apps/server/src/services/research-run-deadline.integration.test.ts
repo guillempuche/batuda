@@ -16,8 +16,8 @@ process.env['RESEARCH_ORPHAN_STALE_SEC'] ??= '3600'
 process.env['RESEARCH_RUN_DEADLINE_SEC'] ??= '2'
 
 import { Effect, Layer, Stream } from 'effect'
-import type { LanguageModel } from 'effect/unstable/ai'
-import { SqlClient } from 'effect/unstable/sql'
+import { LanguageModel } from 'effect/ai'
+import { SqlClient } from 'effect/sql'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import {
@@ -71,7 +71,8 @@ const stubResponse = {
 	},
 }
 
-const stubLlm: LanguageModel.Service = {
+const stubLlm: LanguageModel.LanguageModel = {
+	[LanguageModel.TypeId]: LanguageModel.TypeId,
 	generateText: (_options: unknown) => Effect.succeed(stubResponse) as never,
 	generateObject: (_options: unknown) =>
 		Effect.succeed({
@@ -84,7 +85,7 @@ const stubLlm: LanguageModel.Service = {
 
 // The Agent tier wedges phase 1 for far longer than the run deadline, so the
 // only thing that can end the run is the deadline itself.
-const wedgedAgentLlm: LanguageModel.Service = {
+const wedgedAgentLlm: LanguageModel.LanguageModel = {
 	...stubLlm,
 	generateText: (_options: unknown) =>
 		Effect.sleep('60 seconds').pipe(Effect.as(stubResponse)) as never,

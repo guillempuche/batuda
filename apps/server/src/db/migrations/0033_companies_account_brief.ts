@@ -1,5 +1,5 @@
 import { Effect } from 'effect'
-import { SqlClient } from 'effect/unstable/sql'
+import { SqlClient } from 'effect/sql'
 
 // What a salesperson needs to know about a company before picking up the phone,
 // and where each piece of it came from.

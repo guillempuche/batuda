@@ -3,10 +3,10 @@
 // concurrently. So the order among them is not something a merge list decides.
 //
 // It matters because a middleware that answers a caller itself, without passing
-// the request on, hides everything registered after it. The MCP sign-in check
-// does exactly that for a refused caller, so anything below it never runs for a
+// the request on, hides everything registered after it. A router-wide check that
+// refuses a caller does exactly that, so anything below it never runs for a
 // refusal: observability would write no record of the request, and CORS would
-// add no headers to the challenge telling a browser client how to authenticate.
+// add no headers to the answer telling a browser client why.
 //
 // These drive a real in-process server through `withGlobalMiddlewareOrder` —
 // the same function `main.ts` uses, rather than a copy of it, so re-flattening
@@ -22,7 +22,7 @@ import {
 	HttpServer,
 	HttpServerRequest,
 	HttpServerResponse,
-} from 'effect/unstable/http'
+} from 'effect/http'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 
 import { applyTestEnv, TEST_ENV } from '../test-env'
@@ -43,10 +43,10 @@ const CaptureLogs = Logger.layer([
 	}),
 ]).pipe(Layer.provideMerge(Layer.succeed(References.MinimumLogLevel, 'Debug')))
 
-// Stands in for the MCP sign-in check, in the same shape: refuse this route by
+// Stands in for a router-wide check that refuses a caller: refuse this route by
 // answering the caller directly, and pass anything else on untouched. What it
-// authenticates is beside the point — answering without calling onward is what
-// hides every middleware registered after it.
+// checks is beside the point — answering without calling onward is what hides
+// every middleware registered after it.
 const RefusingMiddleware = HttpRouter.middleware(
 	HttpMiddleware.make(app =>
 		Effect.gen(function* () {
@@ -95,7 +95,7 @@ describe('a request refused by a middleware that never passes it on', () => {
 				return server.address
 			}),
 		)
-		if (address._tag !== 'TcpAddress')
+		if (address._tag === 'UnixPathAddress')
 			throw new Error('expected a TCP address for the test server')
 		baseUrl = `http://127.0.0.1:${address.port}`
 	}, 30_000)

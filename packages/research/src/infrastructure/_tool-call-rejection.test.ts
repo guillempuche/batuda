@@ -1,5 +1,5 @@
 import { Cause, Effect, Exit } from 'effect'
-import { AiError } from 'effect/unstable/ai'
+import { AiError } from 'effect/ai'
 import { describe, expect, it } from 'vitest'
 
 import { reclassifyRejectedToolCall } from './_tool-call-rejection'

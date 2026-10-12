@@ -1,9 +1,10 @@
 import { DateTime, Effect, Schema } from 'effect'
-import { HttpApiBuilder } from 'effect/unstable/httpapi'
+import { HttpApiBuilder } from 'effect/http-api'
 
 import { BatudaApi, NotFound, SessionContext } from '@batuda/controllers'
 import { TaskEvent } from '@batuda/domain'
 
+import { jsonColumn } from '../lib/pg-params'
 import { TaskService } from '../services/tasks'
 
 const decodeTaskEvents = Schema.decodeUnknownEffect(Schema.Array(TaskEvent))
@@ -87,7 +88,7 @@ export const TasksLive = HttpApiBuilder.group(BatudaApi, 'tasks', handlers =>
 							linked_calendar_event_id: _.payload.linkedCalendarEventId ?? null,
 							linked_thread_link_id: _.payload.linkedThreadLinkId ?? null,
 							linked_proposal_id: _.payload.linkedProposalId ?? null,
-							metadata: _.payload.metadata ?? null,
+							metadata: jsonColumn(_.payload.metadata),
 						},
 						{ id: actorId, kind: isAgent ? 'agent' : 'user' },
 					)
@@ -125,7 +126,10 @@ export const TasksLive = HttpApiBuilder.group(BatudaApi, 'tasks', handlers =>
 									: undefined,
 							companyId: _.payload.companyId,
 							contactId: _.payload.contactId,
-							metadata: _.payload.metadata,
+							metadata:
+								_.payload.metadata === undefined
+									? undefined
+									: jsonColumn(_.payload.metadata),
 						},
 						{ id: userId, kind: isAgent ? 'agent' : 'user' },
 						_.headers['if-match'],

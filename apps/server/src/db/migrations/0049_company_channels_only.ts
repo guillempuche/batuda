@@ -1,5 +1,5 @@
 import { Effect } from 'effect'
-import { SqlClient } from 'effect/unstable/sql'
+import { SqlClient } from 'effect/sql'
 
 // A company kept one mailbox, one telephone number, one website and one handle
 // per social network, each in a column of its own. Now that a way of reaching

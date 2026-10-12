@@ -3,8 +3,8 @@ import { request } from 'node:https'
 import { join, resolve } from 'node:path'
 
 import { Config, Effect, Option } from 'effect'
-import type { ChildProcessSpawner } from 'effect/unstable/process'
-import { SqlClient } from 'effect/unstable/sql'
+import type { ChildProcessSpawner } from 'effect/process'
+import { SqlClient } from 'effect/sql'
 
 import { SqlLive } from '../db'
 import { isLocalDatabaseHost, resolveDatabaseHost } from '../lib/database-host'
@@ -256,7 +256,7 @@ const emailCredentialKeyCheck: Check = {
 const mailCatcherCheck: Check = {
 	name: 'Mail catcher',
 	run: Effect.gen(function* () {
-		const url = yield* Config.string('MAIL_CATCHER_HTTP_URL')
+		const url = yield* Config.String('MAIL_CATCHER_HTTP_URL')
 		const res = yield* Effect.tryPromise({
 			try: () =>
 				fetch(`${url}/api/service/readiness`, {

@@ -11,9 +11,9 @@ import { DEMO_MEMBERSHIPS, DEMO_ORGS, DEMO_USERS } from './fixtures'
 
 export const seedIdentities = Effect.gen(function* () {
 	yield* Effect.logInfo('Seeding orgs, users, memberships...')
-	const dbUrl = yield* Config.redacted('DATABASE_URL')
-	const secret = yield* Config.string('BETTER_AUTH_SECRET')
-	const baseURL = yield* Config.string('BETTER_AUTH_BASE_URL').pipe(
+	const dbUrl = yield* Config.Redacted('DATABASE_URL')
+	const secret = yield* Config.String('BETTER_AUTH_SECRET')
+	const baseURL = yield* Config.String('BETTER_AUTH_BASE_URL').pipe(
 		Config.withDefault('http://localhost:3010'),
 	)
 

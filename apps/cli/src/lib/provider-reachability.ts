@@ -8,7 +8,7 @@
  */
 
 import { Effect } from 'effect'
-import { FetchHttpClient } from 'effect/unstable/http'
+import { FetchHttpClient } from 'effect/http'
 
 import {
 	hostOf,

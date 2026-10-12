@@ -3,7 +3,7 @@
 // the contract every MCP client relies on. New invariants belong here.
 
 import { Context, Effect, Schema } from 'effect'
-import { Tool } from 'effect/unstable/ai'
+import { Tool } from 'effect/ai'
 import { describe, expect, it } from 'vitest'
 
 import { CalendarTools } from './calendar'

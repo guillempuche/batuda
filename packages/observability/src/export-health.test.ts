@@ -6,11 +6,7 @@
 import { createServer, type Server } from 'node:http'
 
 import { Duration, Effect } from 'effect'
-import {
-	FetchHttpClient,
-	HttpClient,
-	HttpClientRequest,
-} from 'effect/unstable/http'
+import { FetchHttpClient, HttpClient, HttpClientRequest } from 'effect/http'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 
 import {

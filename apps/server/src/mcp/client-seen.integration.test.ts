@@ -8,7 +8,7 @@ import { randomUUID } from 'node:crypto'
 
 import type { PgClient } from '@effect/sql-pg'
 import { type Config, Effect, ManagedRuntime } from 'effect'
-import { SqlClient, type SqlError } from 'effect/unstable/sql'
+import { SqlClient, type SqlError } from 'effect/sql'
 import pg from 'pg'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 

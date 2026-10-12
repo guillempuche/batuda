@@ -1,9 +1,11 @@
 import { createHmac } from 'node:crypto'
 
 import { Cause, Context, DateTime, Effect, Layer } from 'effect'
-import { SqlClient } from 'effect/unstable/sql'
+import { SqlClient } from 'effect/sql'
 
 import { CurrentOrg } from '@batuda/controllers'
+
+import { textArray } from '../lib/pg-params'
 
 const hmacSign = (secret: string | null, payload: unknown): string => {
 	if (!secret) return ''
@@ -25,6 +27,13 @@ export const matchingEndpoints = (
 	event: string,
 ): ReadonlyArray<WebhookEndpoint> =>
 	endpoints.filter(ep => ep.events.includes(event))
+
+// The event list as `text[]`, so an endpoint listening for nothing yet is not
+// refused for it.
+const withEventList = (data: Record<string, unknown>) =>
+	Array.isArray(data['events'])
+		? { ...data, events: textArray(data['events']) }
+		: data
 
 export class WebhookService extends Context.Service<WebhookService>()(
 	'WebhookService',
@@ -128,14 +137,14 @@ export class WebhookService extends Context.Service<WebhookService>()(
 				create: (data: Record<string, unknown>) =>
 					Effect.gen(function* () {
 						const currentOrg = yield* CurrentOrg
-						return yield* sql`INSERT INTO webhook_endpoints ${sql.insert({ ...data, organizationId: currentOrg.id })} RETURNING *`
+						return yield* sql`INSERT INTO webhook_endpoints ${sql.insert({ ...withEventList(data), organizationId: currentOrg.id })} RETURNING *`
 					}),
 
 				update: (id: string, data: Record<string, unknown>) =>
 					Effect.gen(function* () {
 						const currentOrg = yield* CurrentOrg
 						return yield* sql`
-							UPDATE webhook_endpoints SET ${sql.update(data, ['id'])}
+							UPDATE webhook_endpoints SET ${sql.update(withEventList(data), ['id'])}
 							WHERE id = ${id} AND organization_id = ${currentOrg.id}
 							RETURNING *
 						`

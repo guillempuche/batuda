@@ -1,5 +1,5 @@
 import { Effect } from 'effect'
-import { SqlClient } from 'effect/unstable/sql'
+import { SqlClient } from 'effect/sql'
 
 // Single-initial-migration policy: this file is the only schema source of
 // truth. Every CREATE TABLE here is the table's final shape — no

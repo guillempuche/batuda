@@ -1,5 +1,5 @@
 import { Effect } from 'effect'
-import { SqlClient } from 'effect/unstable/sql'
+import { SqlClient } from 'effect/sql'
 
 // A company could say where each of its facts came from; a person could not.
 // All a contact carried was which runs had touched the row at all — useful for

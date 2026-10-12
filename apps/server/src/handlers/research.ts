@@ -1,6 +1,6 @@
 import { Effect, Ref, Schema, Stream } from 'effect'
-import { HttpApiBuilder } from 'effect/unstable/httpapi'
-import { SqlClient } from 'effect/unstable/sql'
+import { HttpApiBuilder } from 'effect/http-api'
+import { SqlClient } from 'effect/sql'
 
 import {
 	BatudaApi,

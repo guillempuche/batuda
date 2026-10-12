@@ -1,7 +1,9 @@
 import { Effect, Schema } from 'effect'
-import { McpSchema, McpServer } from 'effect/unstable/ai'
+import { McpSchema, McpServer } from 'effect/ai'
 
 import { ResearchService } from '@batuda/research'
+
+import { inMcpOrgScope } from '../org-scope'
 
 const idParam = McpSchema.param('id', Schema.String)
 
@@ -16,5 +18,5 @@ export const ResearchResource =
 			const svc = yield* ResearchService
 			const run = yield* svc.get(id)
 			return JSON.stringify(run, null, 2)
-		}),
+		}, inMcpOrgScope),
 	})

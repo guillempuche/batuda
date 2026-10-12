@@ -1,9 +1,10 @@
 import { Effect, Schema } from 'effect'
-import { McpServer } from 'effect/unstable/ai'
-import { SqlClient } from 'effect/unstable/sql'
+import { McpServer } from 'effect/ai'
+import { SqlClient } from 'effect/sql'
 
 import { CompanyService } from '../../services/companies'
 import { companyVisible } from '../../services/company-liveness'
+import { inMcpOrgScope } from '../org-scope'
 import { completeCompanySlug } from './_completions'
 import { LangParam, langDirective } from './_lang'
 
@@ -17,26 +18,27 @@ export const CompanyResearchPrompt = McpServer.prompt({
 	},
 	completion: { slug: completeCompanySlug },
 	content: ({ slug, lang }) =>
-		Effect.gen(function* () {
-			const service = yield* CompanyService
-			const rawData = yield* service.getWithRelations(slug)
-			const data = rawData as Record<string, unknown>
-			const sql = yield* SqlClient.SqlClient
-			const companyId = data['id'] as string
-			const docs = yield* sql`
+		inMcpOrgScope(
+			Effect.gen(function* () {
+				const service = yield* CompanyService
+				const rawData = yield* service.getWithRelations(slug)
+				const data = rawData as Record<string, unknown>
+				const sql = yield* SqlClient.SqlClient
+				const companyId = data['id'] as string
+				const docs = yield* sql`
 				SELECT d.id, d.type, d.title FROM documents d
 				JOIN document_links dl ON dl.document_id = d.id
 				WHERE dl.subject_table = 'companies' AND dl.subject_id = ${companyId}
 				ORDER BY d.updated_at DESC
 			`
-			const tasks = yield* sql`
+				const tasks = yield* sql`
 					SELECT * FROM tasks
 					WHERE company_id = ${companyId} AND completed_at IS NULL
 						AND ${companyVisible(sql, sql`company_id`)}
 					ORDER BY due_at
 				`
 
-			return `${langDirective(lang)}
+				return `${langDirective(lang)}
 
 You are preparing a research brief for ${data['name']}.
 
@@ -56,5 +58,6 @@ Produce:
 4. Pain points and product fit analysis
 5. Open tasks and pending actions
 6. Recommended next steps and talking points`
-		}),
+			}),
+		),
 })

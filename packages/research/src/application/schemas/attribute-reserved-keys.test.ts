@@ -1,4 +1,4 @@
-import { Tool } from 'effect/unstable/ai'
+import { Tool } from 'effect/ai'
 import { describe, expect, it } from 'vitest'
 
 import { ATTRIBUTE_RESERVED_KEYS } from '@batuda/domain'

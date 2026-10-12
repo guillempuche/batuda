@@ -1,5 +1,5 @@
 import { Effect } from 'effect'
-import { SqlClient } from 'effect/unstable/sql'
+import { SqlClient } from 'effect/sql'
 
 // A user's default instruction stack can either REPLACE the org default (the
 // original behavior) or EXTEND it — resolving as the live org default followed

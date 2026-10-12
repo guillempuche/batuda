@@ -1,6 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { Effect } from 'effect'
-import { AsyncResult } from 'effect/unstable/reactivity'
+import { AsyncResult } from 'effect/reactivity'
 
 import { RUN_LIST_FIRST_PAGE, researchRunsAtom } from '#/atoms/research-atoms'
 import { ResearchRuns } from '#/components/research/run-list'

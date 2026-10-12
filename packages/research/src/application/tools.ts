@@ -24,7 +24,7 @@ import {
 	OpenAiStructuredOutput,
 	Tool,
 	Toolkit,
-} from 'effect/unstable/ai'
+} from 'effect/ai'
 
 import { AcceptedCountryParam, isRegistryCountry } from '../domain/country'
 import {

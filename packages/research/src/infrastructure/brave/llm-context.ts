@@ -21,7 +21,7 @@
  */
 
 import { Config, Effect, Redacted, Schema } from 'effect'
-import { HttpClient, HttpClientResponse } from 'effect/unstable/http'
+import { HttpClient, HttpClientResponse } from 'effect/http'
 
 import { clipText } from '@batuda/domain'
 
@@ -67,7 +67,7 @@ const LlmContextResponse = Schema.Struct({
 
 export const makeBraveLlmContextSearch = (slot: number) =>
 	Effect.gen(function* () {
-		const apiKey = yield* Config.redacted(
+		const apiKey = yield* Config.Redacted(
 			keyForSlot('RESEARCH_API_KEY_SEARCH', slot),
 		)
 		const client = yield* HttpClient.HttpClient

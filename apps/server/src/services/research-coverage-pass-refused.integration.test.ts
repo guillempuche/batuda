@@ -9,7 +9,7 @@ process.env['RESEARCH_MAX_LOOP_PROMPT_TOKENS'] ??= '24000'
 import { createHash, randomUUID } from 'node:crypto'
 
 import { Effect, Layer, ManagedRuntime, Stream } from 'effect'
-import type { LanguageModel } from 'effect/unstable/ai'
+import { LanguageModel } from 'effect/ai'
 import pg from 'pg'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
@@ -55,7 +55,8 @@ const usage = {
 // once its retries are spent.
 const PASSES_BEFORE_COVERING = 2
 let agentCalls = 0
-const agentLlm: LanguageModel.Service = {
+const agentLlm: LanguageModel.LanguageModel = {
+	[LanguageModel.TypeId]: LanguageModel.TypeId,
 	generateText: () =>
 		Effect.suspend(() => {
 			agentCalls += 1
@@ -102,7 +103,8 @@ const agentLlm: LanguageModel.Service = {
 // cover; every extraction after it comes back empty, which is thin enough to
 // leave both trades unanswered and send the run into the covering loop.
 let extractCalls = 0
-const extractLlm: LanguageModel.Service = {
+const extractLlm: LanguageModel.LanguageModel = {
+	[LanguageModel.TypeId]: LanguageModel.TypeId,
 	generateText: () => Effect.succeed({ text: '', content: [], usage }) as never,
 	generateObject: () =>
 		Effect.suspend(() => {
@@ -126,7 +128,8 @@ const extractLlm: LanguageModel.Service = {
 		Stream.succeed({ type: 'text-delta' as const, delta: '' }) as never,
 }
 
-const writerLlm: LanguageModel.Service = {
+const writerLlm: LanguageModel.LanguageModel = {
+	[LanguageModel.TypeId]: LanguageModel.TypeId,
 	generateText: () =>
 		Effect.succeed({
 			text: 'No prospects found.',

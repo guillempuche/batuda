@@ -184,7 +184,7 @@ describe('parseKeepRate', () => {
 			// GIVEN a typo — a comma decimal, a word, an infinity
 			// WHEN parsed
 			// THEN everything is kept. A knob that only thins traces must never
-			// stop the process, and `Config.number` would fail the whole config
+			// stop the process, and `Config.Number` would fail the whole config
 			expect(parseKeepRate('0,25')).toBe(1)
 			expect(parseKeepRate('half')).toBe(1)
 			expect(parseKeepRate('Infinity')).toBe(1)

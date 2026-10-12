@@ -13,7 +13,7 @@
 import { randomUUID } from 'node:crypto'
 
 import { Effect, Layer, Schema } from 'effect'
-import { FetchHttpClient } from 'effect/unstable/http'
+import { FetchHttpClient } from 'effect/http'
 import pg from 'pg'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 

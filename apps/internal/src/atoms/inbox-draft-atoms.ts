@@ -1,4 +1,4 @@
-import { Atom } from 'effect/unstable/reactivity'
+import { Atom } from 'effect/reactivity'
 
 /**
  * In-progress draft for the "Connect mailbox" form, kept in a global atom so a

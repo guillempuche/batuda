@@ -1,6 +1,6 @@
 import { Layer } from 'effect'
-import * as FetchHttpClient from 'effect/unstable/http/FetchHttpClient'
-import { AtomHttpApi } from 'effect/unstable/reactivity'
+import * as FetchHttpClient from 'effect/http/FetchHttpClient'
+import { AtomHttpApi } from 'effect/reactivity'
 
 import { BatudaApi } from '@batuda/controllers'
 

@@ -1,5 +1,5 @@
 import { Effect } from 'effect'
-import { SqlClient } from 'effect/unstable/sql'
+import { SqlClient } from 'effect/sql'
 
 // Which country a company is in — the global geographic segment the CRM filters
 // and groups by. An ISO 3166-1 alpha-2 code (e.g. US, ES, DE), nullable until

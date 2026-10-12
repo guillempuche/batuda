@@ -4,13 +4,14 @@ process.env['DATABASE_URL'] ??=
 	'postgresql://batuda:batuda@localhost:5433/batuda'
 
 import { Effect, Exit, Layer } from 'effect'
-import { SqlClient } from 'effect/unstable/sql'
+import { SqlClient } from 'effect/sql'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 
 import { CurrentOrg, SessionContext } from '@batuda/controllers'
 import { TimelineActivityService } from '@batuda/timeline'
 
 import { PgLive } from '../db/client.js'
+import { textArray } from '../lib/pg-params'
 import { enterOrgScope } from '../middleware/org.js'
 import { CalendarService } from './calendar.js'
 import { CredentialCrypto } from './credential-crypto.js'
@@ -189,9 +190,9 @@ const insertDraft = (inboxId: string) =>
 				organizationId: ORG,
 				inboxId,
 				mode: 'new',
-				toAddresses: [],
-				ccAddresses: [],
-				bccAddresses: [],
+				toAddresses: textArray([]),
+				ccAddresses: textArray([]),
+				bccAddresses: textArray([]),
 				subject: 'private thoughts',
 				bodyJson: '[]',
 			})}

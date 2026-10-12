@@ -12,8 +12,8 @@ import {
 	Option,
 	type Redacted,
 } from 'effect'
-import { FetchHttpClient } from 'effect/unstable/http'
-import { SqlClient } from 'effect/unstable/sql'
+import { FetchHttpClient } from 'effect/http'
+import { SqlClient } from 'effect/sql'
 
 import { isTerminalResearchStatus } from '@batuda/domain'
 import { makeOtlpObservability } from '@batuda/observability'
@@ -135,7 +135,7 @@ export const researchProbe = (opts: {
 	readonly models: ReadonlyArray<string>
 }) =>
 	Effect.gen(function* () {
-		const apiKey = yield* Config.redacted(opts.apiKeyEnv)
+		const apiKey = yield* Config.Redacted(opts.apiKeyEnv)
 		const tools = researchToolkitWireFormat()
 		yield* Console.log(
 			`Probing ${opts.models.length} model(s) at ${opts.baseUrl} with ${tools.length} research tool(s)\n`,
@@ -187,7 +187,7 @@ export const researchProbeConfig = () =>
 
 		for (const slot of slots) {
 			const where = `${slot.tier} slot ${slot.slot} — ${slot.model} on ${slot.vendor}`
-			const apiKey = yield* Config.redacted(slot.apiKeyEnv).pipe(
+			const apiKey = yield* Config.Redacted(slot.apiKeyEnv).pipe(
 				Effect.map(Option.some),
 				Effect.orElseSucceed(() => Option.none<Redacted.Redacted<string>>()),
 			)
@@ -286,7 +286,7 @@ const researchLive = ResearchService.layer.pipe(
 
 const systemDefaults = Effect.gen(function* () {
 	const readCents = (name: string, fallback: number) =>
-		Config.int(name).pipe(Config.withDefault(fallback))
+		Config.Int(name).pipe(Config.withDefault(fallback))
 	return {
 		budgetCents: yield* readCents('RESEARCH_DEFAULT_BUDGET_CENTS', 100),
 		paidBudgetCents: yield* readCents(
@@ -1079,10 +1079,10 @@ export const researchEval = (opts: {
 
 		// Tag the run's spans so a drift chart can group quality by which models
 		// produced it; the endpoint/commit ride the OTLP resource, not here.
-		const agentModel = yield* Config.string('RESEARCH_LLM_AGENT_MODEL').pipe(
+		const agentModel = yield* Config.String('RESEARCH_LLM_AGENT_MODEL').pipe(
 			Config.withDefault('unknown'),
 		)
-		const extractModel = yield* Config.string(
+		const extractModel = yield* Config.String(
 			'RESEARCH_LLM_EXTRACT_MODEL',
 		).pipe(Config.withDefault('unknown'))
 		yield* Effect.annotateCurrentSpan({

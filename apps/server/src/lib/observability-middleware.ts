@@ -4,7 +4,7 @@ import {
 	HttpRouter,
 	HttpServerError,
 	HttpServerRequest,
-} from 'effect/unstable/http'
+} from 'effect/http'
 
 import { boundedCause, makeWorkRecord, WorkRecord } from '@batuda/observability'
 

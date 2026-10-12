@@ -1,5 +1,5 @@
 import { Effect } from 'effect'
-import { SqlClient } from 'effect/unstable/sql'
+import { SqlClient } from 'effect/sql'
 
 // These two tables held a per-person allowance of a provider's monthly credits
 // and how many of them that person had used. Nothing ever counted against them:

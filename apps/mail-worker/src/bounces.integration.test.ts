@@ -36,6 +36,7 @@ const PgLive = PgClient.layerConfig({
 	url: Config.succeed(Redacted.make(DATABASE_URL)),
 	transformResultNames: Config.succeed(snakeToCamel),
 	transformQueryNames: Config.succeed(camelToSnake),
+	prepare: Config.succeed(false),
 })
 
 const ORG_ID = `bounce-org-${randomUUID()}`

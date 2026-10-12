@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { NodeServices } from '@effect/platform-node'
 import * as PgMigrator from '@effect/sql-pg/PgMigrator'
 import { Layer } from 'effect'
-import { Migrator } from 'effect/unstable/sql'
+import { Migrator } from 'effect/sql'
 
 import { PgLive } from './client'
 

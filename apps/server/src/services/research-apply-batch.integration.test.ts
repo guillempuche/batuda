@@ -10,7 +10,8 @@
 import { randomUUID } from 'node:crypto'
 
 import { Effect, Layer } from 'effect'
-import { FetchHttpClient } from 'effect/unstable/http'
+import { FetchHttpClient } from 'effect/http'
+import { SqlClient } from 'effect/sql'
 import pg from 'pg'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
@@ -43,6 +44,23 @@ const deps = Layer.mergeAll(
 
 const runBatch = (items: ReadonlyArray<BatchResolveItem>) =>
 	resolveResearchProposedUpdatesBatch(items, 'u1').pipe(
+		Effect.provideService(CurrentOrg, {
+			id: ORG,
+			name: 'b',
+			slug: 'b',
+			role: 'member',
+		}),
+		Effect.provide(deps),
+		Effect.orDie,
+		Effect.runPromise,
+	)
+
+// The same batch run inside one transaction, the way a request runs it. A
+// proposal Postgres refuses must not take the rest of the batch down with it.
+const runBatchInTransaction = (items: ReadonlyArray<BatchResolveItem>) =>
+	Effect.flatMap(SqlClient.SqlClient, sql =>
+		sql.withTransaction(resolveResearchProposedUpdatesBatch(items, 'u1')),
+	).pipe(
 		Effect.provideService(CurrentOrg, {
 			id: ORG,
 			name: 'b',
@@ -390,6 +408,68 @@ describe('applying a company address a run found', () => {
 			// nothing was written on the way to refusing it
 			expect(outcome?.outcome).toBe('conflict')
 			expect((await companyAddresses()).rows).toHaveLength(before)
+		})
+	})
+
+	describe('when the batch runs inside a transaction and Postgres refuses one item', () => {
+		it('should still land the others and commit', async () => {
+			// GIVEN a run with a proposal naming an id that is not a uuid, which
+			// Postgres refuses outright, beside one that is valid
+			const version = await pool.query<{ version: number }>(
+				`SELECT version FROM contacts WHERE id = $1`,
+				[contactId],
+			)
+			const run = await pool.query<{ id: string }>(
+				`INSERT INTO research_runs (organization_id, query, status, created_by, findings)
+				 VALUES ($1, 'q', 'succeeded', 'u1', $2::jsonb) RETURNING id`,
+				[
+					ORG,
+					JSON.stringify({
+						proposed_updates: [
+							proposal({
+								id: 'tx-bad',
+								subject_table: 'contacts',
+								operation: 'update',
+								subject_id: 'not-a-uuid',
+								expected_version: 0,
+								fields: { role: 'Ghost' },
+							}),
+							proposal({
+								id: 'tx-good',
+								subject_table: 'contacts',
+								operation: 'update',
+								subject_id: contactId,
+								expected_version: version.rows[0]?.version ?? 0,
+								fields: { role: 'Head of Ops' },
+							}),
+						],
+					}),
+				],
+			)
+			const runIdInTx = run.rows[0]!.id
+
+			// WHEN both are applied in one transaction
+			const outcomes = await runBatchInTransaction([
+				{
+					researchId: runIdInTx,
+					proposedUpdateId: 'tx-bad',
+					decision: 'apply',
+				},
+				{
+					researchId: runIdInTx,
+					proposedUpdateId: 'tx-good',
+					decision: 'apply',
+				},
+			])
+
+			// THEN the refused one is reported as invalid, the valid one applied,
+			// and the transaction committed what it applied
+			expect(outcomes.map(o => o.outcome)).toEqual(['invalid', 'applied'])
+			const role = await pool.query<{ role: string }>(
+				`SELECT role FROM contacts WHERE id = $1`,
+				[contactId],
+			)
+			expect(role.rows[0]?.role).toBe('Head of Ops')
 		})
 	})
 })

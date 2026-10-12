@@ -11,11 +11,7 @@ import { createServer } from 'node:http'
 
 import { NodeHttpServer } from '@effect/platform-node'
 import { Effect, Layer, ManagedRuntime, Tracer } from 'effect'
-import {
-	HttpRouter,
-	HttpServer,
-	HttpServerResponse,
-} from 'effect/unstable/http'
+import { HttpRouter, HttpServer, HttpServerResponse } from 'effect/http'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 // Names of the spans opened for an incoming request, in the order they opened.
@@ -62,7 +58,7 @@ describe('the span a request leaves behind', () => {
 				return server.address
 			}),
 		)
-		if (address._tag !== 'TcpAddress')
+		if (address._tag === 'UnixPathAddress')
 			throw new Error('expected a TCP address for the test server')
 		baseUrl = `http://127.0.0.1:${address.port}`
 	}, 30_000)
@@ -79,7 +75,7 @@ describe('the span a request leaves behind', () => {
 
 			// THEN one span was opened, not two
 			expect(response.status).toBe(200)
-			expect(serverSpans).toEqual(['http.server GET'])
+			expect(serverSpans).toEqual(['GET'])
 		})
 	})
 
@@ -93,14 +89,14 @@ describe('the span a request leaves behind', () => {
 
 			// THEN the caller is answered and the request left one span
 			expect(response.status).toBe(500)
-			expect(serverSpans).toEqual(['http.server GET'])
+			expect(serverSpans).toEqual(['GET'])
 
 			// AND the server is still there for the next caller — nothing about the
 			// defect reached the scope holding the server
 			serverSpans.length = 0
 			const next = await fetch(`${baseUrl}/ok`)
 			expect(next.status).toBe(200)
-			expect(serverSpans).toEqual(['http.server GET'])
+			expect(serverSpans).toEqual(['GET'])
 		})
 	})
 })

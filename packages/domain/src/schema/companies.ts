@@ -1,5 +1,5 @@
 import { Schema, SchemaGetter } from 'effect'
-import { Model } from 'effect/unstable/schema'
+import { Model } from 'effect/schema'
 
 import { DbNumberOrNull } from './_common'
 import {

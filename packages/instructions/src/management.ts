@@ -1,10 +1,10 @@
 import { Effect } from 'effect'
-import { SqlClient } from 'effect/unstable/sql'
+import { SqlClient } from 'effect/sql'
 
 import type { Agent, InstructionTemplate } from './domain'
 import { classifyStackTemplates } from './management-logic'
 import type { StackComposition } from './resolver'
-import { type Eff, isUniqueViolation } from './sql'
+import { type Eff, inSavepoint, isUniqueViolation } from './sql'
 
 // SQL-only management operations for instruction templates and default stacks.
 // They run as the request-scoped role, so RLS already limits what
@@ -435,6 +435,7 @@ export const createStack = (input: CreateStackInput): Eff<StackWriteResult> =>
 		yield* writeItems(sql, input.organizationId, row.id, input.templateIds)
 		return { ok: true as const, stack: yield* toSummary(sql, row) }
 	}).pipe(
+		inSavepoint,
 		Effect.catchTag('SqlError', err =>
 			isUniqueViolation(err)
 				? Effect.succeed({
@@ -488,6 +489,7 @@ export const updateStack = (
 		const updated = yield* getStack(id)
 		return updated ? { ok: true as const, stack: updated } : 'not_found'
 	}).pipe(
+		inSavepoint,
 		Effect.catchTag('SqlError', err =>
 			isUniqueViolation(err)
 				? Effect.succeed({

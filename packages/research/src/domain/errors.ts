@@ -8,7 +8,7 @@ import { Schema } from 'effect'
 // are built from follows the other domain packages rather than any need here.
 
 /** External provider call failed (Firecrawl, Exa, libreBORME, etc.). */
-export class ProviderError extends Schema.TaggedErrorClass<ProviderError>()(
+export class ProviderError extends Schema.TaggedError<ProviderError>()(
 	'ProviderError',
 	{
 		provider: Schema.String,
@@ -84,22 +84,29 @@ export const REJECTED_TOOL_CALL = 'ToolParameterValidationError'
 export class RejectedToolCall extends ProviderError {
 	declare readonly toolName: string
 	declare readonly mistake: string
+	// Set when the model named a tool it was not given, listing the ones it was.
+	declare readonly availableTools: ReadonlyArray<string> | undefined
 
 	constructor(
 		fields: { readonly provider: string; readonly message: string },
 		toolName: string,
 		mistake: string,
+		availableTools?: ReadonlyArray<string>,
 	) {
 		super({ ...fields, recoverable: true, reason: REJECTED_TOOL_CALL })
 		// Kept off the enumerable properties: the error travels as provider +
-		// message + reason, and these two are for a caller here rather than for
-		// the wire.
+		// message + reason, and these are for a caller here rather than for the
+		// wire.
 		Object.defineProperty(this, 'toolName', {
 			value: toolName,
 			enumerable: false,
 		})
 		Object.defineProperty(this, 'mistake', {
 			value: mistake,
+			enumerable: false,
+		})
+		Object.defineProperty(this, 'availableTools', {
+			value: availableTools,
 			enumerable: false,
 		})
 	}
@@ -111,7 +118,7 @@ export const isRejectedToolCall = (err: unknown): err is RejectedToolCall =>
 	err instanceof RejectedToolCall
 
 /** Per-run resource budget (cheap or paid tier) exceeded. */
-export class BudgetExceeded extends Schema.TaggedErrorClass<BudgetExceeded>()(
+export class BudgetExceeded extends Schema.TaggedError<BudgetExceeded>()(
 	'BudgetExceeded',
 	{
 		tier: Schema.Literals(['cheap', 'paid-run']),
@@ -127,7 +134,7 @@ export class BudgetExceeded extends Schema.TaggedErrorClass<BudgetExceeded>()(
  * run, so carrying on would research whatever the free text alone suggests
  * and report it as if the record had been read.
  */
-export class SubjectUnavailable extends Schema.TaggedErrorClass<SubjectUnavailable>()(
+export class SubjectUnavailable extends Schema.TaggedError<SubjectUnavailable>()(
 	'SubjectUnavailable',
 	{
 		subjects: Schema.Array(
@@ -137,7 +144,7 @@ export class SubjectUnavailable extends Schema.TaggedErrorClass<SubjectUnavailab
 ) {}
 
 /** Per-user monthly paid spend cap exceeded. Terminal for the run. */
-export class MonthlyCapExceeded extends Schema.TaggedErrorClass<MonthlyCapExceeded>()(
+export class MonthlyCapExceeded extends Schema.TaggedError<MonthlyCapExceeded>()(
 	'MonthlyCapExceeded',
 	{
 		capCents: Schema.Number,
@@ -150,7 +157,7 @@ export class MonthlyCapExceeded extends Schema.TaggedErrorClass<MonthlyCapExceed
  * instead of spending; the model records it under findings.pending_paid_actions
  * for the user to approve (resolve_research_paid_action) rather than retrying.
  */
-export class ApprovalRequired extends Schema.TaggedErrorClass<ApprovalRequired>()(
+export class ApprovalRequired extends Schema.TaggedError<ApprovalRequired>()(
 	'ApprovalRequired',
 	{
 		tool: Schema.String,
@@ -174,12 +181,9 @@ export const approvalRequiredResult = (
  * not a failure. It marks the lookup as one to satisfy through universal
  * contact enrichment instead of a registry.
  */
-export class NoRegistry extends Schema.TaggedErrorClass<NoRegistry>()(
-	'NoRegistry',
-	{
-		country: Schema.String,
-	},
-) {}
+export class NoRegistry extends Schema.TaggedError<NoRegistry>()('NoRegistry', {
+	country: Schema.String,
+}) {}
 
 /** The no_registry outcome rendered as a plain result value. */
 /**
@@ -244,7 +248,7 @@ export const registryUnavailableResult = (country: string) => ({
  * ProviderError so it neither retries, cascades to another key, nor counts as a
  * tool failure.
  */
-export class UnsupportedSite extends Schema.TaggedErrorClass<UnsupportedSite>()(
+export class UnsupportedSite extends Schema.TaggedError<UnsupportedSite>()(
 	'UnsupportedSite',
 	{
 		provider: Schema.String,

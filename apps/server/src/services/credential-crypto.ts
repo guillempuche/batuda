@@ -69,7 +69,7 @@ export class CredentialCrypto extends Context.Service<CredentialCrypto>()(
 			// Read here rather than from the server-wide settings, the way the
 			// database connection reads its own url — nothing else uses it.
 			// Required, no default: boot fails rather than ship plaintext.
-			const key = yield* Config.redacted('EMAIL_CREDENTIAL_KEY')
+			const key = yield* Config.Redacted('EMAIL_CREDENTIAL_KEY')
 			const masterKey = Buffer.from(Redacted.value(key), 'base64')
 			if (masterKey.length !== 32) {
 				return yield* Effect.die(

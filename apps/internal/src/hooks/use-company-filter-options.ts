@@ -1,7 +1,7 @@
 import { useAtomValue } from '@effect/atom-react'
 import type { I18n } from '@lingui/core'
 import { useLingui } from '@lingui/react'
-import { AsyncResult } from 'effect/unstable/reactivity'
+import { AsyncResult } from 'effect/reactivity'
 import { useEffect, useMemo, useRef } from 'react'
 
 import type { CompaniesSearch } from '#/atoms/companies-atoms'

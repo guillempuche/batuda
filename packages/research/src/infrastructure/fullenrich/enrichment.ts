@@ -21,11 +21,7 @@
  */
 
 import { Config, Effect, Redacted, Schema } from 'effect'
-import {
-	HttpClient,
-	HttpClientRequest,
-	HttpClientResponse,
-} from 'effect/unstable/http'
+import { HttpClient, HttpClientRequest, HttpClientResponse } from 'effect/http'
 
 import type { VerificationVerdict } from '@batuda/domain'
 
@@ -140,7 +136,7 @@ export const fullEnrichStatusToVerdict = (
 
 export const makeFullEnrichEnrichment = (slot: number) =>
 	Effect.gen(function* () {
-		const apiKey = yield* Config.redacted(
+		const apiKey = yield* Config.Redacted(
 			keyForSlot('RESEARCH_API_KEY_ENRICH', slot),
 		)
 		const client = yield* HttpClient.HttpClient

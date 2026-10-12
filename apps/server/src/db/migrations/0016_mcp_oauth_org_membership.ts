@@ -1,5 +1,5 @@
 import { Effect } from 'effect'
-import { SqlClient } from 'effect/unstable/sql'
+import { SqlClient } from 'effect/sql'
 
 // Multi-organization MCP OAuth connections. The previous model bound a
 // `(user, client)` pair to exactly one organization via `mcp_oauth_org`

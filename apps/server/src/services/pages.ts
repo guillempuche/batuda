@@ -1,11 +1,13 @@
 import { Context, DateTime, Effect, Layer, Schema } from 'effect'
-import type { Statement } from 'effect/unstable/sql'
-import { SqlClient, type SqlError } from 'effect/unstable/sql'
+import type { Statement } from 'effect/sql'
+import { SqlClient, type SqlError } from 'effect/sql'
 
 import { CurrentOrg, NotFound, PageSummary } from '@batuda/controllers'
 import { Page } from '@batuda/domain'
 import { TiptapDocument } from '@batuda/ui/blocks'
 
+import { withJsonColumns } from '../lib/pg-params'
+import { inOwnSavepoint } from '../lib/savepoint'
 import {
 	type CountMode,
 	pageOf,
@@ -36,12 +38,12 @@ export interface CreatePageData {
 	readonly meta?: unknown
 }
 
-export class SlugRequired extends Schema.TaggedErrorClass<SlugRequired>()(
+export class SlugRequired extends Schema.TaggedError<SlugRequired>()(
 	'SlugRequired',
 	{ reason: Schema.String },
 ) {}
 
-export class SlugCollision extends Schema.TaggedErrorClass<SlugCollision>()(
+export class SlugCollision extends Schema.TaggedError<SlugCollision>()(
 	'SlugCollision',
 	{ attempts: Schema.Number },
 ) {}
@@ -65,7 +67,7 @@ export class PageService extends Context.Service<PageService>()('PageService', {
 		const companies = yield* CompanyService
 
 		const insertPage = (data: Record<string, unknown>, orgId: string) =>
-			sql`INSERT INTO pages ${sql.insert({ ...data, organizationId: orgId })} RETURNING *`
+			sql`INSERT INTO pages ${sql.insert({ ...withJsonColumns(data, ['content', 'meta']), organizationId: orgId })} RETURNING *`
 
 		const create = (data: CreatePageData) =>
 			Effect.gen(function* () {
@@ -93,6 +95,7 @@ export class PageService extends Context.Service<PageService>()('PageService', {
 						{ ...rest, companyId, slug: candidate },
 						currentOrg.id,
 					).pipe(
+						inOwnSavepoint(sql),
 						Effect.catch((err: SqlError.SqlError) =>
 							err.reason._tag === 'UniqueViolation' && attempt < maxAttempts
 								? Effect.succeed(null)
@@ -193,7 +196,7 @@ export class PageService extends Context.Service<PageService>()('PageService', {
 			create,
 
 			update: (id: string, data: Record<string, unknown>) =>
-				sql`UPDATE pages SET ${sql.update({ ...data, updatedAt: DateTime.toDateUtc(DateTime.nowUnsafe()) })} WHERE id = ${id} RETURNING *`.pipe(
+				sql`UPDATE pages SET ${sql.update({ ...withJsonColumns(data, ['content', 'meta']), updatedAt: DateTime.toDateUtc(DateTime.nowUnsafe()) })} WHERE id = ${id} RETURNING *`.pipe(
 					Effect.flatMap(decodePages),
 				),
 
