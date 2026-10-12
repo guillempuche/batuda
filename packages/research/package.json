@@ -56,8 +56,8 @@
 	"dependencies": {
 		"@batuda/domain": "workspace:*",
 		"@batuda/observability": "workspace:*",
-		"@effect/ai-openai-compat": "4.0.0-beta.102",
-		"effect": "4.0.0-beta.102"
+		"@effect/ai-openai-compat": "4.0.3",
+		"effect": "4.0.3"
 	},
 	"devDependencies": {
 		"@types/node": "^22.15.0",

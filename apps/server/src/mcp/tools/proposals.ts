@@ -1,11 +1,12 @@
 import { DateTime, Effect, Schema } from 'effect'
-import { Tool, Toolkit } from 'effect/unstable/ai'
-import { SqlClient } from 'effect/unstable/sql'
+import { Tool, Toolkit } from 'effect/ai'
+import { SqlClient } from 'effect/sql'
 
 import { CurrentOrg } from '@batuda/controllers'
 import { Proposal } from '@batuda/domain'
 import { ProposalEvent, TimelineActivityService } from '@batuda/timeline'
 
+import { jsonColumn } from '../../lib/pg-params'
 import { companyVisible } from '../../services/company-liveness'
 import { CompanyIdParam, ProposalIdParam } from './_ids'
 import { McpPageLimit, TruncatableResult, toTruncatable } from './_result'
@@ -120,7 +121,7 @@ export const ProposalHandlersLive = ProposalTools.toLayer(
 						organizationId: currentOrg.id,
 						companyId: params.company_id,
 						title: params.title,
-						lineItems: params.line_items,
+						lineItems: jsonColumn(params.line_items),
 					}
 					if (params.contact_id !== undefined)
 						row['contactId'] = params.contact_id
@@ -129,7 +130,8 @@ export const ProposalHandlersLive = ProposalTools.toLayer(
 					if (params.currency !== undefined) row['currency'] = params.currency
 					if (params.expires_at !== undefined)
 						row['expiresAt'] = params.expires_at
-					if (params.metadata !== undefined) row['metadata'] = params.metadata
+					if (params.metadata !== undefined)
+						row['metadata'] = jsonColumn(params.metadata)
 					const rows =
 						yield* sql`INSERT INTO proposals ${sql.insert(row)} RETURNING *`
 					const created = rows[0]
@@ -156,10 +158,12 @@ export const ProposalHandlersLive = ProposalTools.toLayer(
 					}
 					if (rest.status !== undefined) data['status'] = rest.status
 					if (rest.title !== undefined) data['title'] = rest.title
-					if (rest.line_items !== undefined) data['lineItems'] = rest.line_items
+					if (rest.line_items !== undefined)
+						data['lineItems'] = jsonColumn(rest.line_items)
 					if (rest.total_value !== undefined)
 						data['totalValue'] = rest.total_value
-					if (rest.metadata !== undefined) data['metadata'] = rest.metadata
+					if (rest.metadata !== undefined)
+						data['metadata'] = jsonColumn(rest.metadata)
 					// Stamp the send/first-response moments on the transition into each.
 					if (rest.status === 'sent' && before?.status !== 'sent') {
 						data['sentAt'] = DateTime.toDateUtc(DateTime.nowUnsafe())

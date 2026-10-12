@@ -1,5 +1,5 @@
 import { Effect } from 'effect'
-import { SqlClient } from 'effect/unstable/sql'
+import { SqlClient } from 'effect/sql'
 
 // AI instruction templates: a surface-neutral library of named prompt blocks,
 // owned by the org (owner_user_id NULL) or a user, that any agent composes into

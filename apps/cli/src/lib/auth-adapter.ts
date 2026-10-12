@@ -11,11 +11,11 @@ export const acquireAuthAdapter = (opts?: {
 	readonly magicLinkSender?: MagicLinkCallback
 }) =>
 	Effect.gen(function* () {
-		const dbUrl = yield* Config.redacted('DATABASE_URL')
-		const secret = yield* Config.string('BETTER_AUTH_SECRET')
+		const dbUrl = yield* Config.Redacted('DATABASE_URL')
+		const secret = yield* Config.String('BETTER_AUTH_SECRET')
 		const baseURL =
 			opts?.baseURL ??
-			(yield* Config.string('BETTER_AUTH_BASE_URL').pipe(
+			(yield* Config.String('BETTER_AUTH_BASE_URL').pipe(
 				Config.withDefault('http://localhost:3010'),
 			))
 		const pool = yield* acquirePgPool(Redacted.value(dbUrl))

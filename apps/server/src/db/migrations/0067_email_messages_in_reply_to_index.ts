@@ -1,5 +1,5 @@
 import { Effect } from 'effect'
-import { SqlClient } from 'effect/unstable/sql'
+import { SqlClient } from 'effect/sql'
 
 // Let the mail worker ask who answered a message.
 //

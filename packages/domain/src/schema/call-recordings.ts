@@ -1,5 +1,5 @@
 import { Schema } from 'effect'
-import { Model } from 'effect/unstable/schema'
+import { Model } from 'effect/schema'
 
 import { DbNumber } from './_common'
 
@@ -24,7 +24,8 @@ export class CallRecording extends Model.Class<CallRecording>('CallRecording')({
 	// Object storage location — `recordings/<companyId>/<ulid>.<ext>` shape.
 	storageKey: Schema.String,
 	mimeType: Schema.String,
-	// BIGINT — node-postgres returns it as a string; accept string-or-number.
+	// BIGINT, which the driver hands over as a bigint; the server reads it into a
+	// number before it reaches this schema.
 	byteSize: DbNumber,
 	// Optional — populated when the upload includes a duration hint or once
 	// transcription extracts it. Audio files alone don't always carry it.

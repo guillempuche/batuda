@@ -1,5 +1,5 @@
 import { Schema } from 'effect'
-import { Model } from 'effect/unstable/schema'
+import { Model } from 'effect/schema'
 
 export const TaskId = Schema.String.pipe(Schema.brand('TaskId'))
 

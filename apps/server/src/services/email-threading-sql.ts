@@ -1,4 +1,4 @@
-import type { SqlClient, Statement } from 'effect/unstable/sql'
+import type { SqlClient, Statement } from 'effect/sql'
 
 /**
  * Which messages are in a conversation, and which of them is the latest.

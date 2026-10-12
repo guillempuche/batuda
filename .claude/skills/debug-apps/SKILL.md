@@ -42,7 +42,7 @@ curl -sk https://api.batuda.localhost:$P/health 2>/dev/null && echo "OK" || echo
 Check the persistent log file at `apps/server/server.log` (survives `node --watch` reloads). Grep for:
 
 - `http.status=4` or `http.status=5` — failing requests
-- `cause=` or `level=Error` — crashes and errors
+- `cause=` or `level=ERROR` — crashes and errors
 - `cors allowed origins:` — verify CORS config
 - `Listening on` — last boot, which port
 

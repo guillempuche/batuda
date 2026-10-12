@@ -1,5 +1,5 @@
 import { Effect, Layer } from 'effect'
-import { HttpMiddleware, HttpRouter } from 'effect/unstable/http'
+import { HttpMiddleware, HttpRouter } from 'effect/http'
 
 import { EnvVars } from './env'
 import { matchOrigin } from './origin-match'

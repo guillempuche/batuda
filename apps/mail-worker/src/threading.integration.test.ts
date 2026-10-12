@@ -35,6 +35,7 @@ const PgLive = PgClient.layerConfig({
 	transformResultNames: Config.succeed(snakeToCamel),
 	transformQueryNames: Config.succeed(camelToSnake),
 	transformJson: Config.succeed(false),
+	prepare: Config.succeed(false),
 })
 
 const runWithSql = <A, E>(eff: Effect.Effect<A, E, never>) =>

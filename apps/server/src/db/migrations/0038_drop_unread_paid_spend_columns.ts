@@ -1,5 +1,5 @@
 import { Effect } from 'effect'
-import { SqlClient } from 'effect/unstable/sql'
+import { SqlClient } from 'effect/sql'
 
 // Three columns on the record of paid research nothing ever read back.
 //

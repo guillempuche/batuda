@@ -1,8 +1,9 @@
 import { Effect } from 'effect'
-import { McpServer } from 'effect/unstable/ai'
-import { SqlClient } from 'effect/unstable/sql'
+import { McpServer } from 'effect/ai'
+import { SqlClient } from 'effect/sql'
 
 import { PipelineService } from '../../services/pipeline'
+import { inMcpOrgScope } from '../org-scope'
 import { LangParam, langDirective } from './_lang'
 
 export const DailyBriefingPrompt = McpServer.prompt({
@@ -13,18 +14,19 @@ export const DailyBriefingPrompt = McpServer.prompt({
 		lang: LangParam,
 	},
 	content: ({ lang }) =>
-		Effect.gen(function* () {
-			const pipeline = yield* PipelineService
-			const data = yield* pipeline.getPipeline()
-			const next = yield* pipeline.getNextSteps(15)
-			const sql = yield* SqlClient.SqlClient
-			const recent = yield* sql`
+		inMcpOrgScope(
+			Effect.gen(function* () {
+				const pipeline = yield* PipelineService
+				const data = yield* pipeline.getPipeline()
+				const next = yield* pipeline.getNextSteps(15)
+				const sql = yield* SqlClient.SqlClient
+				const recent = yield* sql`
 				SELECT i.*, c.name as company_name, c.slug as company_slug
 				FROM interactions i JOIN companies c ON i.company_id = c.id
 				WHERE i.date >= now() - interval '3 days'
 				ORDER BY i.date DESC LIMIT 20`
 
-			return `${langDirective(lang)}
+				return `${langDirective(lang)}
 
 Daily CRM briefing:
 
@@ -49,5 +51,6 @@ Produce:
 Each company appears on one attention list only, so report it once, under that
 heading. Quote totals from counts rather than counting the rows quoted above:
 each list is capped, and the matching *Truncated flag says which were cut short.`
-		}),
+			}),
+		),
 })

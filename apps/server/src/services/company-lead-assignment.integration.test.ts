@@ -11,7 +11,7 @@ process.env['DATABASE_URL'] ??=
 import { randomUUID } from 'node:crypto'
 
 import { Effect, Layer } from 'effect'
-import { SqlClient } from 'effect/unstable/sql'
+import { SqlClient } from 'effect/sql'
 import pg from 'pg'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 

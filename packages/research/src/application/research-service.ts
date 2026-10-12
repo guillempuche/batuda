@@ -17,8 +17,8 @@ import {
 	Schema,
 	Stream,
 } from 'effect'
-import { Prompt } from 'effect/unstable/ai'
-import { SqlClient } from 'effect/unstable/sql'
+import { Prompt } from 'effect/ai'
+import { SqlClient } from 'effect/sql'
 
 import {
 	COMPANY_SIZE_RANGES,
@@ -258,10 +258,7 @@ import {
 import { recordSeenSource } from './source-record'
 import { enforceSourceTier, isFirstPartyHost } from './source-tier-guard'
 import { stripReasoning } from './strip-reasoning'
-import {
-	correctionForFailedRound,
-	toolkitAnsweringBadCalls,
-} from './tool-call-correction'
+import { correctionForFailedRound } from './tool-call-correction'
 import {
 	REGISTRY_LOOKUP_COST_CENTS,
 	SCRAPE_COST_CENTS,
@@ -1019,8 +1016,7 @@ export const queryPendingProposals = (
 	},
 ) =>
 	Effect.gen(function* () {
-		const conditions: Array<import('effect/unstable/sql').Statement.Fragment> =
-			[]
+		const conditions: Array<import('effect/sql').Statement.Fragment> = []
 		if (filters.researchId)
 			conditions.push(sql`research_id = ${filters.researchId}`)
 		if (filters.subjectTable)
@@ -1241,8 +1237,7 @@ export const queryPendingPaidActions = (
 	},
 ) =>
 	Effect.gen(function* () {
-		const conditions: Array<import('effect/unstable/sql').Statement.Fragment> =
-			[]
+		const conditions: Array<import('effect/sql').Statement.Fragment> = []
 		if (filters.researchId)
 			conditions.push(sql`research_id = ${filters.researchId}`)
 
@@ -2204,13 +2199,13 @@ export class ResearchService extends Context.Service<ResearchService>()(
 			// Heartbeat cadence, the staleness window before a run counts as crashed,
 			// and how often the sweep runs. These only tune timing, so a default is
 			// safe when a var is unset — unlike the vars that switch behavior on or off.
-			const heartbeatIntervalSeconds = yield* Config.int(
+			const heartbeatIntervalSeconds = yield* Config.Int(
 				'RESEARCH_HEARTBEAT_INTERVAL_SEC',
 			).pipe(Config.withDefault(30))
-			const orphanStaleSeconds = yield* Config.int(
+			const orphanStaleSeconds = yield* Config.Int(
 				'RESEARCH_ORPHAN_STALE_SEC',
 			).pipe(Config.withDefault(90))
-			const orphanSweepIntervalSeconds = yield* Config.int(
+			const orphanSweepIntervalSeconds = yield* Config.Int(
 				'RESEARCH_ORPHAN_SWEEP_INTERVAL_SEC',
 			).pipe(Config.withDefault(60))
 			// Whole-run wall-clock cap (applied on the run pipe below). Generous
@@ -2220,7 +2215,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 			// this package rather than a setting: an environment that sets nothing
 			// would otherwise run every one of those passes against the old, shorter
 			// clock, and reaching it fails the run and discards what it found.
-			const runDeadlineSeconds = yield* Config.int(
+			const runDeadlineSeconds = yield* Config.Int(
 				'RESEARCH_RUN_DEADLINE_SEC',
 			).pipe(Config.withDefault(3600))
 
@@ -2264,12 +2259,12 @@ export class ResearchService extends Context.Service<ResearchService>()(
 			// userId — releases round-robin across partitions so one tenant's
 			// burst cannot starve the rest. Capacity is fixed at service
 			// construction; changing it requires a restart.
-			const maxConcurrentFibersTotal = yield* Config.int(
+			const maxConcurrentFibersTotal = yield* Config.Int(
 				'RESEARCH_MAX_CONCURRENT_FIBERS_TOTAL',
 			)
 			// Hard cap on reflect-loop rounds per run. Bounds how far the agent can
 			// search, so it is required with no default — like the concurrency cap.
-			const maxAgentSteps = yield* Config.int('RESEARCH_MAX_AGENT_STEPS')
+			const maxAgentSteps = yield* Config.Int('RESEARCH_MAX_AGENT_STEPS')
 			// How many prompt tokens the reflect loop may reach before it stops
 			// searching. Required with no default — sized to the smallest context
 			// window that has to hold the transcript afterwards, which today is the
@@ -2278,23 +2273,23 @@ export class ResearchService extends Context.Service<ResearchService>()(
 			// pass, so a run that searches again stacks a further pass's transcript on
 			// top of it. Raising this without raising MAX_LOOP_PROMPT_CHARS too leaves
 			// the search stopping in the same place.
-			const maxLoopPromptTokens = yield* Config.int(
+			const maxLoopPromptTokens = yield* Config.Int(
 				'RESEARCH_MAX_LOOP_PROMPT_TOKENS',
 			)
 			// System ceiling on monthly paid spend; the per-call cap check takes the
 			// min of this and the user's cap. Already set in production config, with a
 			// default so local and test boots don't need it.
-			const monthlyCapHardCeilingCents = yield* Config.int(
+			const monthlyCapHardCeilingCents = yield* Config.Int(
 				'RESEARCH_MONTHLY_CAP_HARD_CEILING_CENTS',
 			).pipe(Config.withDefault(10000))
 			// What a company may spend on paid calls in a month before it has set a
 			// figure of its own.
-			const defaultMonthlyCapCents = yield* Config.int(
+			const defaultMonthlyCapCents = yield* Config.Int(
 				'RESEARCH_DEFAULT_PAID_MONTHLY_CAP_CENTS',
 			).pipe(Config.withDefault(3000))
 			// Most companies one selector run may fan out across, so a broad filter
 			// can't spawn an unbounded number of leaf runs.
-			const selectorMaxCompanies = yield* Config.int(
+			const selectorMaxCompanies = yield* Config.Int(
 				'RESEARCH_SELECTOR_MAX_COMPANIES',
 			).pipe(Config.withDefault(100))
 			const fiberSem = yield* PartitionedSemaphore.make<string>({
@@ -5539,9 +5534,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 					// model response into the plain data the loop decides on.
 					const phaseOutcome = yield* Effect.gen(function* () {
 						const budget = yield* Budget
-						// A call the model wrote wrongly comes back to it as a result
-						// rather than ending the round.
-						const toolkit = toolkitAnsweringBadCalls(yield* researchToolkit)
+						const toolkit = yield* researchToolkit
 						const scrape = yield* ScrapeProvider
 						const siteMap = yield* MapProvider
 						const registry = yield* RegistryRouter
@@ -8625,9 +8618,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 								country?: string
 								tags?: ReadonlyArray<string>
 							}
-							const conds: Array<
-								import('effect/unstable/sql').Statement.Fragment
-							> = [
+							const conds: Array<import('effect/sql').Statement.Fragment> = [
 								sql`organization_id = ${organizationId}`,
 								sql`deleted_at IS NULL`,
 							]
@@ -8955,9 +8946,9 @@ export class ResearchService extends Context.Service<ResearchService>()(
 					count?: 'exact' | 'none' | undefined
 				}) =>
 					Effect.gen(function* () {
-						const conditions: Array<
-							import('effect/unstable/sql').Statement.Fragment
-						> = [sql`r.status != 'deleted'`]
+						const conditions: Array<import('effect/sql').Statement.Fragment> = [
+							sql`r.status != 'deleted'`,
+						]
 						if (filters.createdBy)
 							conditions.push(sql`r.created_by = ${filters.createdBy}`)
 						// A comma-separated status asks for several at once — "everything

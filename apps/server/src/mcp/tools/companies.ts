@@ -1,6 +1,6 @@
 import { DateTime, Effect, Schema } from 'effect'
-import { Tool, Toolkit } from 'effect/unstable/ai'
-import { SqlClient } from 'effect/unstable/sql'
+import { Tool, Toolkit } from 'effect/ai'
+import { SqlClient } from 'effect/sql'
 
 import {
 	type AttributeRejected,

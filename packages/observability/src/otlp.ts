@@ -1,6 +1,6 @@
 import { Clock, Config, Duration, Effect, Layer, Tracer } from 'effect'
-import { FetchHttpClient, HttpClient } from 'effect/unstable/http'
-import { Otlp } from 'effect/unstable/observability'
+import { FetchHttpClient, HttpClient } from 'effect/http'
+import { Otlp } from 'effect/observability'
 
 import { buildMeta } from './build-meta'
 import {
@@ -242,12 +242,12 @@ export const makeOtlpObservability = (options: {
 			const cadence = { ...defaultCadence, ...options.cadence }
 			const health = options.health ?? exportHealth
 
-			const baseUrl = yield* Config.string('OTEL_EXPORTER_OTLP_ENDPOINT').pipe(
+			const baseUrl = yield* Config.String('OTEL_EXPORTER_OTLP_ENDPOINT').pipe(
 				Config.withDefault(''),
 			)
 			// Read above the disable guard, unlike the settings below it: whether
 			// export being off is ordinary or a fault depends on where this runs.
-			const environment = yield* Config.string('NODE_ENV').pipe(
+			const environment = yield* Config.String('NODE_ENV').pipe(
 				Config.withDefault('development'),
 			)
 
@@ -283,12 +283,12 @@ export const makeOtlpObservability = (options: {
 
 			// Read below the disable guard so a process with OTLP off (e.g. the
 			// mail-worker run locally) never needs these.
-			const headersRaw = yield* Config.string(
+			const headersRaw = yield* Config.String(
 				'OTEL_EXPORTER_OTLP_HEADERS',
 			).pipe(Config.withDefault(''))
 			// Read as text and parsed by `parseKeepRate`, which explains why: see
 			// there for what an unusable or out-of-range value does.
-			const keepRate = yield* Config.string('OTEL_TRACES_KEEP_RATE').pipe(
+			const keepRate = yield* Config.String('OTEL_TRACES_KEEP_RATE').pipe(
 				Config.withDefault('1'),
 				Config.map(parseKeepRate),
 			)

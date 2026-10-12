@@ -1,7 +1,7 @@
 import { Effect, Schema } from 'effect'
-import { Tool, Toolkit } from 'effect/unstable/ai'
-import type { SqlError } from 'effect/unstable/sql'
-import { SqlClient } from 'effect/unstable/sql'
+import { Tool, Toolkit } from 'effect/ai'
+import type { SqlError } from 'effect/sql'
+import { SqlClient } from 'effect/sql'
 
 import { CurrentOrg, SessionContext } from '@batuda/controllers'
 import {

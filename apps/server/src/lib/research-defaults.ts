@@ -16,22 +16,22 @@ export class ResearchDefaults extends Context.Service<ResearchDefaults>()(
 	'ResearchDefaults',
 	{
 		make: Effect.gen(function* () {
-			const budgetCents = yield* Config.int(
+			const budgetCents = yield* Config.Int(
 				'RESEARCH_DEFAULT_BUDGET_CENTS',
 			).pipe(Config.withDefault(100))
-			const paidBudgetCents = yield* Config.int(
+			const paidBudgetCents = yield* Config.Int(
 				'RESEARCH_DEFAULT_PAID_BUDGET_CENTS',
 			).pipe(Config.withDefault(500))
-			const autoApprovePaidCents = yield* Config.int(
+			const autoApprovePaidCents = yield* Config.Int(
 				'RESEARCH_DEFAULT_AUTO_APPROVE_PAID_CENTS',
 			).pipe(Config.withDefault(200))
-			const paidMonthlyCapCents = yield* Config.int(
+			const paidMonthlyCapCents = yield* Config.Int(
 				'RESEARCH_DEFAULT_PAID_MONTHLY_CAP_CENTS',
 			).pipe(Config.withDefault(2000))
 			// The most anyone may raise the monthly cap to. A ceiling on the
 			// ceiling: raising a limit is asked about, but nobody should be able to
 			// agree to an unbounded one.
-			const hardCeiling = yield* Config.int(
+			const hardCeiling = yield* Config.Int(
 				'RESEARCH_MONTHLY_CAP_HARD_CEILING_CENTS',
 			).pipe(Config.withDefault(10_000))
 			return {

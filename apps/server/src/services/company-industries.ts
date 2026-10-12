@@ -18,7 +18,7 @@
  */
 
 import { Effect } from 'effect'
-import type { SqlClient } from 'effect/unstable/sql'
+import type { SqlClient } from 'effect/sql'
 
 import { Conflict, NotFound } from '@batuda/controllers'
 import { foldLabel, slugFromLabel } from '@batuda/domain'

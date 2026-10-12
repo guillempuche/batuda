@@ -10,7 +10,7 @@
  */
 
 import { Config, Effect, Layer, Option, Schema } from 'effect'
-import { Headers } from 'effect/unstable/http'
+import { Headers } from 'effect/http'
 
 import { priceUnitsMicrocents } from '../application/cost-rates'
 import {
@@ -299,7 +299,7 @@ export const configuredRegistryEndpoints = (
 const slotUnitRate = (isStub: boolean, envPrefix: string, slot: number) =>
 	isStub
 		? Effect.succeed(0)
-		: Config.finite(keyForSlot(`${envPrefix}_PRICE_CENTS_PER_UNIT`, slot))
+		: Config.Finite(keyForSlot(`${envPrefix}_PRICE_CENTS_PER_UNIT`, slot))
 
 /**
  * Record what a search or page fetch really cost, priced at that slot's rate.

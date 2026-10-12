@@ -1,5 +1,5 @@
 import { Effect } from 'effect'
-import { SqlClient } from 'effect/unstable/sql'
+import { SqlClient } from 'effect/sql'
 
 // A database backstop for the per-user OAuth data the connections page and the
 // /mcp org-resolution read: a hand-written `WHERE userId = …` is the only thing

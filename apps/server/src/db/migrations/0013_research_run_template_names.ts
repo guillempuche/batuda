@@ -1,5 +1,5 @@
 import { Effect } from 'effect'
-import { SqlClient } from 'effect/unstable/sql'
+import { SqlClient } from 'effect/sql'
 
 // Freeze the names of the instruction templates that shaped a run, in the same
 // order as template_ids. The names are captured at run time by the creator, who

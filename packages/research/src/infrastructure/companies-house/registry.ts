@@ -12,11 +12,7 @@
  */
 
 import { Config, Effect, Redacted, Schema } from 'effect'
-import {
-	HttpClient,
-	HttpClientRequest,
-	HttpClientResponse,
-} from 'effect/unstable/http'
+import { HttpClient, HttpClientRequest, HttpClientResponse } from 'effect/http'
 
 import { type RegistryInput, RegistryRouter } from '../../application/ports'
 import { ProviderError } from '../../domain/errors'
@@ -96,7 +92,7 @@ const formatAddress = (
 
 export const makeCompaniesHouseRegistry = (slot: number) =>
 	Effect.gen(function* () {
-		const apiKey = yield* Config.redacted(
+		const apiKey = yield* Config.Redacted(
 			keyForSlot('RESEARCH_API_KEY_REGISTRY_GB', slot),
 		)
 		const client = yield* HttpClient.HttpClient

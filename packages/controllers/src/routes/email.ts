@@ -1,9 +1,5 @@
 import { Schema } from 'effect'
-import {
-	HttpApiEndpoint,
-	HttpApiGroup,
-	HttpApiSchema,
-} from 'effect/unstable/httpapi'
+import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from 'effect/http-api'
 
 import {
 	EmailBounceType,
@@ -346,10 +342,10 @@ export const EmailGroup = HttpApiGroup.make('email')
 				isPrivate: Schema.optional(Schema.Boolean),
 				isDefault: Schema.optional(Schema.Boolean),
 				imapHost: Schema.String,
-				imapPort: Schema.Number,
+				imapPort: Schema.Int,
 				imapSecurity: Schema.Literals(['tls', 'starttls', 'plain']),
 				smtpHost: Schema.String,
-				smtpPort: Schema.Number,
+				smtpPort: Schema.Int,
 				smtpSecurity: Schema.Literals(['tls', 'starttls', 'plain']),
 				username: Schema.String,
 				password: Schema.String,
@@ -370,12 +366,12 @@ export const EmailGroup = HttpApiGroup.make('email')
 				active: Schema.optional(Schema.Boolean),
 				// Credential / transport patch: any subset triggers a re-probe.
 				imapHost: Schema.optional(Schema.String),
-				imapPort: Schema.optional(Schema.Number),
+				imapPort: Schema.optional(Schema.Int),
 				imapSecurity: Schema.optional(
 					Schema.Literals(['tls', 'starttls', 'plain']),
 				),
 				smtpHost: Schema.optional(Schema.String),
-				smtpPort: Schema.optional(Schema.Number),
+				smtpPort: Schema.optional(Schema.Int),
 				smtpSecurity: Schema.optional(
 					Schema.Literals(['tls', 'starttls', 'plain']),
 				),

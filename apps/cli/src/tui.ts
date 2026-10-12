@@ -3,7 +3,7 @@ import { fileURLToPath } from 'node:url'
 import * as p from '@clack/prompts'
 import { NodeRuntime, NodeServices } from '@effect/platform-node'
 import { Cause, Effect } from 'effect'
-import { Command } from 'effect/unstable/cli'
+import { Command } from 'effect/cli'
 import pc from 'picocolors'
 
 import { batuda } from './cli'

@@ -1,18 +1,13 @@
-// Covers a client opening an MCP connection with a protocol revision newer than
-// the library knows, which the route would otherwise refuse with an empty 400 it
-// cannot recover from.
+// Covers how the /mcp route answers a protocol revision it does not serve, and
+// what a client and a reader can learn from that answer.
 //
 // These drive a real in-process MCP server through a middleware shaped like the
-// live one — open the record, normalise the request, name the call, read its
-// body, hand the same one onward — because the worst failure here is invisible to
-// the header logic alone: a request remembers the body it read and a copy does
-// not, so handing the route the other one leaves it waiting on a drained stream,
-// with no error, no timeout, and no response ever. Only the round trip catches
-// that.
-//
-// The refusal a settled connection still gets is covered here too: it is the
-// library's own answer, so only a real server produces it, and what a client and
-// a reader can learn from it is the whole point of the cases below.
+// live one — open the record, name the call, read the body, hand the route the
+// same request — because two failures here are invisible to the header logic
+// alone. The refusal is the library's own answer, so only a real server
+// produces it. And a request remembers the body it read, so a route handed
+// anything other than that request waits on a drained stream with no error, no
+// timeout and no response ever; only the round trip catches that.
 
 import { createServer } from 'node:http'
 
@@ -25,16 +20,13 @@ import {
 	References,
 	Schema,
 } from 'effect'
-import { McpServer, Tool, Toolkit } from 'effect/unstable/ai'
-import { HttpRouter, HttpServer, HttpServerRequest } from 'effect/unstable/http'
+import { McpServer, Tool, Toolkit } from 'effect/ai'
+import { HttpRouter, HttpServer, HttpServerRequest } from 'effect/http'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { withRequestRecord } from '../lib/observability-middleware'
-import {
-	explainRefusedVersion,
-	recordCall,
-	withNegotiableProtocolVersion,
-} from './http'
+import { noteRefusal, recordCall } from './http'
+import { MCP_PROTOCOLS } from './protocols'
 
 // Every line the server wrote, read the way the built-in formatters read them:
 // annotations live on the fiber, not on the log options.
@@ -73,37 +65,42 @@ const PingHandlersLive = PingTools.toLayer(
 	Effect.succeed({ ping: () => Effect.succeed('pong') }),
 )
 
-// The live middleware's order, with the auth and database work left out: it is
-// the sequence that matters, not what it authenticates.
-const NegotiationMiddleware = HttpRouter.middleware(
+// The request record is opened outermost in the live server, by the router-wide
+// observability middleware, which is what lets the steps below write facts onto
+// the request's own line.
+const RequestRecordMiddleware = HttpRouter.middleware(
+	httpEffect => withRequestRecord(httpEffect),
+	{ global: true },
+)
+
+// The live sign-in middleware's order, with the auth and database work left
+// out: it is the sequence that matters, not what it authenticates. Like the live
+// one, it wraps only the routes the MCP server adds.
+const RefusalMiddleware = HttpRouter.middleware(
 	Effect.gen(function* () {
 		return httpEffect =>
-			// The request record is opened outermost in the live server, which is
-			// what lets the steps below write facts onto the request's own line.
-			withRequestRecord(
-				Effect.gen(function* () {
-					const incoming = yield* HttpServerRequest.HttpServerRequest
-					if (!incoming.url.startsWith('/mcp')) return yield* httpEffect
-					const req = yield* withNegotiableProtocolVersion(incoming)
-					yield* recordCall(incoming)
-					// The live middleware reads the body here, to record which client
-					// called; doing the same is the point of this harness.
-					yield* req.json.pipe(Effect.orElseSucceed(() => null))
-					return yield* explainRefusedVersion(httpEffect, req).pipe(
-						Effect.provideService(HttpServerRequest.HttpServerRequest, req),
-					)
-				}),
-			)
+			Effect.gen(function* () {
+				const req = yield* HttpServerRequest.HttpServerRequest
+				yield* recordCall(req)
+				// The live middleware reads the body here, to record which client
+				// called; doing the same is the point of this harness.
+				yield* req.json.pipe(Effect.orElseSucceed(() => null))
+				return yield* noteRefusal(httpEffect, req)
+			})
 	}),
-	{ global: true },
 )
 
 const McpHttpLive = Layer.mergeAll(
 	McpServer.toolkit(PingTools).pipe(Layer.provide(PingHandlersLive)),
-	NegotiationMiddleware,
+	RequestRecordMiddleware,
 ).pipe(
 	Layer.provide(
-		McpServer.layerHttp({ name: 'test', version: '1.0.0', path: '/mcp' }),
+		McpServer.layerHttp({
+			name: 'test',
+			version: '1.0.0',
+			path: '/mcp',
+			protocols: MCP_PROTOCOLS,
+		}).pipe(Layer.provide(RefusalMiddleware.layer)),
 	),
 )
 
@@ -155,17 +152,16 @@ describe('the /mcp route meeting a protocol revision it does not know', () => {
 				return server.address
 			}),
 		)
-		if (address._tag !== 'TcpAddress')
+		if (address._tag === 'UnixPathAddress')
 			throw new Error('expected a TCP address for the test server')
 		baseUrl = `http://127.0.0.1:${address.port}`
 	}, 30_000)
 
 	afterAll(() => runtime.dispose())
 
-	describe('when a client opens with a revision newer than the library knows', () => {
+	describe('when a client opens with a revision this server does not serve', () => {
 		it('should let the exchange settle a revision instead of refusing it', async () => {
-			// GIVEN a client naming a revision the specification has published but
-			//       the library has not caught up to
+			// GIVEN a client naming a revision newer than any this server lists
 			const response = await initialize({
 				'mcp-protocol-version': '2026-07-28',
 			})
@@ -229,11 +225,10 @@ describe('the /mcp route meeting a protocol revision it does not know', () => {
 			// so naming another one is its own mistake to fix
 			expect(response.status).toBe(400)
 
-			// AND it carries a JSON-RPC error naming the revision, rather than the
-			// empty body a client can do nothing with. Decoding is half the
-			// assertion: a body of another shape fails here.
+			// AND it carries the specification's JSON-RPC error naming the revision.
+			// Decoding is half the assertion: a body of another shape fails here.
 			const body = Schema.decodeUnknownSync(JsonRpcError)(await response.json())
-			expect(body.error.code).toBe(-32000)
+			expect(body.error.code).toBe(-32022)
 			expect(body.error.message).toContain('2026-07-28')
 		})
 
@@ -333,7 +328,7 @@ describe('the /mcp route meeting a protocol revision it does not know', () => {
 			// down, instead of being let through to a layer with no handler for it
 			expect(response.status).toBe(400)
 			const body = Schema.decodeUnknownSync(JsonRpcError)(await response.json())
-			expect(body.error.code).toBe(-32000)
+			expect(body.error.code).toBe(-32022)
 			expect(body.error.message).toContain('2026-07-28')
 		})
 
@@ -355,15 +350,15 @@ describe('the /mcp route meeting a protocol revision it does not know', () => {
 		})
 
 		it('should still let an opening handshake settle a revision', async () => {
-			// GIVEN the negotiation this exclusion sits beside: an opening call naming
-			//       a revision the library does not know, sent as an assistant sends it
+			// GIVEN an opening call naming a revision this server does not serve,
+			//       sent as an assistant sends it
 			const response = await initialize({
 				'mcp-protocol-version': '2026-07-28',
 				'mcp-method': 'initialize',
 			})
 
-			// THEN it is still served — that call names its revision in the body too,
-			// so it can settle one with the header gone
+			// THEN it is still served — that call names its revision in the body,
+			// which is what settles one
 			expect(response.status).toBe(200)
 			expect(response.headers.get('mcp-session-id')).toBeTruthy()
 		})
@@ -391,8 +386,30 @@ describe('the /mcp route meeting a protocol revision it does not know', () => {
 			// THEN nothing claims the revision was the problem — a bad body and a
 			// refused revision both end in 400, and telling a client to re-open its
 			// connection would send it chasing the wrong thing
-			expect(await response.text()).not.toContain('Unsupported MCP protocol')
+			expect(await response.text()).not.toContain(
+				'Unsupported protocol version',
+			)
 			expect(lineFor('mcp.protocol_version.refused')).toBeUndefined()
+		})
+	})
+
+	describe('when a browser page on another origin calls the route', () => {
+		it('should say which origin was turned away', async () => {
+			// GIVEN a request carrying an Origin header the route does not allow,
+			//       as a browser-based client sends it
+			lines.length = 0
+			const response = await initialize({ origin: 'https://inspector.example' })
+
+			// THEN the library refuses it with an empty 403
+			expect(response.status).toBe(403)
+
+			// AND a line names the origin, since a client shows that refusal only as
+			// a silent retry
+			const refusal = lineFor('mcp.origin.refused')
+			expect(refusal?.level).toBe('Warn')
+			expect(refusal?.annotations['mcp.origin']).toBe(
+				'https://inspector.example',
+			)
 		})
 	})
 

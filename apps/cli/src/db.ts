@@ -1,6 +1,6 @@
 import { PgClient } from '@effect/sql-pg'
 import { Config, Effect, Layer } from 'effect'
-import { SqlClient } from 'effect/unstable/sql'
+import { SqlClient } from 'effect/sql'
 
 const DB_MISSING_MSG =
 	'DATABASE_URL is not set.\n' +
@@ -18,10 +18,13 @@ const camelToSnake = (s: string) =>
 // `camelCase` the app writes; `transformJson: false` keeps that conversion out
 // of the contents of a JSON column, so stored keys read back exactly as written.
 export const PgLive = PgClient.layerConfig({
-	url: Config.redacted('DATABASE_URL'),
+	url: Config.Redacted('DATABASE_URL'),
 	transformResultNames: Config.succeed(snakeToCamel),
 	transformQueryNames: Config.succeed(camelToSnake),
 	transformJson: Config.succeed(false),
+	// Named statements cache a query plan, and a migration that adds a column
+	// while the old code still serves makes every `SELECT *` plan fail.
+	prepare: Config.succeed(false),
 })
 
 /**

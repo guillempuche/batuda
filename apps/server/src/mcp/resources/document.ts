@@ -1,6 +1,8 @@
 import { Effect, Schema } from 'effect'
-import { McpSchema, McpServer } from 'effect/unstable/ai'
-import { SqlClient } from 'effect/unstable/sql'
+import { McpSchema, McpServer } from 'effect/ai'
+import { SqlClient } from 'effect/sql'
+
+import { inMcpOrgScope } from '../org-scope'
 
 const docIdParam = McpSchema.param('id', Schema.String)
 
@@ -21,5 +23,5 @@ export const DocumentResource =
 			const subjects =
 				yield* sql`SELECT subject_table, subject_id FROM document_links WHERE document_id = ${id} ORDER BY subject_table, created_at`
 			return JSON.stringify({ ...doc, subjects }, null, 2)
-		}),
+		}, inMcpOrgScope),
 	})

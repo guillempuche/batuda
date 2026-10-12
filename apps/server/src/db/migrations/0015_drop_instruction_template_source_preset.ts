@@ -1,5 +1,5 @@
 import { Effect } from 'effect'
-import { SqlClient } from 'effect/unstable/sql'
+import { SqlClient } from 'effect/sql'
 
 // The starter preset catalog was removed in the corresponding code cleanup.
 // New templates no longer populate source_preset_id, and no code reads it.

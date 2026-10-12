@@ -1,5 +1,5 @@
 import { Effect } from 'effect'
-import { SqlClient } from 'effect/unstable/sql'
+import { SqlClient } from 'effect/sql'
 
 // Adds a denormalized FTS column on email_messages so the listThreads
 // search filter stops matching against email_thread_links.subject (only

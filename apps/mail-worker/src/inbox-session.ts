@@ -1,5 +1,5 @@
 import { type Cause, Effect, Result, Schedule } from 'effect'
-import { SqlClient } from 'effect/unstable/sql'
+import { SqlClient } from 'effect/sql'
 import { ImapFlow } from 'imapflow'
 
 import { boundedCause } from '@batuda/observability'

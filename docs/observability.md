@@ -48,49 +48,50 @@ The mail worker has no request and no scope at all, so every line it writes name
 
 `{domain}.{action}[.{result}]` — so a filter on one prefix gets a whole area.
 
-| Event                          | Description                                                 |
-| ------------------------------ | ----------------------------------------------------------- |
-| `http.request`                 | A request completed                                         |
-| `http.server_error`            | A request ended 5xx                                         |
-| `http.defect`                  | A request died without producing a response                 |
-| `http.not_found`               | A request asked for a route that does not exist             |
-| `company.created`              | New company added to CRM                                    |
-| `company.already_on_file`      | A company offered again, answered with the one already here |
-| `company.status_changed`       | Pipeline status transition                                  |
-| `interaction.logged`           | Interaction recorded                                        |
-| `document.created`             | Research/notes document added                               |
-| `email.sent`                   | Outbound email starting a conversation                      |
-| `email.replied`                | Outbound email answering one                                |
-| `email.draft_sent`             | A saved draft went out                                      |
-| `email.received`               | Inbound reply                                               |
-| `email.failed`                 | Email delivery failed                                       |
-| `email.refused`                | A message was turned away before it was sent, and why       |
-| `email.sent_copy_failed`       | The message went out; keeping our own copy did not          |
-| `email.sent_append_failed`     | The message went out; filing it in Sent did not             |
-| `email.staging_purge_failed`   | Attachments outlived the message they went with             |
-| `email.folder_read_failed`     | A folder would not open, so nothing new was read from it    |
-| `email.idle_wait_failed`       | Waiting for the mail server to report a change failed       |
-| `inbox.created`                | A mailbox was connected                                     |
-| `inbox.probed`                 | A mailbox check that did not pass (a clean one is `debug`)  |
-| `inbox.probe_unrecorded`       | A mailbox was checked but the answer could not be stored    |
-| `inbox.probe_started`          | The recurring mailbox check began, and how often it runs    |
-| `inbox.probe_round`            | A round of checks finished, and how many passed             |
-| `inbox.probe_round_failed`     | A whole round of checks failed — the poller, not a mailbox  |
-| `mail_worker.heartbeat`        | The mail worker is still running, repeated on a timer       |
-| `webhook.fired`                | Webhook fan-out triggered                                   |
-| `webhook.failed`               | Webhook delivery failed                                     |
-| `page.published`               | Sales page made public                                      |
-| `page.viewed`                  | Prospect viewed a sales page                                |
-| `task.created`                 | CRM task raised                                             |
-| `research.run`                 | A research run finished, with what it spent                 |
-| `research.tool_call_corrected` | A model was told a tool call it wrote would not be accepted |
-| `mcp.auth.rejected`            | An MCP call was refused, and why                            |
-| `mcp.protocol_version.refused` | A call named a protocol revision this server does not know  |
-| `otlp.export.failing`          | This process has stopped being able to export, and why      |
-| `otlp.export.recovered`        | Exporting works again                                       |
-| `otlp.export.health`           | Whether this process is exporting, repeated on a timer      |
-| `otlp.clock.skewed`            | This process and the backend disagree about the time        |
-| `otlp.clock.agreed`            | This process and the backend agree again                    |
+| Event                          | Description                                                   |
+| ------------------------------ | ------------------------------------------------------------- |
+| `http.request`                 | A request completed                                           |
+| `http.server_error`            | A request ended 5xx                                           |
+| `http.defect`                  | A request died without producing a response                   |
+| `http.not_found`               | A request asked for a route that does not exist               |
+| `company.created`              | New company added to CRM                                      |
+| `company.already_on_file`      | A company offered again, answered with the one already here   |
+| `company.status_changed`       | Pipeline status transition                                    |
+| `interaction.logged`           | Interaction recorded                                          |
+| `document.created`             | Research/notes document added                                 |
+| `email.sent`                   | Outbound email starting a conversation                        |
+| `email.replied`                | Outbound email answering one                                  |
+| `email.draft_sent`             | A saved draft went out                                        |
+| `email.received`               | Inbound reply                                                 |
+| `email.failed`                 | Email delivery failed                                         |
+| `email.refused`                | A message was turned away before it was sent, and why         |
+| `email.sent_copy_failed`       | The message went out; keeping our own copy did not            |
+| `email.sent_append_failed`     | The message went out; filing it in Sent did not               |
+| `email.staging_purge_failed`   | Attachments outlived the message they went with               |
+| `email.folder_read_failed`     | A folder would not open, so nothing new was read from it      |
+| `email.idle_wait_failed`       | Waiting for the mail server to report a change failed         |
+| `inbox.created`                | A mailbox was connected                                       |
+| `inbox.probed`                 | A mailbox check that did not pass (a clean one is `debug`)    |
+| `inbox.probe_unrecorded`       | A mailbox was checked but the answer could not be stored      |
+| `inbox.probe_started`          | The recurring mailbox check began, and how often it runs      |
+| `inbox.probe_round`            | A round of checks finished, and how many passed               |
+| `inbox.probe_round_failed`     | A whole round of checks failed — the poller, not a mailbox    |
+| `mail_worker.heartbeat`        | The mail worker is still running, repeated on a timer         |
+| `webhook.fired`                | Webhook fan-out triggered                                     |
+| `webhook.failed`               | Webhook delivery failed                                       |
+| `page.published`               | Sales page made public                                        |
+| `page.viewed`                  | Prospect viewed a sales page                                  |
+| `task.created`                 | CRM task raised                                               |
+| `research.run`                 | A research run finished, with what it spent                   |
+| `research.tool_call_corrected` | A model was told a tool call it wrote would not be accepted   |
+| `mcp.auth.rejected`            | An MCP call was refused, and why                              |
+| `mcp.protocol_version.refused` | A call named a protocol revision this server does not know    |
+| `mcp.origin.refused`           | A browser origin the MCP route does not allow was turned away |
+| `otlp.export.failing`          | This process has stopped being able to export, and why        |
+| `otlp.export.recovered`        | Exporting works again                                         |
+| `otlp.export.health`           | Whether this process is exporting, repeated on a timer        |
+| `otlp.clock.skewed`            | This process and the backend disagree about the time          |
+| `otlp.clock.agreed`            | This process and the backend agree again                      |
 
 The `otlp.*` lines are the exception to one record per unit of work: they report on the reporting itself, so they belong to the process rather than to any piece of work it did. See [When export itself fails](#when-export-itself-fails).
 
@@ -423,6 +424,6 @@ Nothing catches this on its own. The exporter's own type is erased by the branch
 
 **Global middleware order has to be stated, not assumed.** Router-wide middleware wraps a request in reverse registration order, and registration order is layer build order — which `Layer.mergeAll` performs concurrently. Left in a merge list, the observability middleware lands wherever the build happens to put it, and that position can change without anyone editing it.
 
-It has to be outermost, because a middleware that answers a caller itself — the MCP sign-in check refusing a connection — hides everything registered after it. Registered later, the observability middleware would never run for a refusal, and a refused MCP connection would leave no record of the request at all. That is the case an MCP client shows as a silent retry loop rather than a visible error, so it is the one that most needs a record.
+It has to be outermost, because a middleware that answers a caller itself hides everything registered after it — CORS answers a browser's preflight without passing it on. Registered later, the observability middleware would never run for those, and they would leave no record of the request at all. The MCP sign-in check is not router-wide: it wraps only the MCP routes, so it always runs inside every router-wide middleware and a refused MCP connection is always recorded, whatever the order.
 
 So it is *provided* to the rest of the app rather than merged alongside it, which states the order as a dependency the build has to respect. The regression guard is the middleware-order test, which drives a real server through a refusing middleware and fails if the two are registered the other way round.

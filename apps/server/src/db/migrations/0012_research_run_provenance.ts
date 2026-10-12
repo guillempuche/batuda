@@ -1,5 +1,5 @@
 import { Effect } from 'effect'
-import { SqlClient } from 'effect/unstable/sql'
+import { SqlClient } from 'effect/sql'
 
 // Provenance for a research run: which instruction templates shaped it
 // (template_ids, in resolution order) and a fingerprint of that resolved set —

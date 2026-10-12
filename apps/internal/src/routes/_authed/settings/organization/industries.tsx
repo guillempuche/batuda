@@ -1,7 +1,7 @@
 import { useAtomRefresh, useAtomSet, useAtomValue } from '@effect/atom-react'
 import { Plural, Trans, useLingui } from '@lingui/react/macro'
 import { createFileRoute, Link } from '@tanstack/react-router'
-import { AsyncResult } from 'effect/unstable/reactivity'
+import { AsyncResult } from 'effect/reactivity'
 import { ArrowLeft, Check, Merge, Trash2 } from 'lucide-react'
 import { styled } from 'next-yak'
 import { useState } from 'react'

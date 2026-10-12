@@ -1,9 +1,5 @@
 import { Schema } from 'effect'
-import {
-	HttpApiEndpoint,
-	HttpApiGroup,
-	HttpApiSchema,
-} from 'effect/unstable/httpapi'
+import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from 'effect/http-api'
 
 import { CallRecording, DbNumber } from '@batuda/domain'
 
@@ -19,7 +15,7 @@ export const RecordingSummary = Schema.Struct({
 	interactionId: Schema.String,
 	storageKey: Schema.String,
 	mimeType: Schema.String,
-	// BIGINT — node-postgres returns it as a string; accept string-or-number.
+	// BIGINT in the database, a plain number on the wire.
 	byteSize: DbNumber,
 	durationSec: Schema.NullOr(Schema.Number),
 	transcriptStatus: Schema.NullOr(Schema.String),

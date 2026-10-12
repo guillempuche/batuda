@@ -8,7 +8,7 @@ import { Config } from 'effect'
 // (BYPASSRLS) via `SET LOCAL ROLE` and sets `app.current_org_id` for
 // audit-trail consistency. See apps/mail-worker/src/ingest.ts.
 export const PgLive = PgClient.layerConfig({
-	url: Config.redacted('DATABASE_URL'),
+	url: Config.Redacted('DATABASE_URL'),
 	transformResultNames: Config.succeed((s: string) =>
 		s.replace(/_([a-z])/g, (_, c: string) => c.toUpperCase()),
 	),
@@ -16,4 +16,7 @@ export const PgLive = PgClient.layerConfig({
 		s.replace(/[A-Z]/g, c => `_${c.toLowerCase()}`),
 	),
 	transformJson: Config.succeed(false),
+	// Named statements cache a query plan, and a migration that adds a column
+	// while the old code still serves makes every `SELECT *` plan fail.
+	prepare: Config.succeed(false),
 })

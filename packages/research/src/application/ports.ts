@@ -1,5 +1,5 @@
 import { Context, type Effect } from 'effect'
-import type { LanguageModel } from 'effect/unstable/ai'
+import type { LanguageModel } from 'effect/ai'
 
 import type { AcceptedCountry } from '../domain/country'
 import type {
@@ -50,23 +50,23 @@ export class ResearchRunContext extends Context.Service<
 >()('research/ResearchRunContext') {}
 
 // ── Tier-specific LanguageModel services ──
-// Three distinct tags backed by the same LanguageModel.Service shape.
+// Three distinct tags backed by the same LanguageModel.LanguageModel shape.
 // Phase 1 pins a different model/provider cascade to each phase of the fiber
 // (agent = reasoning + tool loop, extract = structured JSON, writer = brief).
 
 export class AgentLanguageModel extends Context.Service<
 	AgentLanguageModel,
-	LanguageModel.Service
+	LanguageModel.LanguageModel
 >()('research/AgentLanguageModel') {}
 
 export class ExtractLanguageModel extends Context.Service<
 	ExtractLanguageModel,
-	LanguageModel.Service
+	LanguageModel.LanguageModel
 >()('research/ExtractLanguageModel') {}
 
 export class WriterLanguageModel extends Context.Service<
 	WriterLanguageModel,
-	LanguageModel.Service
+	LanguageModel.LanguageModel
 >()('research/WriterLanguageModel') {}
 
 // ── BlobStorage port (research-local view of app storage) ──

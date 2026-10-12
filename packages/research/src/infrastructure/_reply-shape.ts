@@ -35,7 +35,7 @@ import { DateTime, Effect } from 'effect'
 import {
 	HttpClient,
 	HttpClientResponse as HttpClientResponseNs,
-} from 'effect/unstable/http'
+} from 'effect/http'
 
 const CONTENT_TYPE_HEADER = 'content-type'
 const CONTENT_LENGTH_HEADER = 'content-length'

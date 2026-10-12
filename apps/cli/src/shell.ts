@@ -1,7 +1,7 @@
 import { resolve } from 'node:path'
 
 import { Effect, Stream } from 'effect'
-import { ChildProcess } from 'effect/unstable/process'
+import { ChildProcess } from 'effect/process'
 
 export const ROOT = resolve(import.meta.dirname, '../../..')
 

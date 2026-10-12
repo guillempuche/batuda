@@ -6,7 +6,7 @@
  * would close an import loop back onto itself through the geocoding it forks.
  */
 
-import type { SqlClient } from 'effect/unstable/sql'
+import type { SqlClient } from 'effect/sql'
 
 export interface ProvenanceEntry {
 	readonly runId: string

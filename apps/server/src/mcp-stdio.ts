@@ -1,7 +1,8 @@
 import { NodeRuntime, NodeStdio } from '@effect/platform-node'
 import { Config, Effect, Layer, Logger } from 'effect'
-import { McpServer } from 'effect/unstable/ai'
-import { FetchHttpClient } from 'effect/unstable/http'
+import { McpServer } from 'effect/ai'
+import { FetchHttpClient } from 'effect/http'
+import { SqlClient } from 'effect/sql'
 
 import { BookingProviderLive, IcsParserLive } from '@batuda/calendar'
 import { SessionContext } from '@batuda/controllers'
@@ -20,7 +21,10 @@ import { McpLoggerLive } from './lib/logger'
 import { ResearchDefaults } from './lib/research-defaults'
 import { CurrentOrg } from './mcp/current-org'
 import { CurrentUser } from './mcp/current-user'
+import { McpOrgScope } from './mcp/org-scope'
+import { MCP_PROTOCOLS } from './mcp/protocols'
 import { McpToolsLive } from './mcp/server'
+import { enterOrgScope } from './middleware/org'
 import { CalendarService } from './services/calendar'
 import { CompanyService } from './services/companies'
 import { CredentialCrypto } from './services/credential-crypto'
@@ -86,13 +90,13 @@ const ServicesLive = Layer.mergeAll(
 const CurrentOrgFromEnv = Layer.effect(
 	CurrentOrg,
 	Effect.gen(function* () {
-		const id = yield* Config.string('BATUDA_ACTIVE_ORG_ID')
-		const name = yield* Config.string('BATUDA_ACTIVE_ORG_NAME')
-		const slug = yield* Config.string('BATUDA_ACTIVE_ORG_SLUG')
+		const id = yield* Config.String('BATUDA_ACTIVE_ORG_ID')
+		const name = yield* Config.String('BATUDA_ACTIVE_ORG_NAME')
+		const slug = yield* Config.String('BATUDA_ACTIVE_ORG_SLUG')
 		// Starts at the lowest standing, so local tools reach a colleague's
 		// things only when the developer says so. Set `owner` or `admin` to
 		// try what someone running the organization can do.
-		const role = yield* Config.string('BATUDA_ACTIVE_ORG_ROLE').pipe(
+		const role = yield* Config.String('BATUDA_ACTIVE_ORG_ROLE').pipe(
 			Config.withDefault('member'),
 		)
 		return { id, name, slug, role }
@@ -110,7 +114,7 @@ const CurrentOrgFromEnv = Layer.effect(
 // The address is not read anywhere on this surface — only the id is — so it
 // stays a fixed label rather than something else to configure.
 const LocalIdentity = Effect.gen(function* () {
-	const userId = yield* Config.string('BATUDA_ACTIVE_USER_ID')
+	const userId = yield* Config.String('BATUDA_ACTIVE_USER_ID')
 	return {
 		userId,
 		email: 'local@batuda',
@@ -118,6 +122,25 @@ const LocalIdentity = Effect.gen(function* () {
 		isAgent: false,
 	}
 })
+
+// The way into the organization's scope for each tool call, resource and
+// prompt — the same one a signed-in HTTP request is handed, so this surface
+// reads under row-level security too.
+const McpOrgScopeFromEnv = Layer.effect(
+	McpOrgScope,
+	Effect.gen(function* () {
+		const sql = yield* SqlClient.SqlClient
+		const org = yield* CurrentOrg
+		const { userId } = yield* LocalIdentity
+		return {
+			run: enterOrgScope(sql, {
+				org: { id: org.id, name: org.name, slug: org.slug },
+				userId,
+				role: org.role,
+			}),
+		}
+	}),
+)
 
 const CurrentUserFromEnv = Layer.effect(CurrentUser, LocalIdentity)
 const SessionFromEnv = Layer.effect(SessionContext, LocalIdentity)
@@ -127,6 +150,7 @@ const ServerLayer = McpToolsLive.pipe(
 		McpServer.layerStdio({
 			name: 'batuda',
 			version: '1.0.0',
+			protocols: MCP_PROTOCOLS,
 		}),
 	),
 	// Everything the tools stand on, in the same order main.ts builds it. This
@@ -153,6 +177,7 @@ const ServerLayer = McpToolsLive.pipe(
 	// One shared fetch for everything above that reaches out — the calendar
 	// provider, the research providers, the geocoder.
 	Layer.provide(FetchHttpClient.layer),
+	Layer.provide(McpOrgScopeFromEnv),
 	Layer.provide(PgLive),
 	Layer.provide(CurrentUserFromEnv),
 	Layer.provide(SessionFromEnv),

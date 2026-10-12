@@ -7,7 +7,7 @@
  * passage that made each one look that way. Reading a page in full is the
  * separate `scrape_page` step, so the run pays to open just the pages it picks.
  *
- * Mirrors the `firecrawl/scrape.ts` adapter (Config.redacted key → HttpClient →
+ * Mirrors the `firecrawl/scrape.ts` adapter (Config.Redacted key → HttpClient →
  * Schema-decoded body → ProviderError) with the shared `hardenHttp` wrapper for
  * timeout + recoverable-only retry. Reads the same `RESEARCH_API_KEY_SEARCH`
  * slot the Brave provider does, so switching the search vendor needs no new key.
@@ -16,11 +16,7 @@
  */
 
 import { Config, Effect, Redacted, Schema } from 'effect'
-import {
-	HttpClient,
-	HttpClientRequest,
-	HttpClientResponse,
-} from 'effect/unstable/http'
+import { HttpClient, HttpClientRequest, HttpClientResponse } from 'effect/http'
 
 import { clipText } from '@batuda/domain'
 
@@ -68,7 +64,7 @@ const tbsForRecency = (days: number): string =>
 
 export const makeFirecrawlSearch = (slot: number) =>
 	Effect.gen(function* () {
-		const apiKey = yield* Config.redacted(
+		const apiKey = yield* Config.Redacted(
 			keyForSlot('RESEARCH_API_KEY_SEARCH', slot),
 		)
 		const client = yield* HttpClient.HttpClient

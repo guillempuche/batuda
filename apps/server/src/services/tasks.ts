@@ -1,6 +1,6 @@
 import { Context, DateTime, Effect, Layer, Schema } from 'effect'
-import type { Statement } from 'effect/unstable/sql'
-import { SqlClient } from 'effect/unstable/sql'
+import type { Statement } from 'effect/sql'
+import { SqlClient } from 'effect/sql'
 
 import { BadRequest, Conflict, CurrentOrg, NotFound } from '@batuda/controllers'
 import { Task } from '@batuda/domain'

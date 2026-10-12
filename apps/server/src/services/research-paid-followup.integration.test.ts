@@ -9,7 +9,7 @@ process.env['RESEARCH_MAX_LOOP_PROMPT_TOKENS'] ??= '24000'
 import { randomUUID } from 'node:crypto'
 
 import { Effect, Layer, ManagedRuntime, Stream } from 'effect'
-import type { LanguageModel } from 'effect/unstable/ai'
+import { LanguageModel } from 'effect/ai'
 import pg from 'pg'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
@@ -56,7 +56,8 @@ const stubResponse = {
 		outputTokens: { total: 0, text: undefined, reasoning: undefined },
 	},
 }
-const stubLlm: LanguageModel.Service = {
+const stubLlm: LanguageModel.LanguageModel = {
+	[LanguageModel.TypeId]: LanguageModel.TypeId,
 	generateText: () => Effect.succeed(stubResponse) as never,
 	generateObject: () => Effect.succeed({ ...stubResponse, value: {} }) as never,
 	streamText: () =>

@@ -24,73 +24,21 @@ import {
 	References,
 	Schema,
 } from 'effect'
-import { McpServer, Tool, Toolkit } from 'effect/unstable/ai'
-import { HttpRouter, HttpServer } from 'effect/unstable/http'
+import { McpServer, Tool, Toolkit } from 'effect/ai'
+import { HttpRouter, HttpServer } from 'effect/http'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
+import type { CurrentOrg } from '@batuda/controllers'
 import { makeWorkRecord, WorkRecord } from '@batuda/observability'
 
+import { McpOrgScope } from './org-scope'
+import { MCP_PROTOCOLS } from './protocols'
 import {
 	clientFacingMessage,
 	isExpectedFailure,
 	mcpToolkitSafe,
-	toStructuredContent,
 } from './safe-toolkit'
 import { ToolMessage } from './tool-message'
-
-describe('toStructuredContent', () => {
-	describe('when the handler returns a plain object', () => {
-		it('should pass the record through unchanged', () => {
-			// GIVEN a record result (the already-valid shape)
-			const value = { id: 1, name: 'Ada' }
-			// WHEN normalizing it for structured output
-			// THEN it is returned as-is
-			expect(toStructuredContent(value)).toBe(value)
-		})
-	})
-
-	describe('when the handler returns a bare array', () => {
-		it('should wrap it in an items record so it stays valid structured output', () => {
-			// GIVEN a list result — a bare array is not valid MCP structured output
-			// WHEN normalizing it
-			const result = toStructuredContent([1, 2, 3])
-			// THEN it becomes an object under `items`, preserving the rows
-			expect(result).toEqual({ items: [1, 2, 3] })
-		})
-
-		it('should wrap an empty array too', () => {
-			// GIVEN an empty list
-			// WHEN normalizing it
-			// THEN it is still an object, not a bare array
-			expect(toStructuredContent([])).toEqual({ items: [] })
-		})
-	})
-
-	describe('when the handler returns a value that cannot be a record', () => {
-		it('should omit structured output for null', () => {
-			// GIVEN a null result (e.g. a missing row) — `null` is not a JSON object
-			// WHEN normalizing it
-			// THEN structured output is omitted; the field is optional, so no
-			//      non-record value reaches the client
-			expect(toStructuredContent(null)).toBeUndefined()
-		})
-
-		it('should omit structured output for a scalar', () => {
-			// GIVEN a scalar result
-			// WHEN normalizing a number and a string
-			// THEN both omit structured output rather than shipping a non-record
-			expect(toStructuredContent(42)).toBeUndefined()
-			expect(toStructuredContent('done')).toBeUndefined()
-		})
-
-		it('should omit structured output for undefined', () => {
-			// GIVEN a handler that returned nothing
-			// WHEN normalizing undefined
-			// THEN structured output is omitted
-			expect(toStructuredContent(undefined)).toBeUndefined()
-		})
-	})
-})
 
 describe('clientFacingMessage', () => {
 	describe('when the failure was worded for the caller', () => {
@@ -193,6 +141,8 @@ const RecordTool = Tool.make('one_thing', { success: Schema.Unknown })
 const SpeakingTool = Tool.make('speaking_thing', { success: Schema.Unknown })
 const BoomTool = Tool.make('boom_thing', { success: Schema.Unknown })
 const TaggedTool = Tool.make('tagged_thing', { success: Schema.Unknown })
+const SparseTool = Tool.make('sparse_thing', { success: Schema.Unknown })
+const CountingTool = Tool.make('counting_thing', { success: Schema.Unknown })
 const SafeTools = Toolkit.make(
 	ListTool,
 	MissTool,
@@ -200,6 +150,8 @@ const SafeTools = Toolkit.make(
 	SpeakingTool,
 	BoomTool,
 	TaggedTool,
+	SparseTool,
+	CountingTool,
 )
 
 const SafeHandlersLive = SafeTools.toLayer(
@@ -207,6 +159,8 @@ const SafeHandlersLive = SafeTools.toLayer(
 		list_thing: () => Effect.succeed([{ id: 'a' }, { id: 'b' }]),
 		missing_thing: () => Effect.succeed(null),
 		one_thing: () => Effect.succeed({ ok: true }),
+		sparse_thing: () => Effect.succeed({ ok: true, note: undefined }),
+		counting_thing: () => Effect.succeed({ total: 3n }),
 		speaking_thing: () =>
 			Effect.die(new ToolMessage('footer_id is required to update a footer')),
 		tagged_thing: () => Effect.succeed({ _tag: 'suppressed', recipient: 'x' }),
@@ -241,13 +195,26 @@ const factsNow = () => Effect.runSync(workRecord.read)
 const McpHttpLive = mcpToolkitSafe(SafeTools).pipe(
 	Layer.provide(SafeHandlersLive),
 	Layer.provide(
-		McpServer.layerHttp({ name: 'test', version: '1.0.0', path: '/mcp' }),
+		McpServer.layerHttp({
+			name: 'test',
+			version: '1.0.0',
+			path: '/mcp',
+			protocols: MCP_PROTOCOLS,
+		}),
 	),
 )
 
 const ServerLive = HttpRouter.serve(McpHttpLive, {
 	disableListenLog: true,
 }).pipe(
+	// These tools touch no database, so the org scope they enter passes the
+	// work straight through.
+	Layer.provide(
+		Layer.succeed(McpOrgScope, {
+			run: <A, E, R>(effect: Effect.Effect<A, E, R>) =>
+				effect as Effect.Effect<A, E, Exclude<R, CurrentOrg>>,
+		}),
+	),
 	Layer.provideMerge(NodeHttpServer.layer(createServer, { port: 0 })),
 	Layer.provideMerge(CaptureLogs),
 	Layer.provideMerge(Layer.succeed(WorkRecord, workRecord)),
@@ -307,7 +274,7 @@ describe('a tool served through mcpToolkitSafe', () => {
 				return server.address
 			}),
 		)
-		if (address._tag !== 'TcpAddress')
+		if (address._tag === 'UnixPathAddress')
 			throw new Error('expected a TCP address for the test server')
 		baseUrl = `http://127.0.0.1:${address.port}`
 
@@ -376,17 +343,17 @@ describe('a tool served through mcpToolkitSafe', () => {
 	})
 
 	describe('when the handler returns a bare array', () => {
-		it('should deliver it as an items record, not a bare array', async () => {
+		it('should leave structured output off and carry the rows in the text', async () => {
 			// WHEN the client calls a list-returning tool
 			const reply = await readReply(await callTool('list_thing'))
 
-			// THEN the structured output is an object under `items` a strict
-			// client accepts, with the rows intact
+			// THEN no bare array reaches structured output, which strict clients
+			// reject, and the rows still arrive in the text block
 			expect(reply.result?.isError).toBeFalsy()
-			expect(Array.isArray(reply.result?.structuredContent)).toBe(false)
-			expect(reply.result?.structuredContent).toEqual({
-				items: [{ id: 'a' }, { id: 'b' }],
-			})
+			expect(reply.result?.structuredContent).toBeUndefined()
+			expect(reply.result?.content?.[0]?.text).toBe(
+				JSON.stringify([{ id: 'a' }, { id: 'b' }]),
+			)
 		})
 	})
 
@@ -408,6 +375,27 @@ describe('a tool served through mcpToolkitSafe', () => {
 			const reply = await readReply(await callTool('one_thing'))
 
 			// THEN the record is delivered as-is
+			expect(reply.result?.structuredContent).toEqual({ ok: true })
+		})
+
+		it('should deliver a count the database gave as a bigint as a number', async () => {
+			// GIVEN a tool answering with a raw count, which arrives as a bigint
+			// WHEN the client calls it
+			const reply = await readReply(await callTool('counting_thing'))
+
+			// THEN the call answers with the number rather than failing to write it
+			expect(reply.result?.isError).toBeFalsy()
+			expect(reply.result?.structuredContent).toEqual({ total: 3 })
+		})
+
+		it('should deliver a record holding an unset key the way the wire carries it', async () => {
+			// GIVEN a tool whose answer leaves one optional key unset
+			// WHEN the client calls it
+			const reply = await readReply(await callTool('sparse_thing'))
+
+			// THEN the call answers rather than failing on a value that is not
+			// JSON, and the unset key is simply absent
+			expect(reply.result?.isError).toBeFalsy()
 			expect(reply.result?.structuredContent).toEqual({ ok: true })
 		})
 	})

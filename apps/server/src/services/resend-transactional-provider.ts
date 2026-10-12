@@ -45,8 +45,8 @@ const toBody = (
 export const ResendTransactionalProviderLive = Layer.effect(
 	TransactionalEmailProvider,
 	Effect.gen(function* () {
-		const apiKey = yield* Config.redacted('EMAIL_API_KEY_TRANSACTIONAL')
-		const from = yield* Config.string('EMAIL_FROM_TRANSACTIONAL')
+		const apiKey = yield* Config.Redacted('EMAIL_API_KEY_TRANSACTIONAL')
+		const from = yield* Config.String('EMAIL_FROM_TRANSACTIONAL')
 
 		const post = (
 			body: ResendBody,

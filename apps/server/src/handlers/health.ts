@@ -1,5 +1,5 @@
 import { Clock, Effect } from 'effect'
-import { HttpApiBuilder } from 'effect/unstable/httpapi'
+import { HttpApiBuilder } from 'effect/http-api'
 
 import { BatudaApi } from '@batuda/controllers'
 import { buildMeta, exportHealth, exportReport } from '@batuda/observability'

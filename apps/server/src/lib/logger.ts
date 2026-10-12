@@ -11,8 +11,8 @@ import { Config, Effect, Layer, Logger, References } from 'effect'
  */
 export const LoggerLive = Layer.unwrap(
 	Effect.gen(function* () {
-		const env = yield* Config.string('NODE_ENV')
-		const level = yield* Config.logLevel('MIN_LOG_LEVEL')
+		const env = yield* Config.String('NODE_ENV')
+		const level = yield* Config.LogLevel('MIN_LOG_LEVEL')
 
 		const minLevel = Layer.succeed(References.MinimumLogLevel, level)
 
@@ -35,12 +35,10 @@ export const LoggerLive = Layer.unwrap(
  */
 export const McpLoggerLive = Layer.unwrap(
 	Effect.gen(function* () {
-		const level = yield* Config.logLevel('MIN_LOG_LEVEL')
+		const level = yield* Config.LogLevel('MIN_LOG_LEVEL')
 
-		return Logger.layer([
-			Logger.consolePretty({ stderr: true }),
-			Logger.tracerLogger,
-		]).pipe(
+		return Logger.layer([Logger.consolePretty(), Logger.tracerLogger]).pipe(
+			Layer.provideMerge(Layer.succeed(Logger.LogToStderr, true)),
 			Layer.provideMerge(Layer.succeed(References.MinimumLogLevel, level)),
 		)
 	}),

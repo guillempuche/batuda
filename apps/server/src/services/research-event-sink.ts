@@ -1,9 +1,10 @@
 import { Cause, DateTime, Effect, Layer } from 'effect'
-import { SqlClient } from 'effect/unstable/sql'
+import { SqlClient } from 'effect/sql'
 
 import { ResearchEventSink } from '@batuda/research'
 import { ResearchRunCompleted, TimelineActivityService } from '@batuda/timeline'
 
+import { inOwnSavepoint } from '../lib/savepoint'
 import { resolveSystemOrg } from '../middleware/org'
 import { CompanyService } from './companies'
 import { geocodeCompany } from './company-geocoding'
@@ -140,6 +141,7 @@ export const ResearchEventSinkLive = Layer.effect(
 								yield* geocodeCompany(linked.subjectId).pipe(
 									Effect.provideService(CompanyService, companyService),
 									Effect.provideService(Geocoder, geocoder),
+									inOwnSavepoint(sql),
 									Effect.catchCause(cause =>
 										Effect.logWarning('post-enrichment geocode failed').pipe(
 											Effect.annotateLogs({
@@ -183,6 +185,7 @@ export const ResearchEventSinkLive = Layer.effect(
 									Effect.provideService(Geocoder, geocoder),
 									Effect.provideService(SqlClient.SqlClient, sql),
 									Effect.provideService(TimelineActivityService, timeline),
+									inOwnSavepoint(sql),
 									Effect.catchCause(cause =>
 										Effect.logWarning('research auto-apply failed').pipe(
 											Effect.annotateLogs({

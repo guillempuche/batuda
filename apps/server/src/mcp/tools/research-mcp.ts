@@ -1,6 +1,6 @@
 import { Effect, Result, Schema } from 'effect'
-import { Tool, Toolkit } from 'effect/unstable/ai'
-import { SqlClient } from 'effect/unstable/sql'
+import { Tool, Toolkit } from 'effect/ai'
+import { SqlClient } from 'effect/sql'
 
 import {
 	ContextInput,
@@ -400,9 +400,9 @@ export const ResearchMcpHandlersLive = ResearchMcpTools.toLayer(
 					}
 
 					// Create the run in its OWN top-level transaction on a fresh
-					// pooled connection, detached from this request's transaction.
-					// The whole MCP request runs inside one transaction that commits
-					// only when the handler returns — but the wait below holds it open.
+					// pooled connection, detached from this call's transaction.
+					// The tool call runs inside one transaction that commits only when
+					// the handler returns — but the wait below holds it open.
 					// Without detaching, the run row would stay uncommitted the whole
 					// time: invisible to the dispatch worker (which runs the job on its
 					// own connection, so it never leaves the queue), and rolled back

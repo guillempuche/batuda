@@ -19,7 +19,7 @@
  */
 
 import { Cause, Effect, Layer, Option, Schema } from 'effect'
-import { SqlClient } from 'effect/unstable/sql'
+import { SqlClient } from 'effect/sql'
 
 import { type SearchInput, SearchProvider } from '../application/ports'
 import { recordSeenSources } from '../application/source-record'

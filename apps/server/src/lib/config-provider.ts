@@ -13,7 +13,7 @@ import { ConfigProvider, Layer } from 'effect'
  * happens to be in the environment. Outside production the file is optional and
  * local dev reads `.env`, so an absent file just means "use the environment"
  * and returns `undefined`. Values come back verbatim (all JSON strings, e.g.
- * `"600"`, `"false"`) with no coercion, so `Config.int` / `Config.boolean`
+ * `"600"`, `"false"`) with no coercion, so `Config.Int` / `Config.Boolean`
  * parse them downstream.
  */
 export function resolveConfigEnv(

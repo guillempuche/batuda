@@ -42,13 +42,13 @@ export const seedRecordings = (
 			if (row.subject) idBySubject.set(row.subject, row.id)
 		}
 
-		const storageEndpoint = yield* Config.string('STORAGE_ENDPOINT')
-		const storageRegion = yield* Config.string('STORAGE_REGION')
-		const storageAccessKeyId = yield* Config.string('STORAGE_ACCESS_KEY_ID')
-		const storageSecretAccessKey = yield* Config.redacted(
+		const storageEndpoint = yield* Config.String('STORAGE_ENDPOINT')
+		const storageRegion = yield* Config.String('STORAGE_REGION')
+		const storageAccessKeyId = yield* Config.String('STORAGE_ACCESS_KEY_ID')
+		const storageSecretAccessKey = yield* Config.Redacted(
 			'STORAGE_SECRET_ACCESS_KEY',
 		)
-		const storageBucket = yield* Config.string('STORAGE_BUCKET')
+		const storageBucket = yield* Config.String('STORAGE_BUCKET')
 		const s3 = new S3Client({
 			endpoint: storageEndpoint,
 			region: storageRegion,

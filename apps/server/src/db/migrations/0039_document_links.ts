@@ -1,5 +1,5 @@
 import { Effect } from 'effect'
-import { SqlClient } from 'effect/unstable/sql'
+import { SqlClient } from 'effect/sql'
 
 // A document used to belong to exactly one company, so a note could not be
 // filed against the meeting it was written for, the person it is about, the

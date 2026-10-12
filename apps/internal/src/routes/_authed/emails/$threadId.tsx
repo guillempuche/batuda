@@ -2,7 +2,7 @@ import { useAtomRefresh, useAtomSet, useAtomValue } from '@effect/atom-react'
 import { useLingui } from '@lingui/react/macro'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { DateTime } from 'effect'
-import { AsyncResult } from 'effect/unstable/reactivity'
+import { AsyncResult } from 'effect/reactivity'
 import {
 	AlertTriangle,
 	Archive,

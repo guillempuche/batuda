@@ -1,5 +1,7 @@
 import { Effect } from 'effect'
-import type { SqlClient } from 'effect/unstable/sql'
+import type { SqlClient } from 'effect/sql'
+
+import { inOwnSavepoint } from '../lib/savepoint'
 
 // What an assistant calls itself, taken from the handshake it sends when it
 // opens a session. Self-reported, so it is a label that helps a person tell
@@ -84,6 +86,7 @@ export const recordClientSeen = (
 	`.pipe(
 		// Losing this record must never cost the caller their request — it is a
 		// convenience on a settings page, not part of serving the call.
+		inOwnSavepoint(sql),
 		Effect.catchCause(cause =>
 			Effect.logWarning('Could not record MCP client identity').pipe(
 				Effect.annotateLogs({

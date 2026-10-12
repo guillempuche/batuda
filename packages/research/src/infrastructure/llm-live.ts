@@ -2,7 +2,7 @@
  * Boot-time LLM provider selection for the three tier services.
  *
  * Each tier (Agent / Extract / Writer) reads its own `RESEARCH_LLM_<TIER>_*`
- * env triple at startup and binds an OpenAI-compatible `LanguageModel.Service`
+ * env triple at startup and binds an OpenAI-compatible `LanguageModel.LanguageModel`
  * to the matching tag. All real providers expose OpenAI-compatible APIs and
  * are built via `@effect/ai-openai-compat`.
  *
@@ -38,8 +38,8 @@ import {
 	Layer,
 	Option,
 } from 'effect'
-import type { LanguageModel } from 'effect/unstable/ai'
-import { FetchHttpClient } from 'effect/unstable/http'
+import type { LanguageModel } from 'effect/ai'
+import { FetchHttpClient } from 'effect/http'
 
 import {
 	AgentLanguageModel,
@@ -146,22 +146,22 @@ const slotsForVendors = (
 		// asks for a model. Asking here would fail a tier nobody gave a model to
 		// precisely because it was never going to need one.
 		if (vendors[0] === 'stub') return []
-		const model = yield* Config.string(`${envPrefix}_MODEL`)
+		const model = yield* Config.String(`${envPrefix}_MODEL`)
 		// Read for its validation only: a tier that names a model must also name
 		// how much one reply may write, and the probe reports a bad value by name.
-		yield* Config.int(`${envPrefix}_MAX_OUTPUT_TOKENS`)
+		yield* Config.Int(`${envPrefix}_MAX_OUTPUT_TOKENS`)
 		return yield* Effect.forEach(vendors, (vendor, i) =>
 			Effect.gen(function* () {
 				if (vendor === 'stub') return []
 				const slotModel =
 					i === 0
 						? model
-						: yield* Config.string(keyForSlot(`${envPrefix}_MODEL`, i)).pipe(
+						: yield* Config.String(keyForSlot(`${envPrefix}_MODEL`, i)).pipe(
 								Config.withDefault(model),
 							)
 				const baseUrl =
 					vendor === 'custom'
-						? yield* Config.string(keyForSlot(`${envPrefix}_BASE_URL`, i))
+						? yield* Config.String(keyForSlot(`${envPrefix}_BASE_URL`, i))
 						: LLM_BASE_URLS[vendor]
 				return [
 					{
@@ -242,10 +242,10 @@ const slotRate = (vendor: LlmVendor, envPrefix: string, slot: number) =>
 	vendor === 'stub'
 		? Effect.succeed({ inCentsPer1k: 0, outCentsPer1k: 0 })
 		: Effect.gen(function* () {
-				const inCentsPer1k = yield* Config.finite(
+				const inCentsPer1k = yield* Config.Finite(
 					keyForSlot(`${envPrefix}_PRICE_IN_CENTS_PER_1K`, slot),
 				)
-				const outCentsPer1k = yield* Config.finite(
+				const outCentsPer1k = yield* Config.Finite(
 					keyForSlot(`${envPrefix}_PRICE_OUT_CENTS_PER_1K`, slot),
 				)
 				return { inCentsPer1k, outCentsPer1k }
@@ -262,12 +262,12 @@ const buildSlot = (
 ) =>
 	Effect.gen(function* () {
 		if (vendor === 'stub') return stubLanguageModelService
-		const apiKey = yield* Config.redacted(
+		const apiKey = yield* Config.Redacted(
 			keyForSlot(`${envPrefix}_API_KEY`, slot),
 		)
 		const baseUrl =
 			vendor === 'custom'
-				? yield* Config.string(keyForSlot(`${envPrefix}_BASE_URL`, slot))
+				? yield* Config.String(keyForSlot(`${envPrefix}_BASE_URL`, slot))
 				: LLM_BASE_URLS[vendor]
 		const service = yield* OpenAiLanguageModel.make({
 			model,
@@ -288,7 +288,7 @@ const buildSlot = (
 	})
 
 const buildTierLayer = <Self>(
-	Tag: Context.Key<Self, LanguageModel.Service>,
+	Tag: Context.Key<Self, LanguageModel.LanguageModel>,
 	envPrefix: string,
 	tier: LlmTier,
 ) =>
@@ -310,14 +310,14 @@ const buildTierLayer = <Self>(
 				return Layer.succeed(Tag)(stubLanguageModelService)
 			}
 
-			const model = yield* Config.string(`${envPrefix}_MODEL`)
+			const model = yield* Config.String(`${envPrefix}_MODEL`)
 			// The most one reply may write. Left to the vendor, a long extraction
 			// runs on until the vendor cuts it mid-JSON at a length nobody chose;
 			// set here, the cut is known and the caller can ask for less.
-			const maxOutputTokens = yield* Config.int(
+			const maxOutputTokens = yield* Config.Int(
 				`${envPrefix}_MAX_OUTPUT_TOKENS`,
 			)
-			const timeoutSeconds = yield* Config.int(`${envPrefix}_TIMEOUT_SEC`).pipe(
+			const timeoutSeconds = yield* Config.Int(`${envPrefix}_TIMEOUT_SEC`).pipe(
 				Config.withDefault(DEFAULT_TIMEOUT_SEC[tier]),
 			)
 			const timeout: Duration.Input = `${timeoutSeconds} seconds`
@@ -330,7 +330,7 @@ const buildTierLayer = <Self>(
 					const slotModel =
 						i === 0
 							? model
-							: yield* Config.string(keyForSlot(`${envPrefix}_MODEL`, i)).pipe(
+							: yield* Config.String(keyForSlot(`${envPrefix}_MODEL`, i)).pipe(
 									Config.withDefault(model),
 								)
 					const service = yield* buildSlot(

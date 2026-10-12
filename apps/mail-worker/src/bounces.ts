@@ -1,11 +1,12 @@
 import { DateTime, Effect } from 'effect'
-import { SqlClient } from 'effect/unstable/sql'
+import { SqlClient } from 'effect/sql'
 import type { ParsedMail } from 'mailparser'
 
 import { clipText } from '@batuda/domain'
 import { EmailBounced, TimelineActivityService } from '@batuda/timeline'
 
 import { asOrg } from './lib/as-org.js'
+import { textArray } from './lib/pg-params'
 
 // RFC 3464 Delivery Status Notification parsing. A DSN is a
 // multipart/report;report-type=delivery-status with three parts:
@@ -201,7 +202,7 @@ export const applyBounce = (args: {
 			    END
 			WHERE ch.channel = 'email'
 			  AND ch.organization_id = ${organizationId}
-			  AND lower(ch.address) = ANY(${recipients})
+			  AND lower(ch.address) = ANY(${textArray(recipients)})
 			RETURNING ch.subject_table, ch.subject_id
 		`
 
@@ -217,7 +218,7 @@ export const applyBounce = (args: {
 				? []
 				: yield* sql<{ id: string; companyId: string }>`
 						SELECT c.id, c.company_id FROM contacts c
-						WHERE c.id = ANY(${bouncedContactIds as unknown as string[]})
+						WHERE c.id = ANY(${textArray(bouncedContactIds)}::uuid[])
 					`
 
 		// Soft-bounce promotion: if the rolling 7-day soft bounce count
@@ -231,7 +232,7 @@ export const applyBounce = (args: {
 				    status_updated_at = now()
 				WHERE channel = 'email'
 				  AND organization_id = ${organizationId}
-				  AND lower(address) = ANY(${recipients})
+				  AND lower(address) = ANY(${textArray(recipients)})
 				  AND soft_bounce_count >= 3
 				  AND status_updated_at >= now() - interval '7 days'
 			`

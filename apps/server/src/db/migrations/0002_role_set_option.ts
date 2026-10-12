@@ -1,5 +1,5 @@
 import { Effect } from 'effect'
-import { SqlClient } from 'effect/unstable/sql'
+import { SqlClient } from 'effect/sql'
 
 // Postgres 16+ split role membership into separate ADMIN / INHERIT / SET
 // options. The `CREATE ROLE` auto-grant in 0001_initial.ts hands the

@@ -1,6 +1,6 @@
 import { DateTime, Effect, Schema } from 'effect'
-import { Tool, Toolkit } from 'effect/unstable/ai'
-import { SqlClient } from 'effect/unstable/sql'
+import { Tool, Toolkit } from 'effect/ai'
+import { SqlClient } from 'effect/sql'
 
 import { CurrentOrg, DocumentSummary } from '@batuda/controllers'
 import {
@@ -218,7 +218,7 @@ export const DocumentHandlersLive = DocumentTools.toLayer(
 						conditions.length > 0 ? sql`WHERE ${sql.and(conditions)}` : sql``
 					const rows = yield* sql`
 						SELECT
-							d.id, d.type, d.title, d.created_at, d.updated_at,
+							d.id, d.type, d.format, d.title, d.created_at, d.updated_at,
 							left(d.content, ${SNIPPET_CHARS}) AS snippet,
 							COALESCE((
 								SELECT json_agg(json_build_object(

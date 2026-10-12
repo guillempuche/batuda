@@ -6,7 +6,7 @@ process.env['DATABASE_URL'] ??=
 import { createHash, randomUUID } from 'node:crypto'
 
 import { Effect, Layer } from 'effect'
-import { SqlClient } from 'effect/unstable/sql'
+import { SqlClient } from 'effect/sql'
 import { afterAll, describe, expect, it } from 'vitest'
 
 import {

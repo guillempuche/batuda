@@ -9,8 +9,8 @@ process.env['RESEARCH_MAX_LOOP_PROMPT_TOKENS'] ??= '24000'
 import { createHash, randomUUID } from 'node:crypto'
 
 import { Effect, Layer, ManagedRuntime, Stream } from 'effect'
-import type { LanguageModel } from 'effect/unstable/ai'
-import { SqlClient } from 'effect/unstable/sql'
+import { LanguageModel } from 'effect/ai'
+import { SqlClient } from 'effect/sql'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import {
@@ -108,7 +108,8 @@ const scrapeRound = () => ({
 	usage,
 })
 
-const agentLlm: LanguageModel.Service = {
+const agentLlm: LanguageModel.LanguageModel = {
+	[LanguageModel.TypeId]: LanguageModel.TypeId,
 	generateText: (_o: unknown) =>
 		Effect.sync(() =>
 			agentCall++ === 0 ? scrapeRound() : finalRound,
@@ -128,7 +129,8 @@ const NEW_CONTACT_COMPANY_ID = '00000000-0000-4000-8000-000000000001'
 // a name and the company it belongs to, and no email or phone, so the value guard
 // cannot strip it — whether it survives to the findings is decided by the entity
 // gate alone.
-const extractLlm: LanguageModel.Service = {
+const extractLlm: LanguageModel.LanguageModel = {
+	[LanguageModel.TypeId]: LanguageModel.TypeId,
 	generateText: (_o: unknown) => Effect.succeed(finalRound) as never,
 	generateObject: (_o: unknown) =>
 		Effect.succeed({
@@ -156,7 +158,8 @@ const extractLlm: LanguageModel.Service = {
 		Stream.succeed({ type: 'text-delta' as const, delta: '' }) as never,
 }
 
-const writerLlm: LanguageModel.Service = {
+const writerLlm: LanguageModel.LanguageModel = {
+	[LanguageModel.TypeId]: LanguageModel.TypeId,
 	generateText: (_o: unknown) =>
 		Effect.succeed({ ...finalRound, text: 'a brief' }) as never,
 	generateObject: (_o: unknown) =>

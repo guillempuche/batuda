@@ -1,5 +1,5 @@
 import { Effect } from 'effect'
-import { SqlClient } from 'effect/unstable/sql'
+import { SqlClient } from 'effect/sql'
 
 // Instruction stacks become named entities: each org and each member can keep
 // several named stacks per agent (e.g. an 'email-formal' and an 'email-es'

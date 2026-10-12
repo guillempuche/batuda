@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 
 import { Effect, Layer } from 'effect'
-import { SqlClient } from 'effect/unstable/sql'
+import { SqlClient } from 'effect/sql'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { StorageError } from '@batuda/controllers'

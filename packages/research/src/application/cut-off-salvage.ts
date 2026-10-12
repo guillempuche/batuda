@@ -1,5 +1,5 @@
 import { Effect, Schema } from 'effect'
-import { OpenAiStructuredOutput } from 'effect/unstable/ai'
+import { OpenAiStructuredOutput } from 'effect/ai'
 
 import { closeCutOffJson } from '../domain/cut-off-reply'
 import { CutOffReply } from '../domain/errors'

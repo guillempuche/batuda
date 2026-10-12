@@ -1,10 +1,11 @@
 import { DateTime, Effect, Schema } from 'effect'
-import { Tool, Toolkit } from 'effect/unstable/ai'
-import { SqlClient } from 'effect/unstable/sql'
+import { Tool, Toolkit } from 'effect/ai'
+import { SqlClient } from 'effect/sql'
 
 import { CurrentOrg } from '@batuda/controllers'
 import { Product } from '@batuda/domain'
 
+import { jsonColumn } from '../../lib/pg-params'
 import { ProductIdParam } from './_ids'
 import { McpPageLimit, TruncatableResult, toTruncatable } from './_result'
 
@@ -104,7 +105,8 @@ export const ProductHandlersLive = ProductTools.toLayer(
 						row['defaultPrice'] = params.default_price
 					if (params.price_type !== undefined)
 						row['priceType'] = params.price_type
-					if (params.metadata !== undefined) row['metadata'] = params.metadata
+					if (params.metadata !== undefined)
+						row['metadata'] = jsonColumn(params.metadata)
 					const rows =
 						yield* sql`INSERT INTO products ${sql.insert(row)} RETURNING *`
 					const created = rows[0]
@@ -127,7 +129,8 @@ export const ProductHandlersLive = ProductTools.toLayer(
 					if (rest.default_price !== undefined)
 						data['defaultPrice'] = rest.default_price
 					if (rest.price_type !== undefined) data['priceType'] = rest.price_type
-					if (rest.metadata !== undefined) data['metadata'] = rest.metadata
+					if (rest.metadata !== undefined)
+						data['metadata'] = jsonColumn(rest.metadata)
 					const rows = yield* sql`
 						UPDATE products SET ${sql.update(data, ['id'])}
 						WHERE id = ${id} RETURNING *

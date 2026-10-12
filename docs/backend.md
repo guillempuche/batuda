@@ -185,15 +185,33 @@ import { PgClient } from '@effect/sql-pg'
 import { Config } from 'effect'
 
 export const PgLive = PgClient.layerConfig({
-  url: Config.redacted('DATABASE_URL'),
+  url: Config.Redacted('DATABASE_URL'),
   transformResultNames: Config.succeed((s: string) => s.replace(/_([a-z])/g, (_, c: string) => c.toUpperCase())),
   transformQueryNames: Config.succeed((s: string) => s.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`)),
+  transformJson: Config.succeed(false),
+  prepare: Config.succeed(false),
+  maxConnections: Config.succeed(10),
 })
 ```
+
+`prepare: false` because a named statement caches its plan, and a migration that adds a column while the old code still serves makes every cached `SELECT *` plan fail.
 
 The transform functions handle snake_case ↔ camelCase mapping automatically — `sql.insert({ sizeRange: 'x' })` generates `INSERT INTO ... (size_range) VALUES ('x')`, and SELECT results map `size_range` → `sizeRange`.
 
 **This result mapping applies to *every* query, raw `` sql`…` `` template literals included** — not just the `sql.insert`/query-builder helpers. A `SELECT foo_bar` column comes back on the row as `fooBar`, **not** `foo_bar`. So read result columns in camelCase and type your `` sql<{ … }>` `` row shapes in camelCase, even though the SQL text itself — column names, `WHERE`, `INSERT`/`UPDATE` targets — stays snake_case. The trap: reading a snake_case key that the transform renamed (`row.foo_bar`) returns `undefined` with no type error and no runtime error, so the miss reads as an empty/missing value and slips through silently.
+
+### Binding values
+
+`@effect/sql-pg` talks to Postgres with its own client and picks each parameter's type from its JavaScript value. Write values in the form the column expects; `apps/server/src/lib/pg-params.ts` holds the helpers (the mail worker and the CLI seed carry their own copy of `textArray`).
+
+- **Lists** bind as `text[]`, typed from their first element, so an empty list is refused. Send every list through `textArray(xs)`. Compare one against a `uuid` column with `= ANY(${textArray(ids)}::uuid[])`.
+- **JSON columns** refuse a bare object or number. Send `jsonColumn(value)` (a string is taken to be JSON text already; `null`/`undefined` become NULL), or `withJsonColumns(row, ['metadata'])` for a row whose named keys are JSON.
+- **Whole-number columns** take a decimal without complaint and round it, so validate inputs with `Schema.Int`.
+- **Reads:** `int8` and `count(*)` arrive as `bigint` (cast with `::int` or read through `Number()`), `DATE` as a `"YYYY-MM-DD"` string, and a column of a type the client does not know (the `tsvector` on `email_messages`) fails the whole row — name the columns rather than `SELECT *`.
+
+### Refused statements inside a transaction
+
+A statement Postgres refuses aborts the transaction around it. Code that catches the refusal and carries on — a unique index answering "already there", an id the model invented — must run that statement in a savepoint of its own, or the COMMIT that follows rolls everything back and fails. Use `inOwnSavepoint(sql)` (`apps/server/src/lib/savepoint.ts`) before the catch; `packages/instructions` uses `inSavepoint`.
 
 ### Migrator layer (`@effect/sql-pg/PgMigrator`)
 
@@ -215,7 +233,7 @@ export const MigratorLive = PgMigrator.layer({
 
 ```typescript
 // apps/server/src/db/migrations/0001_initial.ts
-import { SqlClient } from 'effect/unstable/sql'
+import { SqlClient } from 'effect/sql'
 import { Effect } from 'effect'
 
 export default Effect.gen(function* () {
@@ -276,8 +294,8 @@ Follow only the patterns documented here — do not mix in patterns from older E
 
 ```typescript
 import { Context, Effect, Layer } from "effect"
-import { SqlClient } from 'effect/unstable/sql'
-import type { Statement } from 'effect/unstable/sql'
+import { SqlClient } from 'effect/sql'
+import type { Statement } from 'effect/sql'
 
 // Service definition — uses Effect SQL template literals
 class CompanyService extends Context.Service<CompanyService>()(
@@ -314,7 +332,7 @@ class CompanyService extends Context.Service<CompanyService>()(
 ### HTTP routes
 
 ```typescript
-import { HttpApiGroup, HttpApiEndpoint, HttpApiSchema } from "effect/unstable/httpapi"
+import { HttpApiGroup, HttpApiEndpoint, HttpApiSchema } from "effect/http-api"
 
 export const CompaniesApi = HttpApiGroup.make("companies").add(
   HttpApiEndpoint.get("list", "/companies", {
@@ -336,7 +354,7 @@ export const CompaniesApi = HttpApiGroup.make("companies").add(
 ### Route handlers
 
 ```typescript
-import { HttpApiBuilder } from "effect/unstable/httpapi"
+import { HttpApiBuilder } from "effect/http-api"
 
 export const CompaniesApiLive = HttpApiBuilder.group(
   BatudaApi,
@@ -365,7 +383,7 @@ An error carries an Effect Schema when — and only when — a route answers a r
 ```typescript
 import { Schema } from "effect"
 
-export class NotFoundError extends Schema.TaggedErrorClass<NotFoundError>()(
+export class NotFoundError extends Schema.TaggedError<NotFoundError>()(
   "NotFoundError",
   { entity: Schema.String, id: Schema.String }
 ) {}
@@ -468,7 +486,7 @@ An agent tool that takes a `limit` must return `hasMore` too, through `PageResul
 
 ## MCP server (Effect AI)
 
-The MCP server uses `effect/unstable/ai` — tools, resources, prompts, and elicitation. Source reference: `docs/repos/effect/packages/effect/MCP.md`.
+The MCP server uses `effect/ai` — tools, resources, prompts, and elicitation. Source reference: `docs/repos/effect/packages/effect/MCP.md`.
 
 ### Architecture
 
@@ -491,7 +509,7 @@ Tools are defined with `Tool.make()`, grouped into `Toolkit.make()`, and registe
 ```typescript
 // src/mcp/tools/companies.ts
 import { Effect, Schema } from 'effect'
-import { Tool, Toolkit } from 'effect/unstable/ai'
+import { Tool, Toolkit } from 'effect/ai'
 
 const SearchCompanies = Tool.make('search_companies', {
   description: 'Filter companies by status, country, industry, priority, or query.',
@@ -542,7 +560,7 @@ All tools MUST set `Tool.Destructive` explicitly — it defaults to `true`.
 Static resources use `McpServer.resource({...})`. Parameterized resources use template literals with `McpSchema.param()`:
 
 ```typescript
-import { McpSchema, McpServer } from 'effect/unstable/ai'
+import { McpSchema, McpServer } from 'effect/ai'
 
 const slugParam = McpSchema.param('slug', Schema.String)
 
@@ -570,7 +588,7 @@ export const CompanyResource = McpServer.resource`batuda://company/${slugParam}`
 Prompts are parameterized templates with auto-completion. The synthesis prompts (company-research, daily-briefing, proposal-draft, interaction-follow-up, research-designer) accept `lang: 'ca' | 'es' | 'en'` (default `en`) for multilingual output; the action prompts (apply-instruction, save-instruction) emit a directive in the caller's language instead.
 
 ```typescript
-import { McpServer } from 'effect/unstable/ai'
+import { McpServer } from 'effect/ai'
 import { LangParam, langDirective } from './_lang'
 import { completeCompanySlug } from './_completions'
 
@@ -599,13 +617,13 @@ publish_page: ({ id }) => Effect.gen(function* () {
   )
   if (answer === 'unaskable')
     return { status: 'cancelled', reason: 'this client cannot ask anyone; publish it from the app instead' }
-  if (answer === 'declined')
-    return { status: 'cancelled', reason: 'the answer was no' }
+  if (answer !== 'confirmed')
+    return { status: 'cancelled', reason: answer === 'declined' ? 'the answer was no' : 'nobody answered in time' }
   return yield* service.publish(id)
 }).pipe(Effect.orDie),
 ```
 
-The tool must list `McpSchema.McpServerClient` in its `dependencies`, and its `success` schema must be able to carry the refusal — a closed `Schema.Struct` cannot, and the refusal then fails to encode.
+The tool must list `McpSchema.McpServerClient` and `McpSchema.McpRequestContext` in its `dependencies`, act only on `'confirmed'` (`requireApproval` also answers `'unanswered'` when nobody replies within four minutes), and its `success` schema must be able to carry the refusal — a closed `Schema.Struct` cannot, and the refusal then fails to encode.
 
 Two things not to do. Do not call `McpServer.elicit()` without asking `canElicit` first: a client that cannot show a question answers the request with a refusal, and reading that as "the person said no" reports a decision nobody made. Neither Claude.ai nor ChatGPT can show one today, so on those clients every such question used to answer itself. And do not use `Tool.make`'s `needsApproval` field — Effect reads it only in its AI client loop, never in the MCP server, so a tool declaring it runs anyway while its description promises otherwise. A test in `_annotations.test.ts` fails if one reappears.
 
@@ -620,7 +638,7 @@ export class CurrentUser extends Context.Service<CurrentUser>()('CurrentUser', {
 }) {}
 ```
 
-- **HTTP transport**: middleware validates Better Auth session → provides `CurrentUser` per-request
+- **HTTP transport**: a middleware on the `/mcp` routes alone signs the caller in (API key, OAuth token or session) and provides `CurrentUser` per request. It wraps only the routes `McpServer.layerHttp` adds, so it runs on exactly the requests the router sends there, however the path is spelled — a check on the raw URL would have to copy how the router reads a path, and every gap in the copy is a way in without signing in.
 - **Stdio transport**: static `CurrentUser` (trusted local user)
 - Tool handlers: `const user = yield* CurrentUser` for audit/permissions
 
@@ -645,7 +663,11 @@ Layer.launch(ServerLayer).pipe(NodeRuntime.runMain)
 ```typescript
 // src/mcp/http.ts
 export const McpHttpLive = McpToolsLive.pipe(
-  Layer.provide(McpServer.layerHttp({ name: 'batuda', version: '1.0.0', path: '/mcp' })),
+  Layer.provide(
+    McpServer.layerHttp({ name: 'batuda', version: '1.0.0', path: '/mcp', protocols: MCP_PROTOCOLS })
+      // Route middleware: wraps the routes this layer adds and nothing else.
+      .pipe(Layer.provide(McpAuthMiddleware.layer)),
+  ),
 )
 
 // In main.ts — merged with REST API on the same HttpRouter:
@@ -702,7 +724,7 @@ npx @modelcontextprotocol/inspector -- pnpm --filter @batuda/server dev:mcp
 echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{"elicitation":{}},"clientInfo":{"name":"test","version":"0.1"}}}' | pnpm --filter @batuda/server dev:mcp
 
 # HTTP endpoint
-curl -X POST -k https://api.batuda.localhost:$(cat ~/.portless/proxy.port 2>/dev/null || echo 443)/mcp -H 'Content-Type: application/json' -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{...}}'
+curl -X POST -k https://api.batuda.localhost:$(cat ~/.portless/proxy.port 2>/dev/null || echo 443)/mcp -H 'Content-Type: application/json' -H 'Accept: application/json, text/event-stream' -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{...}}'
 
 # Claude Code — .mcp.json points at the deployed HTTP server (api.batuda.co),
 # not this one, so a local change shows up there only after a release.
@@ -1065,7 +1087,7 @@ Style: 2-space indent, 100-char line width, single quotes, ES5 trailing commas, 
 1. Define tool with `Tool.make(name, { description, parameters, success })` in `src/mcp/tools/<domain>.ts`
 2. Add annotations: `.annotate(Tool.Title, ...)`, `.annotate(Tool.Readonly, ...)`, `.annotate(Tool.Destructive, false)`, `.annotate(Tool.OpenWorld, false)`
 3. Add to a `Toolkit.make(...)` and export both `*Tools` and `*HandlersLive`
-4. Register in `src/mcp/server.ts` via `mcpToolkitSafe(Tools)` + `Layer.provide(HandlersLive)`
+4. Register in `src/mcp/server.ts` via `mcpToolkitSafe(Tools)` + `Layer.provide(HandlersLive)` — each call then runs in the signed-in organization's scope on its own
 5. Document in `AGENTS.md` if it changes agent workflows
 
 ## Adding a new MCP resource
@@ -1074,14 +1096,16 @@ Style: 2-space indent, 100-char line width, single quotes, ES5 trailing commas, 
 2. Static: `McpServer.resource({ uri, name, description, mimeType, audience, content })`
 3. Parameterized: `McpServer.resource\`batuda://entity/${McpSchema.param('id', Schema.String)}\`({...})`
 4. Add `completion` for parameterized resources
-5. Add to `McpToolsLive` in `src/mcp/server.ts`
+5. Wrap `content`, and any `completion` that reads the CRM, in `inMcpOrgScope` (`Effect.fn(..., inMcpOrgScope)` for a parameterized one) — without it the read has no organization scope
+6. Add to `McpToolsLive` in `src/mcp/server.ts`
 
 ## Adding a new MCP prompt
 
 1. Define in `src/mcp/prompts/<name>.ts`
 2. Include `lang: LangParam` in parameters, prepend `langDirective(lang)` to output
 3. Use `completeCompanySlug` from `_completions.ts` for slug auto-completion
-4. Add to `McpToolsLive` in `src/mcp/server.ts`
+4. Wrap `content`, and any `completion` that reads the CRM, in `inMcpOrgScope`
+5. Add to `McpToolsLive` in `src/mcp/server.ts`
 
 ## Adding a new research capability provider
 

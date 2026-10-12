@@ -1,7 +1,7 @@
 import { useAtomRefresh, useAtomValue } from '@effect/atom-react'
 import { Trans, useLingui } from '@lingui/react/macro'
 import { DateTime } from 'effect'
-import { AsyncResult } from 'effect/unstable/reactivity'
+import { AsyncResult } from 'effect/reactivity'
 import { Calendar, ExternalLink } from 'lucide-react'
 import { styled } from 'next-yak'
 import { useMemo } from 'react'

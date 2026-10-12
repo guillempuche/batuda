@@ -1,9 +1,5 @@
 import { Schema } from 'effect'
-import {
-	HttpApiEndpoint,
-	HttpApiGroup,
-	HttpApiSchema,
-} from 'effect/unstable/httpapi'
+import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from 'effect/http-api'
 
 import { RESEARCH_QUERY_MAX_CHARS, ResearchSubjectTable } from '@batuda/domain'
 // Straight from the schemas file rather than the package entry point: that entry
@@ -111,9 +107,9 @@ export const CreateResearchInput = Schema.Struct({
 	// would otherwise write a batch row and one run per matched company, every
 	// one of them doomed.
 	schema_name: Schema.optional(SchemaNameSchema),
-	budget_cents: Schema.optional(Schema.Number),
-	paid_budget_cents: Schema.optional(Schema.Number),
-	auto_approve_paid_cents: Schema.optional(Schema.Number),
+	budget_cents: Schema.optional(Schema.Int),
+	paid_budget_cents: Schema.optional(Schema.Int),
+	auto_approve_paid_cents: Schema.optional(Schema.Int),
 	confirm: Schema.optional(Schema.Boolean),
 	// A saved stack (id) and/or ad-hoc extra templates for this run. The UI holds
 	// ids, so only ids are accepted here (the MCP surface resolves names).
@@ -122,12 +118,12 @@ export const CreateResearchInput = Schema.Struct({
 })
 
 const UpdatePolicyInput = Schema.Struct({
-	budget_cents: Schema.optional(Schema.Number),
-	paid_budget_cents: Schema.optional(Schema.Number),
-	auto_approve_paid_cents: Schema.optional(Schema.Number),
-	paid_monthly_cap_cents: Schema.optional(Schema.Number),
+	budget_cents: Schema.optional(Schema.Int),
+	paid_budget_cents: Schema.optional(Schema.Int),
+	auto_approve_paid_cents: Schema.optional(Schema.Int),
+	paid_monthly_cap_cents: Schema.optional(Schema.Int),
 	// Nullable so the client can turn auto-apply off by sending null.
-	auto_apply_min_confidence: Schema.optional(Schema.NullOr(Schema.Number)),
+	auto_apply_min_confidence: Schema.optional(Schema.NullOr(Schema.Int)),
 })
 
 const AttachInput = Schema.Struct({

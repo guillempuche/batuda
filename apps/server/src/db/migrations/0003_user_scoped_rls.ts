@@ -1,5 +1,5 @@
 import { Effect } from 'effect'
-import { SqlClient } from 'effect/unstable/sql'
+import { SqlClient } from 'effect/sql'
 
 // user_research_policy, provider_quotas, and provider_usage are keyed by
 // user_id and intentionally span orgs (a user's quota travels with them).

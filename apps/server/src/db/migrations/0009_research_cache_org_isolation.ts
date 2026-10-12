@@ -1,5 +1,5 @@
 import { Effect } from 'effect'
-import { SqlClient } from 'effect/unstable/sql'
+import { SqlClient } from 'effect/sql'
 
 // research_cache had no organization_id and used key_hash as its sole primary
 // key, so two organizations whose runs hashed to the same key collided — the

@@ -1,7 +1,7 @@
 import { useAtomRefresh, useAtomSet, useAtomValue } from '@effect/atom-react'
 import { Trans, useLingui } from '@lingui/react/macro'
 import { Link } from '@tanstack/react-router'
-import { AsyncResult } from 'effect/unstable/reactivity'
+import { AsyncResult } from 'effect/reactivity'
 import { styled } from 'next-yak'
 import { useState } from 'react'
 

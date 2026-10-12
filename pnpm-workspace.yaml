@@ -34,13 +34,13 @@ forceLegacyDeploy: true
 # quietly seating a v3 package next to our v4 runtime, which is the crash above.
 # Do not delete these to make an install pass: find what pulled them in.
 overrides:
-  '@effect/platform-node-shared': 4.0.0-beta.102
-  '@effect/platform-node': 4.0.0-beta.102
-  '@effect/platform': 4.0.0-beta.102
-  '@effect/sql-pg': 4.0.0-beta.102
-  '@effect/sql': 4.0.0-beta.102
-  '@effect/ai-openai-compat': 4.0.0-beta.102
-  effect: 4.0.0-beta.102
+  '@effect/platform-node-shared': 4.0.3
+  '@effect/platform-node': 4.0.3
+  '@effect/platform': 4.0.3
+  '@effect/sql-pg': 4.0.3
+  '@effect/sql': 4.0.3
+  '@effect/ai-openai-compat': 4.0.3
+  effect: 4.0.3
   # Pin the whole @tiptap family to one version. `@tiptap/markdown` (used by
   # apps/internal's rich-text editor) is published only from 3.28.0 and needs
   # `@tiptap/core@^3.28.0`, but `@react-email/editor` pulls the rest of the

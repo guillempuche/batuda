@@ -1,5 +1,5 @@
 import { Context } from 'effect'
-import { HttpApiMiddleware, HttpApiSchema } from 'effect/unstable/httpapi'
+import { HttpApiMiddleware, HttpApiSchema } from 'effect/http-api'
 
 import { Unauthorized } from '../errors'
 

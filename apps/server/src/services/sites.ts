@@ -1,5 +1,5 @@
 import { Effect } from 'effect'
-import type { SqlClient } from 'effect/unstable/sql'
+import type { SqlClient } from 'effect/sql'
 
 /**
  * The branch to store for a person, checked against the company they work for.

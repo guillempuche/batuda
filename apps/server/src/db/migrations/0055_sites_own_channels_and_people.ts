@@ -1,5 +1,5 @@
 import { Effect } from 'effect'
-import { SqlClient } from 'effect/unstable/sql'
+import { SqlClient } from 'effect/sql'
 
 // A branch is somewhere you can reach and somewhere people work, so it holds
 // its own addresses and its own staff. Otherwise a chain with three shops keeps

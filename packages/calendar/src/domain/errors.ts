@@ -1,7 +1,7 @@
 import { Schema } from 'effect'
 
 /** External booking provider rejected a call (network, 4xx/5xx, shape mismatch). */
-export class BookingFailed extends Schema.TaggedErrorClass<BookingFailed>()(
+export class BookingFailed extends Schema.TaggedError<BookingFailed>()(
 	'BookingFailed',
 	{
 		provider: Schema.String,
@@ -11,7 +11,7 @@ export class BookingFailed extends Schema.TaggedErrorClass<BookingFailed>()(
 ) {}
 
 /** No slots available for the requested event type / window. */
-export class NoAvailability extends Schema.TaggedErrorClass<NoAvailability>()(
+export class NoAvailability extends Schema.TaggedError<NoAvailability>()(
 	'NoAvailability',
 	{
 		eventTypeId: Schema.String,
@@ -23,15 +23,12 @@ export class NoAvailability extends Schema.TaggedErrorClass<NoAvailability>()(
 ) {}
 
 /** ICS body could not be parsed into one or more valid VEVENTs. */
-export class InvalidIcs extends Schema.TaggedErrorClass<InvalidIcs>()(
-	'InvalidIcs',
-	{
-		reason: Schema.String,
-	},
-) {}
+export class InvalidIcs extends Schema.TaggedError<InvalidIcs>()('InvalidIcs', {
+	reason: Schema.String,
+}) {}
 
 /** Provider does not support the requested RSVP transition (e.g., tentative on cal.com). */
-export class UnsupportedRsvp extends Schema.TaggedErrorClass<UnsupportedRsvp>()(
+export class UnsupportedRsvp extends Schema.TaggedError<UnsupportedRsvp>()(
 	'UnsupportedRsvp',
 	{
 		provider: Schema.String,

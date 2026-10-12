@@ -1,5 +1,5 @@
 import { Effect } from 'effect'
-import { SqlClient } from 'effect/unstable/sql'
+import { SqlClient } from 'effect/sql'
 
 // Better Auth's `organization`/`member`/`invitation`/`apikey` tables were
 // created by its own migrator and left without RLS in 0001_initial.ts, while

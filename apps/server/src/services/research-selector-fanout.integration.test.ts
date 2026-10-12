@@ -9,8 +9,8 @@ process.env['RESEARCH_MAX_LOOP_PROMPT_TOKENS'] ??= '24000'
 import { randomUUID } from 'node:crypto'
 
 import { Effect, Layer, Stream } from 'effect'
-import type { LanguageModel } from 'effect/unstable/ai'
-import { SqlClient } from 'effect/unstable/sql'
+import { LanguageModel } from 'effect/ai'
+import { SqlClient } from 'effect/sql'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import {
@@ -63,7 +63,8 @@ const stubResponse = {
 	},
 }
 
-const stubLlm: LanguageModel.Service = {
+const stubLlm: LanguageModel.LanguageModel = {
+	[LanguageModel.TypeId]: LanguageModel.TypeId,
 	generateText: () => Effect.succeed(stubResponse) as never,
 	generateObject: () =>
 		Effect.succeed({ ...stubResponse, value: { summary: STUB_TEXT } }) as never,

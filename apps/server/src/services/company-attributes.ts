@@ -1,6 +1,6 @@
 import { Effect, Schema } from 'effect'
-import type { SqlError, Statement } from 'effect/unstable/sql'
-import { SqlClient } from 'effect/unstable/sql'
+import type { SqlError, Statement } from 'effect/sql'
+import { SqlClient } from 'effect/sql'
 
 import { AttributeRejected } from '@batuda/controllers'
 import {
@@ -25,6 +25,7 @@ import {
 import { recordFacts } from '@batuda/observability'
 import { isPlainObject, isWebAddress } from '@batuda/research'
 
+import { textArray } from '../lib/pg-params'
 import { textAnywhere } from '../lib/search-text'
 import {
 	type FieldSource,
@@ -259,8 +260,8 @@ export const attributeWriteFragments = (
 	merge === undefined
 		? { attributes: sql`attributes`, fieldProvenance: sql`field_provenance` }
 		: {
-				attributes: sql`(attributes || ${JSON.stringify(merge.entries)}::jsonb) - ${merge.removed}::text[]`,
-				fieldProvenance: sql`(COALESCE(field_provenance, '{}'::jsonb) || ${JSON.stringify(merge.provenance)}::jsonb) - ${merge.provenanceCleared}::text[]`,
+				attributes: sql`(attributes || ${JSON.stringify(merge.entries)}::jsonb) - ${textArray(merge.removed)}`,
+				fieldProvenance: sql`(COALESCE(field_provenance, '{}'::jsonb) || ${JSON.stringify(merge.provenance)}::jsonb) - ${textArray(merge.provenanceCleared)}`,
 			}
 
 // ── Landing a run's own findings ───────────────────────────────────────────

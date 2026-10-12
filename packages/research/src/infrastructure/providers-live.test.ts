@@ -1,5 +1,5 @@
 import { Cause, ConfigProvider, Effect, Exit, Layer } from 'effect'
-import { FetchHttpClient } from 'effect/unstable/http'
+import { FetchHttpClient } from 'effect/http'
 import { describe, expect, it } from 'vitest'
 
 import { EnrichmentChain, RegistryRouter } from '../application/ports'

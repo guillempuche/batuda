@@ -1,6 +1,6 @@
 import { Effect } from 'effect'
-import type { SqlError } from 'effect/unstable/sql'
-import { SqlClient } from 'effect/unstable/sql'
+import type { SqlError } from 'effect/sql'
+import { SqlClient } from 'effect/sql'
 
 import {
 	ATTRIBUTE_DESCRIPTION_MAX,
@@ -26,7 +26,7 @@ import {
 } from '@batuda/domain'
 
 import type { Agent, ResearchAttribute } from './domain'
-import { type Eff, isUniqueViolation } from './sql'
+import { type Eff, inSavepoint, isUniqueViolation } from './sql'
 import { isUuidRef } from './uuid'
 
 // The attributes an organisation declares on its research stacks, and the
@@ -661,6 +661,7 @@ export const createAttribute = (
 			return yield* Effect.die('research attribute vanished after insert')
 		return { ok: true as const, attribute }
 	}).pipe(
+		inSavepoint,
 		Effect.catchTag('SqlError', err =>
 			isUniqueViolation(err)
 				? Effect.succeed({

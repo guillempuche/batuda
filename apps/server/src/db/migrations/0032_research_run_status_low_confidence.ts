@@ -1,5 +1,5 @@
 import { Effect } from 'effect'
-import { SqlClient } from 'effect/unstable/sql'
+import { SqlClient } from 'effect/sql'
 
 // A research run that succeeds but is thin — a weak entity match, a barely-grounded
 // profile, or a scan vetted against a single source — flips to a distinct terminal

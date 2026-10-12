@@ -6,7 +6,7 @@
  */
 
 import { Effect, Stream } from 'effect'
-import type { LanguageModel } from 'effect/unstable/ai'
+import { LanguageModel } from 'effect/ai'
 
 const STUB_TEXT =
 	'Acme Corp S.L. (CIF B12345678) is a Barcelona-based industrial solutions company founded in 2005. ' +
@@ -31,7 +31,8 @@ const stubResponse = {
 	},
 }
 
-export const stubLanguageModelService: LanguageModel.Service = {
+export const stubLanguageModelService: LanguageModel.LanguageModel = {
+	[LanguageModel.TypeId]: LanguageModel.TypeId,
 	generateText: (_options: unknown) => Effect.succeed(stubResponse) as never,
 	generateObject: (_options: unknown) =>
 		Effect.succeed({

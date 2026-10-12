@@ -1,5 +1,5 @@
 import { Effect } from 'effect'
-import { SqlClient } from 'effect/unstable/sql'
+import { SqlClient } from 'effect/sql'
 
 // Migration 0069 declared `current_tools` on every organisation it copied a
 // value for, but gave the declaration no `description` — the sentence a

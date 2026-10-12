@@ -9,51 +9,51 @@ export class WorkerEnvVars extends Context.Service<WorkerEnvVars>()(
 	'WorkerEnvVars',
 	{
 		make: Effect.gen(function* () {
-			const DATABASE_URL = yield* Config.redacted('DATABASE_URL')
-			const NODE_ENV = yield* Config.string('NODE_ENV').pipe(
+			const DATABASE_URL = yield* Config.Redacted('DATABASE_URL')
+			const NODE_ENV = yield* Config.String('NODE_ENV').pipe(
 				Config.withDefault('development'),
 			)
-			const MIN_LOG_LEVEL = yield* Config.string('MIN_LOG_LEVEL').pipe(
+			const MIN_LOG_LEVEL = yield* Config.String('MIN_LOG_LEVEL').pipe(
 				Config.withDefault('Info'),
 			)
 
 			// Same R2/MinIO bucket the server writes drafts/attachments to —
 			// raw RFC822 lives under `messages/<org>/<inbox>/<uidvalidity>/<uid>.eml`.
-			const STORAGE_ENDPOINT = yield* Config.string('STORAGE_ENDPOINT')
-			const STORAGE_REGION = yield* Config.string('STORAGE_REGION')
-			const STORAGE_ACCESS_KEY_ID = yield* Config.string(
+			const STORAGE_ENDPOINT = yield* Config.String('STORAGE_ENDPOINT')
+			const STORAGE_REGION = yield* Config.String('STORAGE_REGION')
+			const STORAGE_ACCESS_KEY_ID = yield* Config.String(
 				'STORAGE_ACCESS_KEY_ID',
 			)
-			const STORAGE_SECRET_ACCESS_KEY = yield* Config.redacted(
+			const STORAGE_SECRET_ACCESS_KEY = yield* Config.Redacted(
 				'STORAGE_SECRET_ACCESS_KEY',
 			)
-			const STORAGE_BUCKET = yield* Config.string('STORAGE_BUCKET')
+			const STORAGE_BUCKET = yield* Config.String('STORAGE_BUCKET')
 
 			// Same master key as the server — credential rows are encrypted at
 			// write time by the server (createInbox/updateInbox) and decrypted
 			// here at session-establishment time. A mismatch fails decryption.
-			const EMAIL_CREDENTIAL_KEY = yield* Config.redacted(
+			const EMAIL_CREDENTIAL_KEY = yield* Config.Redacted(
 				'EMAIL_CREDENTIAL_KEY',
 			)
 
 			// Per-worker IMAP connection cap. One process can hold a few
 			// hundred IDLEs comfortably; sharding across replicas happens via
 			// pg_advisory_lock so a hard cap keeps each replica honest.
-			const EMAIL_WORKER_MAX_CONNECTIONS = yield* Config.int(
+			const EMAIL_WORKER_MAX_CONNECTIONS = yield* Config.Int(
 				'EMAIL_WORKER_MAX_CONNECTIONS',
 			).pipe(Config.withDefault(50))
 
 			// Initial fetch horizon when an inbox is first connected. 30 days
 			// is enough for "yesterday's thread" while keeping the first sync
 			// bounded; UI users can request a deeper backfill via a manual op.
-			const EMAIL_WORKER_BACKFILL_DAYS = yield* Config.int(
+			const EMAIL_WORKER_BACKFILL_DAYS = yield* Config.Int(
 				'EMAIL_WORKER_BACKFILL_DAYS',
 			).pipe(Config.withDefault(30))
 
 			// Re-issue IDLE before this many seconds elapse. RFC 2177 caps
 			// IDLE at 30 minutes; we re-issue at 29 to leave slack for clock
 			// skew between us and the server.
-			const EMAIL_WORKER_IDLE_TIMEOUT_SEC = yield* Config.int(
+			const EMAIL_WORKER_IDLE_TIMEOUT_SEC = yield* Config.Int(
 				'EMAIL_WORKER_IDLE_TIMEOUT_SEC',
 			).pipe(Config.withDefault(1740))
 

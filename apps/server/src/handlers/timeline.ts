@@ -1,7 +1,7 @@
 import { Effect, Schema } from 'effect'
-import { HttpApiBuilder } from 'effect/unstable/httpapi'
-import type { Statement } from 'effect/unstable/sql'
-import { SqlClient } from 'effect/unstable/sql'
+import { HttpApiBuilder } from 'effect/http-api'
+import type { Statement } from 'effect/sql'
+import { SqlClient } from 'effect/sql'
 
 import { BatudaApi } from '@batuda/controllers'
 import { TimelineActivity } from '@batuda/domain'

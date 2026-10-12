@@ -1,5 +1,5 @@
 import { Effect } from 'effect'
-import { SqlClient } from 'effect/unstable/sql'
+import { SqlClient } from 'effect/sql'
 
 // This table backed a structured-extract cache that no longer exists in the
 // code — nothing reads or writes it anymore. Drop it so the database schema

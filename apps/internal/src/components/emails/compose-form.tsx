@@ -1,6 +1,6 @@
 import { useAtomRefresh, useAtomSet, useAtomValue } from '@effect/atom-react'
 import { useLingui } from '@lingui/react/macro'
-import { AsyncResult } from 'effect/unstable/reactivity'
+import { AsyncResult } from 'effect/reactivity'
 import { AlertTriangle, Plus, Send, X } from 'lucide-react'
 import { css, styled } from 'next-yak'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'

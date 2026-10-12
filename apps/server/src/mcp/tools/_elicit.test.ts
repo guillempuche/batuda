@@ -1,5 +1,6 @@
-import { Effect, Layer } from 'effect'
-import { McpSchema } from 'effect/unstable/ai'
+import { Effect, Fiber, Layer } from 'effect'
+import { McpSchema } from 'effect/ai'
+import { TestClock } from 'effect/testing'
 import { describe, expect, it } from 'vitest'
 
 import { canElicit, requireApproval } from './_elicit'
@@ -8,11 +9,18 @@ import { canElicit, requireApproval } from './_elicit'
 // itself when it opened one. Only the capabilities matter here, so the rest of
 // the connection is left unbuilt.
 const clientSaying = (capabilities: Record<string, unknown>) =>
-	Layer.succeed(McpSchema.McpServerClient, {
-		clientId: 1,
-		initializePayload: { capabilities },
-		getClient: Effect.die('the test never talks back to the client'),
-	} as never)
+	Layer.mergeAll(
+		Layer.succeed(McpSchema.McpServerClient, {
+			clientId: 1,
+			initializePayload: { capabilities },
+			getClient: Effect.die('the test never talks back to the client'),
+		} as never),
+		Layer.succeed(McpSchema.McpRequestContext, {
+			clientId: 1,
+			protocolVersion: '2025-11-25',
+			clientCapabilities: capabilities,
+		}),
+	)
 
 const ask = (capabilities: Record<string, unknown>) =>
 	Effect.runPromise(canElicit.pipe(Effect.provide(clientSaying(capabilities))))
@@ -65,15 +73,24 @@ describe('canElicit', () => {
 const clientAnswering = (
 	answer: { action: 'accept'; content: unknown } | { action: 'decline' },
 ) =>
-	Layer.succeed(McpSchema.McpServerClient, {
-		clientId: 1,
-		initializePayload: { capabilities: { elicitation: {} } },
-		getClient: Effect.succeed({
-			'elicitation/create': () => Effect.succeed(answer),
+	Layer.mergeAll(
+		Layer.succeed(McpSchema.McpServerClient, {
+			clientId: 1,
+			initializePayload: { capabilities: { elicitation: {} } },
+			getClient: Effect.succeed({
+				elicit: () => Effect.succeed(answer),
+			}),
+		} as never),
+		Layer.succeed(McpSchema.McpRequestContext, {
+			clientId: 1,
+			protocolVersion: '2025-11-25',
+			clientCapabilities: { elicitation: {} },
 		}),
-	} as never)
+	)
 
-const askFor = (layer: Layer.Layer<McpSchema.McpServerClient>) =>
+const askFor = (
+	layer: Layer.Layer<McpSchema.McpServerClient | McpSchema.McpRequestContext>,
+) =>
 	Effect.runPromise(
 		requireApproval('Do the thing?').pipe(Effect.provide(layer)),
 	)
@@ -123,5 +140,39 @@ describe('requireApproval', () => {
 			// person somewhere they can decide instead of claiming they said no
 			expect(await askFor(clientSaying({ sampling: {} }))).toBe('unaskable')
 		})
+	})
+})
+
+describe('requireApproval when nobody answers', () => {
+	it('should stop waiting and say nobody answered, rather than hold on forever', async () => {
+		// GIVEN a client that can be asked but whose person never replies
+		const silent = Layer.mergeAll(
+			Layer.succeed(McpSchema.McpServerClient, {
+				clientId: 1,
+				initializePayload: { capabilities: { elicitation: {} } },
+				getClient: Effect.succeed({ elicit: () => Effect.never }),
+			} as never),
+			Layer.succeed(McpSchema.McpRequestContext, {
+				clientId: 1,
+				protocolVersion: '2025-11-25',
+				clientCapabilities: { elicitation: {} },
+			}),
+		)
+
+		// WHEN approval is asked for and the clock runs past the wait
+		const answer = await Effect.runPromise(
+			Effect.gen(function* () {
+				const asking = yield* Effect.forkChild(
+					requireApproval('Do the thing?').pipe(Effect.provide(silent)),
+				)
+				yield* Effect.yieldNow
+				yield* TestClock.adjust('5 minutes')
+				return yield* Fiber.join(asking)
+			}).pipe(Effect.provide(TestClock.layer())),
+		)
+
+		// THEN the answer is that nobody answered — not a no, and not a client
+		// that could not ask — so the tool can say which it was
+		expect(answer).toBe('unanswered')
 	})
 })

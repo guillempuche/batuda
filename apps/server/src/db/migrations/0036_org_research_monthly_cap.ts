@@ -1,5 +1,5 @@
 import { Effect } from 'effect'
-import { SqlClient } from 'effect/unstable/sql'
+import { SqlClient } from 'effect/sql'
 
 // The monthly ceiling on what research may spend at paid vendors belongs to the
 // company, not to each person in it. The vendor plans are bought once for the

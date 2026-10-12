@@ -1,7 +1,33 @@
 /** biome-ignore-all lint/style/noNonNullAssertion: seed data */
 import { createHash } from 'node:crypto'
 
-import type { SqlClient } from 'effect/unstable/sql'
+import { PgTypes } from '@effect/sql-pg'
+import { Result } from 'effect'
+import type { SqlClient } from 'effect/sql'
+
+// A list of strings bound as `text[]`. The driver infers an array's type from
+// its first element, so an empty list has none and is refused; naming the type
+// here binds every list, empty or not.
+export const textArray = (values: ReadonlyArray<string>): PgTypes.Parameter =>
+	Result.getOrThrow(PgTypes.array(values, PgTypes.OID.text))
+
+// Checked by prototype, so a Date in a fixture is bound as a timestamp rather
+// than written out as JSON.
+const isPlainObject = (value: unknown): value is Record<string, unknown> => {
+	if (value === null || typeof value !== 'object') return false
+	const proto = Object.getPrototypeOf(value)
+	return proto === Object.prototype || proto === null
+}
+
+// What the fixtures write, in the form the driver binds: a list of strings is
+// a `text[]` column, and any other list or a plain object is a JSON column.
+const toColumnValue = (value: unknown): unknown => {
+	if (Array.isArray(value))
+		return value.every(item => typeof item === 'string')
+			? textArray(value)
+			: JSON.stringify(value)
+	return isPlainObject(value) ? JSON.stringify(value) : value
+}
 
 /** Align row shapes within a batch — sql.insert requires uniform keys. */
 export const normalizeRows = <T extends Record<string, unknown>>(
@@ -12,7 +38,7 @@ export const normalizeRows = <T extends Record<string, unknown>>(
 	return rows.map(
 		row =>
 			Object.fromEntries(
-				[...allKeys].map(k => [k, k in row ? row[k] : null]),
+				[...allKeys].map(k => [k, k in row ? toColumnValue(row[k]) : null]),
 			) as T,
 	)
 }

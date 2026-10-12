@@ -11,7 +11,7 @@ process.env['DATABASE_URL'] ??=
 	'postgresql://batuda:batuda@localhost:5433/batuda'
 
 import { Effect } from 'effect'
-import { SqlClient } from 'effect/unstable/sql'
+import { SqlClient } from 'effect/sql'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 
 import type { CurrentOrg, SessionContext } from '@batuda/controllers'

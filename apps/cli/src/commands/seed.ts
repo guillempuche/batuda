@@ -1,5 +1,5 @@
 import { Effect } from 'effect'
-import { SqlClient } from 'effect/unstable/sql'
+import { SqlClient } from 'effect/sql'
 
 import { seedAttributes } from './seed/attributes'
 import { seedCalendar } from './seed/calendar'

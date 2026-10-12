@@ -1,5 +1,5 @@
 import { Effect } from 'effect'
-import { SqlClient } from 'effect/unstable/sql'
+import { SqlClient } from 'effect/sql'
 
 // When a human confirmed this company is a real lead worth working, and who did.
 // Kept separate from the pipeline `status` on purpose: a company can be a

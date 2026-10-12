@@ -9,8 +9,8 @@ process.env['RESEARCH_MAX_LOOP_PROMPT_TOKENS'] ??= '24000'
 import { createHash, randomUUID } from 'node:crypto'
 
 import { Effect, Layer, ManagedRuntime, Stream } from 'effect'
-import type { LanguageModel } from 'effect/unstable/ai'
-import { SqlClient } from 'effect/unstable/sql'
+import { LanguageModel } from 'effect/ai'
+import { SqlClient } from 'effect/sql'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import type { ResearchAttributeDeclaration } from '@batuda/domain'
@@ -126,7 +126,8 @@ const attributeEntry = {
 
 // The searching pass gathers the company's own page and settles at once, so the
 // run reaches the reading with evidence and spends nothing on the way.
-const agentLlm: LanguageModel.Service = {
+const agentLlm: LanguageModel.LanguageModel = {
+	[LanguageModel.TypeId]: LanguageModel.TypeId,
 	generateText: () =>
 		Effect.succeed({
 			...settled,
@@ -150,7 +151,8 @@ const hasField = (schema: unknown, name: string): boolean => {
 	return fields !== undefined && Object.hasOwn(fields, name)
 }
 
-const extractLlm: LanguageModel.Service = {
+const extractLlm: LanguageModel.LanguageModel = {
+	[LanguageModel.TypeId]: LanguageModel.TypeId,
 	generateText: () => Effect.succeed(settled) as never,
 	generateObject: ((options: { readonly schema?: unknown }) =>
 		Effect.sync(() => {
@@ -191,7 +193,8 @@ const extractLlm: LanguageModel.Service = {
 		Stream.succeed({ type: 'text-delta' as const, delta: '' }) as never,
 }
 
-const writerLlm: LanguageModel.Service = {
+const writerLlm: LanguageModel.LanguageModel = {
+	[LanguageModel.TypeId]: LanguageModel.TypeId,
 	generateText: () => Effect.succeed({ ...settled, text: '## Brief' }) as never,
 	generateObject: () => Effect.succeed({ usage, value: {} }) as never,
 	streamText: () =>

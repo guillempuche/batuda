@@ -1,5 +1,5 @@
 import { Schema } from 'effect'
-import { OpenAiStructuredOutput } from 'effect/unstable/ai'
+import { OpenAiStructuredOutput } from 'effect/ai'
 import { describe, expect, it } from 'vitest'
 
 import { CompanyEnrichmentV1Schema } from './company-enrichment-v1'

@@ -10,7 +10,7 @@
  * tears down the whole route tree.
  *
  * Instead we return `DehydratedAtomValue` — the same shape used by
- * `effect/unstable/reactivity/Hydration`. It's a plain object with a
+ * `effect/reactivity/Hydration`. It's a plain object with a
  * string `key` (derived by the atom's `SerializableTypeId.key`) and a
  * schema-encoded `value` (pure JSON, since `AsyncResult.Schema` encodes
  * to tagged unions of primitive/object data). The root route collects
@@ -30,29 +30,21 @@
 
 import { notFound } from '@tanstack/react-router'
 import type { Effect } from 'effect'
-import { Atom } from 'effect/unstable/reactivity'
+import { Atom } from 'effect/reactivity'
+import type { DehydratedAtomValue } from 'effect/reactivity/Hydration'
 
 import type { BatudaApiServerClient } from './batuda-api-server'
 
-/**
- * Serializable dehydrated atom value. Shape matches
- * `effect/unstable/reactivity/Hydration.DehydratedAtomValue` verbatim —
- * we redeclare here so loaders don't pull in the Hydration module
- * (keeps the server-only code path lean).
- */
-export type DehydratedAtomValue = {
-	readonly '~effect/reactivity/DehydratedAtom': true
-	readonly key: string
-	readonly value: unknown
-	readonly dehydratedAt: number
-}
+// A type-only import is erased at build time, so loaders still don't pull the
+// Hydration module into the server bundle.
+export type { DehydratedAtomValue } from 'effect/reactivity/Hydration'
 
 /**
  * Encode an atom value into the serializable dehydrated shape. The atom
  * must be serializable (created via `Atom.serializable(...)` — every
  * `AtomHttpApi.query(...)` result qualifies because `AtomHttpApi` wraps
  * atoms automatically, see
- * `effect/unstable/reactivity/AtomHttpApi.ts:229`).
+ * `effect/reactivity/AtomHttpApi.ts:229`).
  *
  * Throws at runtime if the atom isn't serializable — this is a
  * programmer error, not a recoverable state.
@@ -72,7 +64,7 @@ export function dehydrateAtom<A>(
 	// is safe.
 	const meta = atom[Atom.SerializableTypeId]
 	return {
-		'~effect/reactivity/DehydratedAtom': true,
+		'~effect/reactivity/Hydration/DehydratedAtom': true,
 		key: meta.key,
 		value: meta.encode(value),
 		dehydratedAt: Date.now(),

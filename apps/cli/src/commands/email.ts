@@ -8,7 +8,7 @@
 
 import { GetObjectCommand, S3Client } from '@aws-sdk/client-s3'
 import { Config, Console, Effect, Redacted } from 'effect'
-import { SqlClient } from 'effect/unstable/sql'
+import { SqlClient } from 'effect/sql'
 import { simpleParser } from 'mailparser'
 
 import { injectViaSmtp } from '../lib/smtp-inject'
@@ -94,17 +94,17 @@ export const emailBackfillBodies = (args: { readonly dryRun: boolean }) =>
 		)
 
 		const s3 = new S3Client({
-			endpoint: yield* Config.string('STORAGE_ENDPOINT'),
-			region: yield* Config.string('STORAGE_REGION'),
+			endpoint: yield* Config.String('STORAGE_ENDPOINT'),
+			region: yield* Config.String('STORAGE_REGION'),
 			credentials: {
-				accessKeyId: yield* Config.string('STORAGE_ACCESS_KEY_ID'),
+				accessKeyId: yield* Config.String('STORAGE_ACCESS_KEY_ID'),
 				secretAccessKey: Redacted.value(
-					yield* Config.redacted('STORAGE_SECRET_ACCESS_KEY'),
+					yield* Config.Redacted('STORAGE_SECRET_ACCESS_KEY'),
 				),
 			},
 			forcePathStyle: true,
 		})
-		const bucket = yield* Config.string('STORAGE_BUCKET')
+		const bucket = yield* Config.String('STORAGE_BUCKET')
 
 		let filled = 0
 		let unreadable = 0

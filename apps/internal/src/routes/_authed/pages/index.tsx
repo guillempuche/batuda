@@ -1,7 +1,7 @@
 import { Trans, useLingui } from '@lingui/react/macro'
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import { DateTime, Schema } from 'effect'
-import { AsyncResult } from 'effect/unstable/reactivity'
+import { AsyncResult } from 'effect/reactivity'
 import { ChevronsUpDown, ExternalLink } from 'lucide-react'
 import { styled } from 'next-yak'
 import { useEffect, useMemo, useState } from 'react'

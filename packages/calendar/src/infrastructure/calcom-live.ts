@@ -18,7 +18,7 @@ import {
 	HttpClient,
 	HttpClientRequest,
 	type HttpClientResponse,
-} from 'effect/unstable/http'
+} from 'effect/http'
 
 import { BookingProvider } from '../application/ports/booking-provider'
 import type {
@@ -505,8 +505,8 @@ export const makeCalcomBookingProvider = (config: CalcomAdapterConfig) =>
 export const CalcomBookingProviderLayer = Layer.effect(
 	BookingProvider,
 	Effect.gen(function* () {
-		const apiKey = yield* Config.redacted('CALENDAR_API_KEY')
-		const baseUrl = yield* Config.string('CALENDAR_BASE_URL').pipe(
+		const apiKey = yield* Config.Redacted('CALENDAR_API_KEY')
+		const baseUrl = yield* Config.String('CALENDAR_BASE_URL').pipe(
 			Config.withDefault(CALCOM_DEFAULT_BASE_URL),
 		)
 		yield* Effect.logInfo('calendar.provider.calcom').pipe(

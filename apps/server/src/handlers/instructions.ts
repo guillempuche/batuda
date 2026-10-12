@@ -1,5 +1,5 @@
 import { Effect, Schema } from 'effect'
-import { HttpApiBuilder } from 'effect/unstable/httpapi'
+import { HttpApiBuilder } from 'effect/http-api'
 
 import { BatudaApi, CurrentOrg, SessionContext } from '@batuda/controllers'
 import {

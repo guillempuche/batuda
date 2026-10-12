@@ -11,8 +11,8 @@ process.env['RESEARCH_ORPHAN_SWEEP_INTERVAL_SEC'] ??= '1'
 process.env['RESEARCH_ORPHAN_STALE_SEC'] ??= '1'
 
 import { Effect, Layer, Stream } from 'effect'
-import type { LanguageModel } from 'effect/unstable/ai'
-import { SqlClient } from 'effect/unstable/sql'
+import { LanguageModel } from 'effect/ai'
+import { SqlClient } from 'effect/sql'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import {
@@ -43,7 +43,8 @@ interface Org {
 	slug: string
 }
 
-const stubLlm: LanguageModel.Service = {
+const stubLlm: LanguageModel.LanguageModel = {
+	[LanguageModel.TypeId]: LanguageModel.TypeId,
 	generateText: (_options: unknown) => Effect.die('llm not exercised') as never,
 	generateObject: (_options: unknown) =>
 		Effect.die('llm not exercised') as never,

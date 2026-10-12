@@ -186,17 +186,17 @@ export const seedDocuments = (
 		)
 		if (htmlDocs.length > 0) {
 			const s3 = new S3Client({
-				endpoint: yield* Config.string('STORAGE_ENDPOINT'),
-				region: yield* Config.string('STORAGE_REGION'),
+				endpoint: yield* Config.String('STORAGE_ENDPOINT'),
+				region: yield* Config.String('STORAGE_REGION'),
 				credentials: {
-					accessKeyId: yield* Config.string('STORAGE_ACCESS_KEY_ID'),
+					accessKeyId: yield* Config.String('STORAGE_ACCESS_KEY_ID'),
 					secretAccessKey: Redacted.value(
-						yield* Config.redacted('STORAGE_SECRET_ACCESS_KEY'),
+						yield* Config.Redacted('STORAGE_SECRET_ACCESS_KEY'),
 					),
 				},
 				forcePathStyle: true,
 			})
-			const bucket = yield* Config.string('STORAGE_BUCKET')
+			const bucket = yield* Config.String('STORAGE_BUCKET')
 			for (const { doc, index } of htmlDocs) {
 				const key = htmlKeyFor(tallerOrgId, rows[index]!.id)
 				rows[index]!.storageKey = key

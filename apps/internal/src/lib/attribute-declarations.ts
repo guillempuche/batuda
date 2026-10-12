@@ -1,5 +1,5 @@
 import { Effect } from 'effect'
-import { AsyncResult } from 'effect/unstable/reactivity'
+import { AsyncResult } from 'effect/reactivity'
 
 import { attributeDeclarationsAtom } from '#/atoms/attribute-atoms'
 import { type DehydratedAtomValue, dehydrateAtom } from '#/lib/atom-hydration'

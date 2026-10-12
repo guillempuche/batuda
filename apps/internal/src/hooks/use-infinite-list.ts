@@ -1,6 +1,6 @@
 import { useAtomRefresh, useAtomValue } from '@effect/atom-react'
-import type { Atom } from 'effect/unstable/reactivity'
-import { AsyncResult } from 'effect/unstable/reactivity'
+import type { Atom } from 'effect/reactivity'
+import { AsyncResult } from 'effect/reactivity'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { advance, firstPage, type ListPage } from '#/lib/list-page'

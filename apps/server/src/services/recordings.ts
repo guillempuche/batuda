@@ -1,7 +1,14 @@
 import { randomUUID } from 'node:crypto'
 
-import { Context, DateTime, Effect, Layer, Schema } from 'effect'
-import { SqlClient } from 'effect/unstable/sql'
+import {
+	Context,
+	DateTime,
+	Effect,
+	Layer,
+	Schema,
+	SchemaTransformation,
+} from 'effect'
+import { SqlClient } from 'effect/sql'
 
 import {
 	BadRequest,
@@ -38,12 +45,22 @@ export interface IngestResult {
 	readonly interactionId: string
 }
 
+// The size is a BIGINT, which arrives as a bigint. A recording is nowhere near
+// the size where a number loses precision, so it is read as one.
+const ByteSizeFromRow = Schema.BigInt.pipe(
+	Schema.decodeTo(
+		Schema.Finite,
+		SchemaTransformation.transform({ decode: Number, encode: BigInt }),
+	),
+)
+
 // The raw Postgres rows carry Date objects; these decoders mirror the wire
 // schemas (RecordingSummary/RecordingDetail) but read each date column from a
 // Date rather than a string, so the decoded value lands as DateTime.Utc and
 // the wire schema can re-encode it as an ISO string.
 const RecordingSummaryRow = Schema.Struct({
 	...RecordingSummary.fields,
+	byteSize: ByteSizeFromRow,
 	interactionDate: Schema.NullOr(Schema.DateTimeUtcFromDate),
 	createdAt: Schema.DateTimeUtcFromDate,
 	updatedAt: Schema.DateTimeUtcFromDate,
@@ -54,6 +71,7 @@ const decodeSummaries = Schema.decodeUnknownEffect(
 
 const RecordingDetailRow = Schema.Struct({
 	...RecordingDetail.fields,
+	byteSize: ByteSizeFromRow,
 	transcribedAt: Schema.NullOr(Schema.DateTimeUtcFromDate),
 	deletedAt: Schema.NullOr(Schema.DateTimeUtcFromDate),
 	createdAt: Schema.DateTimeUtcFromDate,

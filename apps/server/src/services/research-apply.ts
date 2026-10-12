@@ -1,5 +1,5 @@
 import { Cause, DateTime, Effect, Schema } from 'effect'
-import { SqlClient } from 'effect/unstable/sql'
+import { SqlClient } from 'effect/sql'
 
 import { CurrentOrg } from '@batuda/controllers'
 import {
@@ -30,9 +30,12 @@ import {
 } from '@batuda/timeline'
 
 import { pgErrorCode } from '../lib/pg-error'
+import { jsonColumn } from '../lib/pg-params'
+import { inOwnSavepoint } from '../lib/savepoint'
 import {
 	type ChannelInput,
 	splitCompanyChannelFields,
+	toCompanyColumn,
 	writeChannels,
 } from './channels'
 import {
@@ -497,13 +500,22 @@ export const occUpdate = (
 	fields: Record<string, unknown>,
 	enrichment?: CompanyEnrichment,
 ) => {
+	const columns =
+		table === 'companies'
+			? Object.fromEntries(
+					Object.entries(fields).map(([key, value]) => [
+						key,
+						toCompanyColumn(key, value),
+					]),
+				)
+			: fields
 	// A change can carry no column at all and still be a real change: a company's
 	// mailbox and number are rows elsewhere now, so a suggestion naming only those
 	// leaves nothing to set here. The row still has to be claimed — its version
 	// checked and bumped — so the assignment list is simply left out rather than
 	// written empty, which is not valid SQL.
 	const setFields =
-		Object.keys(fields).length > 0 ? sql`${sql.update(fields)},` : sql``
+		Object.keys(columns).length > 0 ? sql`${sql.update(columns)},` : sql``
 	const provenance =
 		enrichment && Object.keys(enrichment.provenance).length > 0
 			? JSON.stringify(enrichment.provenance)
@@ -698,11 +710,13 @@ export const findDuplicateContact = (
 		if (flagged?.subject_id) {
 			// The id came from the model, so a value that isn't a UUID would trip
 			// text parsing (22P02); treat that as simply no match.
+			// In a savepoint, so a refused id leaves the transaction usable.
 			const rows = yield* sql<{ id: string }>`
 				SELECT id FROM contacts
 				WHERE id = ${flagged.subject_id} AND organization_id = ${orgId}
 				LIMIT 1
 			`.pipe(
+				inOwnSavepoint(sql),
 				Effect.catchTag('SqlError', () =>
 					Effect.succeed([] as ReadonlyArray<{ id: string }>),
 				),
@@ -807,6 +821,7 @@ export const resolveResearchProposedUpdate = (
 					}),
 				)
 				.pipe(
+					inOwnSavepoint(sql),
 					Effect.catchCause(cause =>
 						Effect.logWarning('research apply timeline write failed').pipe(
 							Effect.annotateLogs({ cause: Cause.pretty(cause) }),
@@ -940,17 +955,20 @@ export const resolveResearchProposedUpdate = (
 				runId,
 				created.citations,
 			)
+			// In a savepoint of its own: a refused insert aborts the transaction
+			// around it, and the rest of the batch still has to land.
 			const inserted = yield* sql<{ id: string; version: number }>`
 				INSERT INTO contacts ${sql.insert({
 					...created.fields,
 					companyId: created.companyId,
 					organizationId: org.id,
 					...(Object.keys(createdSources).length > 0
-						? { fieldProvenance: createdSources }
+						? { fieldProvenance: jsonColumn(createdSources) }
 						: {}),
 				})}
 				RETURNING id, version
 			`.pipe(
+				inOwnSavepoint(sql),
 				Effect.catchTag('SqlError', e => {
 					const code = pgErrorCode(e)
 					// A hallucinated company_id is a bad proposal, not a server error: a
@@ -1079,6 +1097,7 @@ export const resolveResearchProposedUpdate = (
 						WHERE id = ${validated.subjectId} AND organization_id = ${org.id}
 						LIMIT 1
 					`.pipe(
+						inOwnSavepoint(sql),
 						Effect.catchTag('SqlError', e =>
 							pgErrorCode(e) === '22P02' ? Effect.succeed([]) : Effect.fail(e),
 						),
@@ -1166,6 +1185,7 @@ export const resolveResearchProposedUpdate = (
 					}
 				: { provenance },
 		).pipe(
+			inOwnSavepoint(sql),
 			Effect.catchTag('SqlError', e => {
 				const code = pgErrorCode(e)
 				return code === '22P02' || code === '23503'
@@ -1246,19 +1266,22 @@ export type BatchResolveItemResult =
 // Resolve many proposals in one call, returning a per-item outcome. Runs the
 // items one at a time on purpose: two proposals in the same run each rewrite
 // that run's findings by array position, so resolving them at the same time
-// could clobber each other. A failure on one item is caught into an `error`
-// outcome so the rest of the batch still runs.
+// could clobber each other. A failure on one item rolls back to its own
+// savepoint and is caught into an `error` outcome, so the rest of the batch
+// still runs and still lands.
 export const resolveResearchProposedUpdatesBatch = (
 	items: ReadonlyArray<BatchResolveItem>,
 	actorUserId: string | null,
 ) =>
 	Effect.forEach(items, item =>
-		resolveResearchProposedUpdate(
-			item.researchId,
-			item.proposedUpdateId,
-			item.decision,
-			actorUserId,
-			{ origin: 'bulk' },
+		Effect.flatMap(SqlClient.SqlClient, sql =>
+			resolveResearchProposedUpdate(
+				item.researchId,
+				item.proposedUpdateId,
+				item.decision,
+				actorUserId,
+				{ origin: 'bulk' },
+			).pipe(inOwnSavepoint(sql)),
 		).pipe(
 			Effect.map(
 				outcome =>

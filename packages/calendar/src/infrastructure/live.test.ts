@@ -1,5 +1,5 @@
 import { Cause, ConfigProvider, Effect, Layer } from 'effect'
-import { FetchHttpClient } from 'effect/unstable/http'
+import { FetchHttpClient } from 'effect/http'
 import { describe, expect, it } from 'vitest'
 
 import { BookingProvider } from '../application/ports/booking-provider'

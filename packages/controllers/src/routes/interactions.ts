@@ -1,5 +1,5 @@
 import { Schema } from 'effect'
-import { HttpApiEndpoint, HttpApiGroup } from 'effect/unstable/httpapi'
+import { HttpApiEndpoint, HttpApiGroup } from 'effect/http-api'
 
 import { Interaction } from '@batuda/domain'
 
@@ -11,7 +11,7 @@ const CreateInteractionInput = Schema.Struct({
 	companyId: Schema.String,
 	contactId: Schema.optional(Schema.String),
 	date: Schema.optional(Schema.DateTimeUtc),
-	durationMin: Schema.optional(Schema.Number),
+	durationMin: Schema.optional(Schema.Int),
 	channel: Schema.String,
 	direction: Schema.String,
 	type: Schema.String,

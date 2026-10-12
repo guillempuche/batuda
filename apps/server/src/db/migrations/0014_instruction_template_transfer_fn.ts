@@ -1,5 +1,5 @@
 import { Effect } from 'effect'
-import { SqlClient } from 'effect/unstable/sql'
+import { SqlClient } from 'effect/sql'
 
 // Reassigning a personal instruction template to another member can't happen in
 // the member's own access scope: the per-user read policy

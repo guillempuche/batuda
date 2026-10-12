@@ -1,7 +1,7 @@
 import { resolve } from 'node:path'
 
 import { Config, Console, Effect, Layer, Schedule } from 'effect'
-import { SqlClient } from 'effect/unstable/sql'
+import { SqlClient } from 'effect/sql'
 
 import { PgLive } from '../db'
 import { exec, ROOT } from '../shell'
@@ -46,7 +46,7 @@ const checkMigrations = Effect.gen(function* () {
  * catcher can accept mail; give up silently like checkMigrations.
  */
 const checkMailCatcher = Effect.gen(function* () {
-	const url = yield* Config.string('MAIL_CATCHER_HTTP_URL')
+	const url = yield* Config.String('MAIL_CATCHER_HTTP_URL')
 	const probe = Effect.gen(function* () {
 		const res = yield* Effect.tryPromise(() =>
 			fetch(`${url}/api/service/readiness`, {

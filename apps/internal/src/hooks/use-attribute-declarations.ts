@@ -1,6 +1,6 @@
 import { useAtomValue } from '@effect/atom-react'
 import { Option } from 'effect'
-import { AsyncResult } from 'effect/unstable/reactivity'
+import { AsyncResult } from 'effect/reactivity'
 import { useMemo } from 'react'
 
 import { attributeDeclarationsAtom } from '#/atoms/attribute-atoms'

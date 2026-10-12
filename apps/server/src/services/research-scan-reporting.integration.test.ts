@@ -9,8 +9,8 @@ process.env['RESEARCH_MAX_LOOP_PROMPT_TOKENS'] ??= '24000'
 import { createHash, randomUUID } from 'node:crypto'
 
 import { Effect, Layer, ManagedRuntime, Stream } from 'effect'
-import type { LanguageModel } from 'effect/unstable/ai'
-import { SqlClient } from 'effect/unstable/sql'
+import { LanguageModel } from 'effect/ai'
+import { SqlClient } from 'effect/sql'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import {
@@ -132,7 +132,8 @@ const usage = {
 
 // Agent pass: hand back two web_search results carrying real page text, so
 // every pass gathers the seeded sources.
-const agentLlm: LanguageModel.Service = {
+const agentLlm: LanguageModel.LanguageModel = {
+	[LanguageModel.TypeId]: LanguageModel.TypeId,
 	generateText: () =>
 		Effect.sync(() => {
 			agentRounds++
@@ -207,7 +208,8 @@ let extractionCalls = 0
 // The cut-off replies the current case still has to serve.
 let cutOffsLeft: string[] = []
 
-const extractLlm: LanguageModel.Service = {
+const extractLlm: LanguageModel.LanguageModel = {
+	[LanguageModel.TypeId]: LanguageModel.TypeId,
 	generateText: () => Effect.succeed({ text: '', content: [], usage }) as never,
 	generateObject: ((options: { readonly prompt?: unknown }) =>
 		Effect.sync(() => {
@@ -311,7 +313,8 @@ const extractLlm: LanguageModel.Service = {
 // because the shortfall paragraph is the half of this a person actually reads.
 let briefPrompt = ''
 
-const writerLlm: LanguageModel.Service = {
+const writerLlm: LanguageModel.LanguageModel = {
+	[LanguageModel.TypeId]: LanguageModel.TypeId,
 	generateText: ((options: { readonly prompt?: unknown }) =>
 		Effect.sync(() => {
 			if (typeof options.prompt === 'string') briefPrompt = options.prompt

@@ -1,9 +1,11 @@
 import { randomUUID } from 'node:crypto'
 
 import { Context, DateTime, Effect, Layer } from 'effect'
-import { SqlClient } from 'effect/unstable/sql'
+import { SqlClient } from 'effect/sql'
 
 import { CurrentOrg, NotFound } from '@batuda/controllers'
+
+import { textArray } from '../lib/pg-params'
 
 // Owns the full draft state in Postgres: recipient lists, subject, the
 // editor block tree, threading metadata. Replaces the
@@ -81,9 +83,9 @@ export class DraftStore extends Context.Service<DraftStore>()('DraftStore', {
 						organizationId: currentOrg.id,
 						inboxId: input.inboxId,
 						mode: input.mode ?? 'new',
-						toAddresses: input.to ?? [],
-						ccAddresses: input.cc ?? [],
-						bccAddresses: input.bcc ?? [],
+						toAddresses: textArray(input.to ?? []),
+						ccAddresses: textArray(input.cc ?? []),
+						bccAddresses: textArray(input.bcc ?? []),
 						subject: input.subject ?? null,
 						inReplyTo: input.inReplyTo ?? null,
 						threadLinkId: input.threadLinkId ?? null,
@@ -144,9 +146,10 @@ export class DraftStore extends Context.Service<DraftStore>()('DraftStore', {
 				const patch: Record<string, unknown> = {
 					updatedAt: DateTime.toDateUtc(DateTime.nowUnsafe()),
 				}
-				if (input.to !== undefined) patch['toAddresses'] = input.to
-				if (input.cc !== undefined) patch['ccAddresses'] = input.cc
-				if (input.bcc !== undefined) patch['bccAddresses'] = input.bcc
+				if (input.to !== undefined) patch['toAddresses'] = textArray(input.to)
+				if (input.cc !== undefined) patch['ccAddresses'] = textArray(input.cc)
+				if (input.bcc !== undefined)
+					patch['bccAddresses'] = textArray(input.bcc)
 				if (input.subject !== undefined) patch['subject'] = input.subject
 				if (input.bodyJson !== undefined) {
 					patch['bodyJson'] = JSON.stringify(input.bodyJson)

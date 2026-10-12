@@ -1,6 +1,6 @@
 import { Effect, Stream } from 'effect'
-import { HttpServerResponse, Multipart } from 'effect/unstable/http'
-import { HttpApiBuilder } from 'effect/unstable/httpapi'
+import { HttpServerResponse, Multipart } from 'effect/http'
+import { HttpApiBuilder } from 'effect/http-api'
 
 import { BadRequest, BatudaApi, SessionContext } from '@batuda/controllers'
 

@@ -7,7 +7,7 @@ import { Config } from 'effect'
 // exactly the keys the app wrote — and a list whose first entry is empty reads
 // back at all, instead of failing the query.
 export const PgLive = PgClient.layerConfig({
-	url: Config.redacted('DATABASE_URL'),
+	url: Config.Redacted('DATABASE_URL'),
 	transformResultNames: Config.succeed((s: string) =>
 		s.replace(/_([a-z])/g, (_, c: string) => c.toUpperCase()),
 	),
@@ -15,4 +15,11 @@ export const PgLive = PgClient.layerConfig({
 		s.replace(/[A-Z]/g, c => `_${c.toLowerCase()}`),
 	),
 	transformJson: Config.succeed(false),
+	// Named statements cache a query plan, and a migration that adds a column
+	// while the old code still serves makes every `SELECT *` plan fail.
+	prepare: Config.succeed(false),
+	// Written out though it is the driver's default: a tool call waiting on a
+	// person's approval holds one of these, so this is the ceiling that wait
+	// counts against.
+	maxConnections: Config.succeed(10),
 })

@@ -41,6 +41,7 @@ const PgLive = PgClient.layerConfig({
 	transformResultNames: Config.succeed(snakeToCamel),
 	transformQueryNames: Config.succeed(camelToSnake),
 	transformJson: Config.succeed(false),
+	prepare: Config.succeed(false),
 })
 
 const ORG_ID = `persist-privacy-${randomUUID().slice(0, 8)}`

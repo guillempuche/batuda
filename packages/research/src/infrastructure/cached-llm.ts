@@ -1,5 +1,5 @@
 /**
- * Adds a DB-backed completion cache around a tier `LanguageModel.Service`.
+ * Adds a DB-backed completion cache around a tier `LanguageModel.LanguageModel`.
  *
  * Key = sha256(tier + model + method + stable(options)). The entire response
  * body (text + tool_calls + usage) is cached as JSON so a cache hit can
@@ -18,8 +18,8 @@
  */
 
 import { Cache, type Config, Duration, Effect, Option } from 'effect'
-import { LanguageModel } from 'effect/unstable/ai'
-import { SqlClient } from 'effect/unstable/sql'
+import { LanguageModel } from 'effect/ai'
+import { SqlClient } from 'effect/sql'
 
 import { type LlmRate, priceLlmMicrocents } from '../application/cost-rates'
 import { UsageMeter } from '../application/usage-meter'
@@ -28,12 +28,21 @@ import { cacheBypassConfig } from './_config'
 
 export type LlmTier = 'agent' | 'extract' | 'writer'
 
+// Which shape of stored reply a key points at. A reply is stored as the parts
+// the AI library produced, so a library upgrade that changes those parts bumps
+// this, and old rows simply stop matching instead of replaying into new code —
+// or new rows into old code after a rollback.
+const STORED_REPLY_SHAPE = 'effect-4.0'
+
 export const computeLlmCacheKey = (
 	tier: LlmTier,
 	model: string,
 	method: 'text' | 'object',
 	options: unknown,
-): string => sha256Hex(`${tier}|${model}|${method}|${stableStringify(options)}`)
+): string =>
+	sha256Hex(
+		`${STORED_REPLY_SHAPE}|${tier}|${model}|${method}|${stableStringify(options)}`,
+	)
 
 export const isLlmCacheable = (options: unknown): boolean => {
 	if (!options || typeof options !== 'object') return true
@@ -105,7 +114,7 @@ const MEM_CACHE_TTL = Duration.minutes(5)
  * tier-layer builder.
  */
 export const makeCachedLanguageModel = (
-	inner: LanguageModel.Service,
+	inner: LanguageModel.LanguageModel,
 	tier: LlmTier,
 	// Model used for the cache key + logs: the tier's primary model, kept stable
 	// so a cached answer is shared across fallback slots and changing the primary
@@ -121,7 +130,7 @@ export const makeCachedLanguageModel = (
 	// cascades between vendors silently, and the two are not interchangeable.
 	vendor = 'unknown',
 ): Effect.Effect<
-	LanguageModel.Service,
+	LanguageModel.LanguageModel,
 	Config.ConfigError,
 	SqlClient.SqlClient
 > =>
@@ -288,8 +297,9 @@ export const makeCachedLanguageModel = (
 			)
 
 		return {
+			[LanguageModel.TypeId]: LanguageModel.TypeId,
 			generateText,
 			generateObject,
 			streamText: inner.streamText,
-		} as unknown as LanguageModel.Service
+		} as unknown as LanguageModel.LanguageModel
 	})

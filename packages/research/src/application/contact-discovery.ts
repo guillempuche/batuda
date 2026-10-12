@@ -12,7 +12,7 @@
  */
 
 import { Config, Context, Effect, Layer, Ref } from 'effect'
-import { SqlClient } from 'effect/unstable/sql'
+import { SqlClient } from 'effect/sql'
 
 import type { VerificationVerdict } from '@batuda/domain'
 import { decidesPurchase } from '@batuda/domain'
@@ -470,7 +470,7 @@ export class ContactDiscovery extends Context.Service<ContactDiscovery>()(
 			const verifier = yield* EmailVerifier
 			const registry = yield* RegistryRouter
 			const mx = yield* MxResolver
-			const fanout = yield* Config.int('RESEARCH_MAX_CONCURRENCY_FANOUT').pipe(
+			const fanout = yield* Config.Int('RESEARCH_MAX_CONCURRENCY_FANOUT').pipe(
 				Config.withDefault(3),
 			)
 

@@ -1,5 +1,5 @@
 import { Context, Data, Effect, Layer, Schema, Semaphore } from 'effect'
-import { HttpClient, HttpClientResponse } from 'effect/unstable/http'
+import { HttpClient, HttpClientResponse } from 'effect/http'
 
 const NominatimHit = Schema.Struct({
 	lat: Schema.String,

@@ -1,6 +1,6 @@
 import { DateTime, Effect, Schema } from 'effect'
-import { Tool, Toolkit } from 'effect/unstable/ai'
-import { SqlClient } from 'effect/unstable/sql'
+import { Tool, Toolkit } from 'effect/ai'
+import { SqlClient } from 'effect/sql'
 
 import { CurrentOrg } from '@batuda/controllers'
 import { Interaction } from '@batuda/domain'
@@ -33,7 +33,7 @@ const LogInteraction = Tool.make('log_interaction', {
 		outcome: Schema.optionalKey(Schema.String),
 		next_action: Schema.optionalKey(Schema.String),
 		next_action_at: Schema.optionalKey(Schema.String),
-		duration_min: Schema.optionalKey(Schema.Number),
+		duration_min: Schema.optionalKey(Schema.Int),
 	}),
 	success: Interaction.json,
 	dependencies: REQUEST_DEPENDENCIES,

@@ -1,5 +1,5 @@
 import { Effect } from 'effect'
-import { SqlClient } from 'effect/unstable/sql'
+import { SqlClient } from 'effect/sql'
 
 // Contact channels become the single source of truth for every reachable
 // address. The per-platform scalar columns (email/phone/whatsapp/linkedin/

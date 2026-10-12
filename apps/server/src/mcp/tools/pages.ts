@@ -1,5 +1,5 @@
 import { Effect, Schema } from 'effect'
-import { McpSchema, Tool, Toolkit } from 'effect/unstable/ai'
+import { McpSchema, Tool, Toolkit } from 'effect/ai'
 
 import { CurrentOrg, PageSummary } from '@batuda/controllers'
 import { Page } from '@batuda/domain'
@@ -61,7 +61,7 @@ const PublishPage = Tool.make('publish_page', {
 		id: PageIdParam,
 	}),
 	success: PublishResult,
-	dependencies: [McpSchema.McpServerClient],
+	dependencies: [McpSchema.McpServerClient, McpSchema.McpRequestContext],
 })
 	.annotate(Tool.Title, 'Publish Page')
 	.annotate(Tool.Destructive, true)
@@ -104,7 +104,7 @@ const EditPageBlock = Tool.make('edit_page_block', {
 	parameters: Schema.Struct({
 		page_id: PageIdParam,
 		action: Schema.Literals(['insert', 'update', 'move', 'remove']),
-		position: Schema.optionalKey(Schema.Number),
+		position: Schema.optionalKey(Schema.Int),
 		block: Schema.optionalKey(BlockNode),
 		attrs: Schema.optional(Schema.Unknown),
 		from: Schema.optionalKey(Schema.Number),
@@ -165,10 +165,13 @@ export const PageHandlersLive = PageTools.toLayer(
 							reason:
 								'this client cannot ask anyone to confirm making the page public; publish it from the app instead',
 						}
-					if (answer === 'declined')
+					if (answer !== 'confirmed')
 						return {
 							status: 'cancelled' as const,
-							reason: 'the page was not published because the answer was no',
+							reason:
+								answer === 'declined'
+									? 'the page was not published because the answer was no'
+									: 'the page was not published because nobody answered in time',
 						}
 					const rows = yield* service.publish(id)
 					const published = rows[0]

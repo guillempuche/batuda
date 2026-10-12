@@ -14,7 +14,7 @@ import { createServer } from 'node:http'
 import type { PgClient } from '@effect/sql-pg'
 import { verifyAccessToken, verifyJwsAccessToken } from 'better-auth/oauth2'
 import { type Config, Effect, Layer, ManagedRuntime } from 'effect'
-import { SqlClient, type SqlError } from 'effect/unstable/sql'
+import { SqlClient, type SqlError } from 'effect/sql'
 import pg from 'pg'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 

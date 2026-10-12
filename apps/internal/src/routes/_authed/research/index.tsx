@@ -1,6 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { Effect, Result } from 'effect'
-import { AsyncResult } from 'effect/unstable/reactivity'
+import { AsyncResult } from 'effect/reactivity'
 
 import {
 	pendingPaidActionsAtom,

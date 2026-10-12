@@ -10,8 +10,8 @@ import {
 	Schedule,
 	Schema,
 } from 'effect'
-import type { Statement } from 'effect/unstable/sql'
-import { SqlClient } from 'effect/unstable/sql'
+import type { Statement } from 'effect/sql'
+import { SqlClient } from 'effect/sql'
 
 import {
 	BadRequest,
@@ -55,6 +55,7 @@ const UUID_PATTERN =
 
 import { EmailSent, TimelineActivityService } from '@batuda/timeline'
 
+import { textArray } from '../lib/pg-params'
 import { textAnywhere } from '../lib/search-text'
 import { CalendarService } from './calendar.js'
 import { suppressedAmong } from './channels.js'
@@ -110,6 +111,15 @@ const EmailMessageRecordRow = Schema.Struct({
 	createdAt: Schema.DateTimeUtcFromDate,
 	updatedAt: Schema.DateTimeUtcFromDate,
 })
+
+// The columns a message record reads. Named rather than `*` because the table
+// also holds its full-text search vector, which the driver cannot decode.
+const MESSAGE_RECORD_COLUMNS = `id, inbox_id, message_id, in_reply_to, "references",
+	direction, folder, subject, received_at, text_preview, text_body, html_body,
+	attachments, company_id, contact_id, recipients, status, status_reason,
+	bounce_type, bounce_sub_type, inbound_classification, status_updated_at,
+	deleted_at, created_at, updated_at`
+
 const decodeMessage = Schema.decodeUnknownEffect(EmailMessageRecordRow)
 const decodeMessages = Schema.decodeUnknownEffect(
 	Schema.Array(EmailMessageRecordRow),
@@ -1255,7 +1265,7 @@ export class EmailService extends Context.Service<EmailService>()(
 									messageId: args.result.messageId,
 									threadKey: externalThreadId,
 									inReplyTo,
-									references: referencesArr,
+									references: textArray(referencesArr),
 									direction: 'outbound',
 									folder: 'Sent',
 									imapUid: null,
@@ -2290,7 +2300,7 @@ export class EmailService extends Context.Service<EmailService>()(
 
 						const page = pageOf(filters ?? {}, 50)
 						const probed = yield* sql<{ readonly total?: string | number }>`
-							SELECT *${totalColumn(sql, page.count)} FROM email_messages
+							SELECT ${sql.unsafe(MESSAGE_RECORD_COLUMNS)}${totalColumn(sql, page.count)} FROM email_messages
 							WHERE ${sql.and(conditions)}
 							ORDER BY status_updated_at DESC
 							LIMIT ${probeLimit(page.limit)}
@@ -2325,7 +2335,7 @@ export class EmailService extends Context.Service<EmailService>()(
 					Effect.gen(function* () {
 						const currentOrg = yield* CurrentOrg
 						const rows = yield* sql`
-							SELECT * FROM email_messages
+							SELECT ${sql.unsafe(MESSAGE_RECORD_COLUMNS)} FROM email_messages
 							WHERE organization_id = ${currentOrg.id}
 							  AND (id::text = ${messageId} OR message_id = ${messageId})
 							LIMIT 1
@@ -2614,7 +2624,8 @@ export class EmailService extends Context.Service<EmailService>()(
 								// attempt between takes real time. The loser gets told, not
 								// crashed.
 								Effect.catchTag('SqlError', error =>
-									String(error.cause).includes('idx_inboxes_email_active')
+									error.reason._tag === 'UniqueViolation' &&
+									error.reason.constraint === 'idx_inboxes_email_active'
 										? Effect.fail(
 												new BadRequest({
 													message: 'That address is already connected',

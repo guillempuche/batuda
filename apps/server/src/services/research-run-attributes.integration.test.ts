@@ -9,8 +9,8 @@ process.env['RESEARCH_MAX_LOOP_PROMPT_TOKENS'] ??= '24000'
 import { createHash, randomUUID } from 'node:crypto'
 
 import { Effect, Layer, Stream } from 'effect'
-import type { LanguageModel } from 'effect/unstable/ai'
-import { SqlClient } from 'effect/unstable/sql'
+import { LanguageModel } from 'effect/ai'
+import { SqlClient } from 'effect/sql'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import type { ResearchAttributeDeclaration } from '@batuda/domain'
@@ -104,7 +104,8 @@ const remember = (options: unknown) => {
 	prompts.push(JSON.stringify(options))
 }
 
-const agentLlm: LanguageModel.Service = {
+const agentLlm: LanguageModel.LanguageModel = {
+	[LanguageModel.TypeId]: LanguageModel.TypeId,
 	generateText: (options: unknown) => {
 		remember(options)
 		return Effect.succeed(finalRound) as never
@@ -133,7 +134,8 @@ const hasField = (schema: unknown, name: string): boolean => {
 const hasAttributesField = (schema: unknown): boolean =>
 	hasField(schema, 'attributes')
 
-const extractLlm: LanguageModel.Service = {
+const extractLlm: LanguageModel.LanguageModel = {
+	[LanguageModel.TypeId]: LanguageModel.TypeId,
 	generateText: (_options: unknown) => Effect.succeed(finalRound) as never,
 	generateObject: (options: unknown) => {
 		remember(options)
@@ -197,7 +199,8 @@ const extractLlm: LanguageModel.Service = {
 		Stream.succeed({ type: 'text-delta' as const, delta: '' }) as never,
 }
 
-const writerLlm: LanguageModel.Service = {
+const writerLlm: LanguageModel.LanguageModel = {
+	[LanguageModel.TypeId]: LanguageModel.TypeId,
 	generateText: (options: unknown) => {
 		remember(options)
 		return Effect.succeed({

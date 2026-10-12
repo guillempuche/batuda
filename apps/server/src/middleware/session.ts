@@ -1,7 +1,7 @@
 import { NodeHttpServerRequest } from '@effect/platform-node'
 import { fromNodeHeaders } from 'better-auth/node'
 import { Effect, Layer } from 'effect'
-import { HttpServerRequest } from 'effect/unstable/http'
+import { HttpServerRequest } from 'effect/http'
 
 import {
 	SessionContext,

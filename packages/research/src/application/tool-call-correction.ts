@@ -16,10 +16,7 @@
  * call wrong needs.
  */
 
-import { Effect, Stream } from 'effect'
-import { AiError, type Tool, type Toolkit } from 'effect/unstable/ai'
-
-import { isRejectedToolCall, REJECTED_TOOL_CALL } from '../domain/errors'
+import { isRejectedToolCall } from '../domain/errors'
 import { toolParametersWireFormat } from './tools'
 
 interface ParameterSchema {
@@ -112,6 +109,21 @@ export const rejectedToolCallCorrection = (
 	].join('\n')
 }
 
+/**
+ * The correction to append after the model called a tool it was not given.
+ *
+ * Names the tools it may call in this pass, which is the one thing that
+ * changes the call it writes next. A pass that offers only some of the tools
+ * refuses the rest the same way, so the list is the pass's, not the toolkit's.
+ */
+export const unknownToolCorrection = (
+	toolName: string,
+	availableTools: ReadonlyArray<string>,
+): string =>
+	availableTools.length === 0
+		? `There is no ${toolName} tool, and no tool can be called here. Answer without calling one.`
+		: `There is no ${toolName} tool. Call only ${availableTools.join(', ')}, and carry on with the research.`
+
 /** A correction to put to the model, and the tool it is about. */
 export interface ToolCallCorrection {
 	readonly toolName: string
@@ -124,8 +136,8 @@ export interface ToolCallCorrection {
  *
  * Three reasons there is nothing to say, and the failure stands: it was not the
  * model's own bad tool call, this pass has already spent its corrections, or the
- * tool named cannot be looked up — which is what a provider whose wording could
- * not be read leaves behind.
+ * tool whose arguments were refused cannot be looked up — which is what a
+ * provider whose wording could not be read leaves behind.
  *
  * Only decides. Appending to the prompt and counting what has been spent are
  * left to the caller, which is what makes the decision testable on its own.
@@ -136,90 +148,10 @@ export const correctionForFailedRound = (
 	limit: number,
 ): ToolCallCorrection | undefined => {
 	if (!isRejectedToolCall(error) || correctionsMade >= limit) return undefined
-	const text = rejectedToolCallCorrection(error.toolName, error.mistake)
+	const text =
+		error.availableTools !== undefined
+			? unknownToolCorrection(error.toolName, error.availableTools)
+			: rejectedToolCallCorrection(error.toolName, error.mistake)
 	if (text === undefined) return undefined
 	return { toolName: error.toolName, provider: error.provider, text }
 }
-
-// The two mistakes the model can make that a toolkit refuses before any handler
-// runs: naming a tool we do not have, and writing arguments that do not fit the
-// tool's schema.
-const isModelsMistake = (err: unknown): err is AiError.AiError =>
-	err instanceof AiError.AiError &&
-	(err.reason._tag === 'ToolNotFoundError' ||
-		err.reason._tag === REJECTED_TOOL_CALL)
-
-// What the model is handed back in place of the result it asked for. Shaped like
-// the other results a tool can answer with — a status and the facts behind it —
-// so it reads as an answer rather than as something gone wrong.
-const badCallResult = (reason: AiError.AiErrorReason): unknown => {
-	if (reason._tag === 'ToolNotFoundError') {
-		return {
-			status: 'no_such_tool',
-			tool: reason.toolName,
-			available_tools: reason.availableTools,
-			message: `There is no ${reason.toolName} tool. Call one of the tools listed in available_tools instead.`,
-		}
-	}
-	if (reason._tag === REJECTED_TOOL_CALL) {
-		return {
-			status: 'invalid_arguments',
-			tool: reason.toolName,
-			error: reason.description,
-			message:
-				rejectedToolCallCorrection(reason.toolName, reason.description) ??
-				`The arguments for ${reason.toolName} did not fit the tool. Check its description and call it again.`,
-		}
-	}
-	return { status: 'invalid_arguments' }
-}
-
-/**
- * A toolkit that answers a call the model wrote wrongly instead of ending the
- * round.
- *
- * A tool that fails while running already comes back to the model as a result —
- * that is what `failureMode: 'return'` buys, so one dead page cannot sink a run.
- * A call refused BEFORE the handler runs does not: the toolkit checks the tool's
- * name and decodes its arguments first, and either check failing takes down the
- * whole round. Since a round's tool calls are resolved together, that also
- * discards whatever the model's other calls had already found. So both checks
- * answer with a result saying what was wrong and what the tool really accepts,
- * which the model reads beside its own call and acts on next round.
- *
- * What this cannot reach is a provider that refuses the call at its own API: the
- * answer then carries no tool calls at all, so there is nothing to reply to. The
- * run's correction after a failed round is what covers that.
- */
-export const toolkitAnsweringBadCalls = <
-	Tools extends Record<string, Tool.Any>,
->(
-	toolkit: Toolkit.WithHandler<Tools>,
-): Toolkit.WithHandler<Tools> => ({
-	tools: toolkit.tools,
-	handle: ((name: string, params: unknown, toolCallId?: string) =>
-		(
-			toolkit.handle as unknown as (
-				name: string,
-				params: unknown,
-				toolCallId?: string,
-			) => Effect.Effect<
-				Stream.Stream<unknown, unknown, unknown>,
-				AiError.AiError
-			>
-		)(name, params, toolCallId).pipe(
-			Effect.catchIf(isModelsMistake, err => {
-				const result = badCallResult(err.reason)
-				return Effect.succeed(
-					Stream.succeed({
-						result,
-						// Already a plain JSON value, so what the provider is sent is
-						// what is written here rather than a re-encoding of it.
-						encodedResult: result,
-						isFailure: true,
-						preliminary: false,
-					}),
-				)
-			}),
-		)) as unknown as Toolkit.WithHandler<Tools>['handle'],
-})

@@ -10,8 +10,8 @@
  */
 
 import { Console, Effect, Layer } from 'effect'
-import { FetchHttpClient } from 'effect/unstable/http'
-import { SqlClient } from 'effect/unstable/sql'
+import { FetchHttpClient } from 'effect/http'
+import { SqlClient } from 'effect/sql'
 
 import type {
 	CalendarLocationType,

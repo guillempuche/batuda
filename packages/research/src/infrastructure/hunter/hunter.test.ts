@@ -5,7 +5,7 @@ import {
 	type HttpClientRequest,
 	type HttpClientResponse,
 	HttpClientResponse as HttpClientResponseNs,
-} from 'effect/unstable/http'
+} from 'effect/http'
 import { describe, expect, it } from 'vitest'
 
 import { hunterStatusToVerdict } from './_client'

@@ -1,5 +1,5 @@
 import { Effect } from 'effect'
-import { SqlClient } from 'effect/unstable/sql'
+import { SqlClient } from 'effect/sql'
 
 // A contact or company that a research run wrote back keeps a trail to the
 // evidence behind it. The citations the run attached to that suggestion —

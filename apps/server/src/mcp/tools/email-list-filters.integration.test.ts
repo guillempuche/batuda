@@ -15,8 +15,8 @@ process.env['DATABASE_URL'] ??=
 import { randomUUID } from 'node:crypto'
 
 import { Effect, Layer, Stream } from 'effect'
-import { McpSchema } from 'effect/unstable/ai'
-import { SqlClient } from 'effect/unstable/sql'
+import { McpSchema } from 'effect/ai'
+import { SqlClient } from 'effect/sql'
 import pg from 'pg'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
@@ -70,6 +70,11 @@ const stubs = Layer.mergeAll(
 		clientId: 1,
 		initializePayload: { capabilities: {} },
 		getClient: Effect.die('this suite never talks back to the client'),
+	}),
+	stub(McpSchema.McpRequestContext, {
+		clientId: 1,
+		protocolVersion: '2025-11-25',
+		clientCapabilities: {},
 	}),
 )
 

@@ -9,7 +9,7 @@ import {
 	useNavigate,
 } from '@tanstack/react-router'
 import { DateTime, Effect, Schema } from 'effect'
-import { AsyncResult } from 'effect/unstable/reactivity'
+import { AsyncResult } from 'effect/reactivity'
 import {
 	AlertTriangle,
 	BadgeCheck,

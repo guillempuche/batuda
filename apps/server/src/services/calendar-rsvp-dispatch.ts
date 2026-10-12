@@ -1,5 +1,5 @@
 import { Effect } from 'effect'
-import { SqlClient } from 'effect/unstable/sql'
+import { SqlClient } from 'effect/sql'
 
 import { CurrentOrg } from '@batuda/controllers'
 import type { EmailBlocks } from '@batuda/email/schema'

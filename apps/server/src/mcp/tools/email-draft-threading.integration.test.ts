@@ -17,8 +17,8 @@ process.env['DATABASE_URL'] ??=
 	'postgresql://batuda:batuda@localhost:5433/batuda'
 
 import { Effect, Layer, Stream } from 'effect'
-import { McpSchema } from 'effect/unstable/ai'
-import { SqlClient } from 'effect/unstable/sql'
+import { McpSchema } from 'effect/ai'
+import { SqlClient } from 'effect/sql'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 
 import { CurrentOrg, SessionContext } from '@batuda/controllers'
@@ -74,6 +74,11 @@ const stubs = Layer.mergeAll(
 		clientId: 1,
 		initializePayload: { capabilities: {} },
 		getClient: Effect.die('this suite never talks back to the client'),
+	}),
+	stub(McpSchema.McpRequestContext, {
+		clientId: 1,
+		protocolVersion: '2025-11-25',
+		clientCapabilities: {},
 	}),
 )
 

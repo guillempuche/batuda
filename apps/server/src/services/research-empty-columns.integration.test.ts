@@ -9,7 +9,7 @@ process.env['RESEARCH_MAX_LOOP_PROMPT_TOKENS'] ??= '24000'
 import { createHash, randomUUID } from 'node:crypto'
 
 import { Effect, Layer, ManagedRuntime, Stream } from 'effect'
-import type { LanguageModel } from 'effect/unstable/ai'
+import { LanguageModel } from 'effect/ai'
 import pg from 'pg'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
@@ -57,7 +57,8 @@ const remember = (options: unknown): void => {
 	promptsSeen.push(JSON.stringify(options))
 }
 
-const agentLlm: LanguageModel.Service = {
+const agentLlm: LanguageModel.LanguageModel = {
+	[LanguageModel.TypeId]: LanguageModel.TypeId,
 	generateText: (options: unknown) =>
 		Effect.sync(() => {
 			remember(options)
@@ -91,7 +92,8 @@ const agentLlm: LanguageModel.Service = {
 		Stream.succeed({ type: 'text-delta' as const, delta: '' }) as never,
 }
 
-const extractLlm: LanguageModel.Service = {
+const extractLlm: LanguageModel.LanguageModel = {
+	[LanguageModel.TypeId]: LanguageModel.TypeId,
 	generateText: () => Effect.succeed({ text: '', content: [], usage }) as never,
 	generateObject: (options: unknown) =>
 		Effect.sync(() => {
@@ -123,7 +125,8 @@ const extractLlm: LanguageModel.Service = {
 		Stream.succeed({ type: 'text-delta' as const, delta: '' }) as never,
 }
 
-const writerLlm: LanguageModel.Service = {
+const writerLlm: LanguageModel.LanguageModel = {
+	[LanguageModel.TypeId]: LanguageModel.TypeId,
 	generateText: () =>
 		Effect.succeed({ text: 'Nothing found.', content: [], usage }) as never,
 	generateObject: () => Effect.succeed({ usage, value: {} }) as never,

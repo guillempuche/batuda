@@ -1,5 +1,5 @@
 import { Console, Effect, Option } from 'effect'
-import { SqlClient } from 'effect/unstable/sql'
+import { SqlClient } from 'effect/sql'
 
 import { printTable } from '../lib/table'
 
@@ -50,7 +50,7 @@ export const dataInspect = (entity: Option.Option<EntityName>, json: boolean) =>
 				],
 				rows: () => sql<Row>`
 					SELECT o.slug, o.name,
-						(SELECT count(*) FROM member m WHERE m."organizationId" = o.id) AS members
+						(SELECT count(*)::int FROM member m WHERE m."organizationId" = o.id) AS members
 					FROM organization o ORDER BY o.slug`,
 			},
 			members: {
@@ -109,7 +109,7 @@ export const dataInspect = (entity: Option.Option<EntityName>, json: boolean) =>
 						s.agent, s.name,
 						CASE WHEN s.is_default THEN 'yes' ELSE '' END AS "isDefault",
 						s.composition,
-						(SELECT count(*) FROM instruction_stack_items i WHERE i.stack_id = s.id) AS items,
+						(SELECT count(*)::int FROM instruction_stack_items i WHERE i.stack_id = s.id) AS items,
 						CASE WHEN s.research_fills_attributes THEN 'yes' ELSE '' END AS "fillsAttributes"
 					FROM instruction_stacks s JOIN organization o ON o.id = s.organization_id
 					ORDER BY o.slug, scope, s.agent, s.is_default DESC, s.name`,

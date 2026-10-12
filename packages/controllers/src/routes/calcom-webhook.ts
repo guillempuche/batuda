@@ -1,5 +1,5 @@
 import { Schema } from 'effect'
-import { HttpApiEndpoint, HttpApiGroup } from 'effect/unstable/httpapi'
+import { HttpApiEndpoint, HttpApiGroup } from 'effect/http-api'
 
 export const CalcomWebhookGroup = HttpApiGroup.make('calcomWebhook').add(
 	HttpApiEndpoint.post('inbound', '/webhooks/calcom', {

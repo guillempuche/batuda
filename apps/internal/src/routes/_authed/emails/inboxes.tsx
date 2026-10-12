@@ -7,7 +7,7 @@ import {
 import { useLingui } from '@lingui/react/macro'
 import { createFileRoute, Link, useLocation } from '@tanstack/react-router'
 import { DateTime, Option, Schema } from 'effect'
-import { AsyncResult } from 'effect/unstable/reactivity'
+import { AsyncResult } from 'effect/reactivity'
 import {
 	Check,
 	ChevronLeft,

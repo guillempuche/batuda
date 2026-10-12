@@ -1,6 +1,6 @@
 import { Context, Effect, Layer } from 'effect'
-import type { SqlError } from 'effect/unstable/sql'
-import { SqlClient } from 'effect/unstable/sql'
+import type { SqlError } from 'effect/sql'
+import { SqlClient } from 'effect/sql'
 
 import {
 	type Agent,

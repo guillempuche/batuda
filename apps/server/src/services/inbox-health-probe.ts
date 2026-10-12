@@ -1,5 +1,5 @@
 import { Cause, Config, Context, Effect, Layer, Schedule } from 'effect'
-import { SqlClient } from 'effect/unstable/sql'
+import { SqlClient } from 'effect/sql'
 
 import type {
 	GrantAuthFailed,
@@ -44,7 +44,7 @@ export class InboxHealthProbe extends Context.Service<InboxHealthProbe>()(
 			const sql = yield* SqlClient.SqlClient
 			const transport = yield* MailTransport
 			const crypto = yield* CredentialCrypto
-			const intervalSec = yield* Config.int('EMAIL_HEALTH_PROBE_INTERVAL_SEC')
+			const intervalSec = yield* Config.Int('EMAIL_HEALTH_PROBE_INTERVAL_SEC')
 
 			// A transaction per piece of database work, so no connection is held
 			// open while a mail server takes its time. The role is set inside each

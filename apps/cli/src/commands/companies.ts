@@ -1,5 +1,5 @@
 import { Console, Effect } from 'effect'
-import { SqlClient } from 'effect/unstable/sql'
+import { SqlClient } from 'effect/sql'
 
 // One-time backfill: geocode every company that has a written location but no
 // coordinates — rows enriched before geocoding was stored, located by hand, or

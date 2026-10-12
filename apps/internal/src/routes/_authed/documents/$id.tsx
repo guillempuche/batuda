@@ -2,7 +2,7 @@ import { useAtomRefresh, useAtomValue } from '@effect/atom-react'
 import { Trans, useLingui } from '@lingui/react/macro'
 import { createFileRoute } from '@tanstack/react-router'
 import { DateTime } from 'effect'
-import { AsyncResult } from 'effect/unstable/reactivity'
+import { AsyncResult } from 'effect/reactivity'
 import { styled } from 'next-yak'
 
 import { documentAtomFor } from '#/atoms/documents-atoms'

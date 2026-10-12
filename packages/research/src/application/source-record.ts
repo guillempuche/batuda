@@ -15,7 +15,7 @@
  */
 
 import { Effect } from 'effect'
-import type { SqlClient, SqlError } from 'effect/unstable/sql'
+import type { SqlClient, SqlError } from 'effect/sql'
 
 import { canonicalizeUrl, sourceIdFor, urlHashForScrape } from './source-key'
 

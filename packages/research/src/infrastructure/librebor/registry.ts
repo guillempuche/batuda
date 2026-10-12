@@ -14,11 +14,7 @@
  */
 
 import { Config, Effect, Redacted, Schema } from 'effect'
-import {
-	HttpClient,
-	HttpClientRequest,
-	HttpClientResponse,
-} from 'effect/unstable/http'
+import { HttpClient, HttpClientRequest, HttpClientResponse } from 'effect/http'
 
 import { type RegistryInput, RegistryRouter } from '../../application/ports'
 import { ProviderError } from '../../domain/errors'
@@ -79,7 +75,7 @@ const failStatus = (status: number) =>
 
 export const makeLibreborRegistry = (slot: number) =>
 	Effect.gen(function* () {
-		const credential = yield* Config.redacted(
+		const credential = yield* Config.Redacted(
 			keyForSlot('RESEARCH_API_KEY_REGISTRY_ES', slot),
 		)
 		const client = yield* HttpClient.HttpClient

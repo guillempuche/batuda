@@ -30,11 +30,7 @@
  */
 
 import { Cause, type Config, Effect } from 'effect'
-import {
-	FetchHttpClient,
-	HttpClient,
-	HttpClientRequest,
-} from 'effect/unstable/http'
+import { FetchHttpClient, HttpClient, HttpClientRequest } from 'effect/http'
 
 import { REGISTRY_COUNTRIES, type RegistryCountry } from '../domain/country'
 import type { LlmTier } from './cached-llm'
