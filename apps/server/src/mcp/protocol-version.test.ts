@@ -413,6 +413,53 @@ describe('the /mcp route meeting a protocol revision it does not know', () => {
 		})
 	})
 
+	describe('when the library refuses a call for another reason', () => {
+		it('should say how it was refused when the client cannot take both reply kinds', async () => {
+			// GIVEN a client whose Accept names only plain JSON, not the event
+			//       stream a reply may come as
+			lines.length = 0
+			const response = await initialize({ accept: 'application/json' })
+
+			// THEN the library refuses it with an empty 406
+			expect(response.status).toBe(406)
+
+			// AND a line says so, since the client shows it only as a silent retry
+			const refusal = lineFor('mcp.request.refused')
+			expect(refusal?.level).toBe('Warn')
+			expect(refusal?.annotations['http.status']).toBe(406)
+		})
+
+		it('should carry the protocol error code when the refusal has one', async () => {
+			// GIVEN a call that names no session, sent as if one had been opened
+			lines.length = 0
+			const response = await post({
+				jsonrpc: '2.0',
+				id: 9,
+				method: 'tools/call',
+				params: { name: 'ping', arguments: {} },
+			})
+
+			// THEN it is refused, and the line names the code the client was given
+			expect(response.status).toBe(400)
+			const refusal = lineFor('mcp.request.refused')
+			expect(refusal?.level).toBe('Warn')
+			expect(refusal?.annotations['mcp.error_code']).toBe(-32600)
+		})
+
+		it('should write a method the route does not serve quietly', async () => {
+			// GIVEN a client opening a stream with GET, which this route does not
+			//       serve and which a client takes in its stride
+			lines.length = 0
+			const response = await fetch(`${baseUrl}/mcp`, {
+				headers: { accept: 'text/event-stream' },
+			})
+
+			// THEN it is refused with 405, and the line is not a warning
+			expect(response.status).toBe(405)
+			expect(lineFor('mcp.request.refused')?.level).toBe('Info')
+		})
+	})
+
 	describe('when a client names nothing at all', () => {
 		it('should be served unchanged', async () => {
 			// GIVEN a client that omits the header, as one does before agreeing a

@@ -4,6 +4,7 @@ import { McpSchema, McpServer } from 'effect/ai'
 import { ResearchService } from '@batuda/research'
 
 import { inMcpOrgScope } from '../org-scope'
+import { noSuggestions } from '../prompts/_completions'
 
 const idParam = McpSchema.param('id', Schema.String)
 
@@ -14,6 +15,7 @@ export const ResearchResource =
 			'Full research run with findings, brief, sources, and tool log.',
 		mimeType: 'application/json',
 		audience: ['assistant'],
+		completion: { id: noSuggestions },
 		content: Effect.fn(function* (_uri, id) {
 			const svc = yield* ResearchService
 			const run = yield* svc.get(id)

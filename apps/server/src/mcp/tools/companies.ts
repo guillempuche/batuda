@@ -35,6 +35,7 @@ import {
 	companySlugFromName,
 	HandSetVerificationVerdict,
 } from '@batuda/domain'
+import { isUuidRef } from '@batuda/instructions'
 import {
 	NAME_ONLY_EVIDENCE,
 	NAME_ONLY_EVIDENCE_FIELD,
@@ -712,7 +713,20 @@ export const CompanyHandlersLive = CompanyTools.toLayer(
 				),
 			get_company: ({ id_or_slug }) =>
 				service.getWithRelations(id_or_slug).pipe(
-					Effect.catchTag('NotFound', () => service.findById(id_or_slug)),
+					// Not a slug, so maybe an id — but only something shaped like one is
+					// tried, since the database refuses anything else outright.
+					Effect.catchTag('NotFound', notFound =>
+						isUuidRef(id_or_slug)
+							? service.findById(id_or_slug)
+							: Effect.fail(notFound),
+					),
+					Effect.catchTag('NotFound', () =>
+						Effect.die(
+							new ToolMessage(
+								`No company has the slug or id "${id_or_slug}". Look it up with search_companies first.`,
+							),
+						),
+					),
 					Effect.orDie,
 				),
 			create_companies: params =>

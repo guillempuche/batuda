@@ -562,6 +562,9 @@ Static resources use `McpServer.resource({...})`. Parameterized resources use te
 ```typescript
 import { McpSchema, McpServer } from 'effect/ai'
 
+import { companyProfile } from '../company-profile'
+import { inMcpOrgScope } from '../org-scope'
+
 const slugParam = McpSchema.param('slug', Schema.String)
 
 export const CompanyResource = McpServer.resource`batuda://company/${slugParam}`({
@@ -569,19 +572,26 @@ export const CompanyResource = McpServer.resource`batuda://company/${slugParam}`
   description: 'Full company profile with contacts and recent interactions.',
   mimeType: 'application/json',
   audience: ['assistant'],
+  // Both read the CRM, so both run inside the caller's organization scope.
   completion: {
-    slug: (input) => Effect.gen(function* () {
-      const sql = yield* SqlClient.SqlClient
-      const rows = yield* sql`SELECT slug FROM companies WHERE slug ILIKE ${input + '%'} LIMIT 10`
-      return rows.map((r: any) => r.slug as string)
-    }),
+    slug: (input: string) =>
+      inMcpOrgScope(
+        Effect.gen(function* () {
+          const sql = yield* SqlClient.SqlClient
+          const rows = yield* sql<{ slug: string }>`
+            SELECT slug FROM companies WHERE slug ILIKE ${textAtTheStart(input)} LIMIT 10
+          `
+          return rows.map(row => row.slug)
+        }),
+      ),
   },
   content: Effect.fn(function* (_uri, slug) {
-    const service = yield* CompanyService
-    return JSON.stringify(yield* service.getWithRelations(slug), null, 2)
-  }),
+    return JSON.stringify(yield* companyProfile(slug), null, 2)
+  }, inMcpOrgScope),
 })
 ```
+
+Every argument a client can ask suggestions for needs a `completion` entry, even one with nothing to suggest (`noSuggestions` in `prompts/_completions.ts`): an argument without one is answered with an error rather than an empty list.
 
 ### Prompt definition pattern
 
@@ -623,7 +633,7 @@ publish_page: ({ id }) => Effect.gen(function* () {
 }).pipe(Effect.orDie),
 ```
 
-The tool must list `McpSchema.McpServerClient` and `McpSchema.McpRequestContext` in its `dependencies`, act only on `'confirmed'` (`requireApproval` also answers `'unanswered'` when nobody replies within four minutes), and its `success` schema must be able to carry the refusal — a closed `Schema.Struct` cannot, and the refusal then fails to encode.
+The tool must list `McpSchema.McpServerClient` and `McpSchema.McpRequestContext` in its `dependencies`, act only on `'confirmed'` (`requireApproval` also answers `'unanswered'` when nobody replies within 90 seconds, well inside the 125 seconds Cloudflare lets a silent connection live, and `'unaskable'` when the client fails to show the question; a person closing it counts as `'declined'`), and its `success` schema must be able to carry the refusal — a closed `Schema.Struct` cannot, and the refusal then fails to encode.
 
 Two things not to do. Do not call `McpServer.elicit()` without asking `canElicit` first: a client that cannot show a question answers the request with a refusal, and reading that as "the person said no" reports a decision nobody made. Neither Claude.ai nor ChatGPT can show one today, so on those clients every such question used to answer itself. And do not use `Tool.make`'s `needsApproval` field — Effect reads it only in its AI client loop, never in the MCP server, so a tool declaring it runs anyway while its description promises otherwise. A test in `_annotations.test.ts` fails if one reappears.
 

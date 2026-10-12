@@ -1,4 +1,13 @@
-import { Cause, Context, Effect, Layer, Option, Sink, Stream } from 'effect'
+import {
+	Cause,
+	Context,
+	Effect,
+	Layer,
+	Option,
+	Schema,
+	Sink,
+	Stream,
+} from 'effect'
 import { AiError, McpSchema, McpServer, Tool, type Toolkit } from 'effect/ai'
 
 import { recordFacts } from '@batuda/observability'
@@ -22,6 +31,18 @@ const omitRequestServices = Context.omit(
 	McpSchema.McpServerClient,
 )
 
+// A tool's arguments, advertised closed: no keys beyond the ones it names, which
+// is what tells a model not to invent any. The library's own generator leaves
+// objects open. Decoding still ignores an extra key, since clients send some.
+const closedInputSchema = (tool: Tool.Any) => {
+	const document = Schema.toJsonSchemaDocument(tool.parametersSchema, {
+		onExcessProperty: 'error',
+	})
+	return Object.keys(document.definitions).length > 0
+		? { ...document.schema, $defs: document.definitions }
+		: document.schema
+}
+
 // The tag on an answer that names what kind of answer it is — `suppressed`,
 // `cancelled`, and the rest. Read generically: any tool may adopt the shape,
 // and this file has no business knowing which tags exist.
@@ -36,23 +57,27 @@ export const answerTag = (value: unknown): string | undefined => {
 // carrying table names and Postgres phrasing.
 const INTERNAL_FAILURE = 'The tool failed because of an internal server error.'
 
-// Whether a failure is one the tool meant to give. "No EmailDraft with id …"
-// is an answer, not a fault: the caller asked about something that is not
-// there and was told so. Recording those as errors buries the faults nobody
-// expected among hundreds of ordinary answers.
-export const isExpectedFailure = (cause: Cause.Cause<unknown>): boolean =>
-	isToolMessage(Cause.squash(cause))
+// Arguments that do not fit the tool's own schema, turned away before it ran.
+const isRejectedArguments = (error: unknown): error is AiError.AiError =>
+	AiError.isAiError(error) &&
+	error.reason._tag === 'ToolParameterValidationError'
+
+// Whether a failure is one the caller was meant to get. "No EmailDraft with id
+// …" is an answer, not a fault: the caller asked about something that is not
+// there and was told so — and arguments that do not fit are the caller's to
+// fix as well. Recording those as errors buries the faults nobody expected
+// among hundreds of ordinary answers.
+export const isExpectedFailure = (cause: Cause.Cause<unknown>): boolean => {
+	const failure = Cause.squash(cause)
+	return isToolMessage(failure) || isRejectedArguments(failure)
+}
 
 export const clientFacingMessage = (error: unknown): string => {
 	if (isToolMessage(error)) return error.message
 	// The one library failure worth forwarding verbatim: it names the parameter
 	// that was wrong, which is the only thing an assistant can act on. Its text
 	// is generated from the tool's own schema, so it exposes nothing internal.
-	if (
-		AiError.isAiError(error) &&
-		error.reason._tag === 'ToolParameterValidationError'
-	)
-		return error.reason.message
+	if (isRejectedArguments(error)) return error.reason.message
 	return INTERNAL_FAILURE
 }
 
@@ -77,7 +102,7 @@ const registerToolkitSafe = <Tools extends Record<string, Tool.Any>>(
 			const mcpTool = new McpSchema.Tool({
 				name: tool.name,
 				description: Tool.getDescription(tool),
-				inputSchema: Tool.getJsonSchema(tool),
+				inputSchema: closedInputSchema(tool),
 				annotations: {
 					...Option.getOrUndefined(
 						Option.map(Context.getOption(annotations, Tool.Title), title => ({

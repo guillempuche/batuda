@@ -2,10 +2,10 @@ import { Effect, Schema } from 'effect'
 import { McpServer } from 'effect/ai'
 import { SqlClient } from 'effect/sql'
 
-import { CompanyService } from '../../services/companies'
 import { companyVisible } from '../../services/company-liveness'
+import { companyProfile } from '../company-profile'
 import { inMcpOrgScope } from '../org-scope'
-import { completeCompanySlug } from './_completions'
+import { completeCompanySlug, completeLang } from './_completions'
 import { LangParam, langDirective } from './_lang'
 
 export const InteractionFollowUpPrompt = McpServer.prompt({
@@ -16,12 +16,11 @@ export const InteractionFollowUpPrompt = McpServer.prompt({
 		slug: Schema.String,
 		lang: LangParam,
 	},
-	completion: { slug: completeCompanySlug },
+	completion: { slug: completeCompanySlug, lang: completeLang },
 	content: ({ slug, lang }) =>
 		inMcpOrgScope(
 			Effect.gen(function* () {
-				const service = yield* CompanyService
-				const rawData = yield* service.getWithRelations(slug)
+				const rawData = yield* companyProfile(slug)
 				const data = rawData as Record<string, unknown>
 				const companyId = data['id'] as string
 				const sql = yield* SqlClient.SqlClient

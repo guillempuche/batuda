@@ -1,4 +1,4 @@
-import { Duration, Effect, Option, Schema } from 'effect'
+import { Cause, Duration, Effect, Option, Schema } from 'effect'
 import type { McpSchema } from 'effect/ai'
 import { McpServer } from 'effect/ai'
 
@@ -21,10 +21,10 @@ export const canElicit: Effect.Effect<
 
 /**
  * What came back when a person was asked to approve something: they agreed,
- * they said no, there was nobody who could be asked, or nobody answered in
- * time. The last two are kept apart from a no on purpose — a tool that folds
- * them together reports a refusal nobody gave, and the caller can never tell
- * whether to try elsewhere.
+ * they said no (or closed the question without choosing), there was nobody who
+ * could be asked, or nobody answered in time. The last two are kept apart from
+ * a no on purpose — a tool that folds them together reports a refusal nobody
+ * gave, and the caller can never tell whether to try elsewhere.
  */
 export type ApprovalAnswer =
 	| 'confirmed'
@@ -32,10 +32,11 @@ export type ApprovalAnswer =
 	| 'unaskable'
 	| 'unanswered'
 
-// How long a question waits for its answer. The tool call holds a database
-// transaction and a pooled connection while it waits, so the wait ends inside
-// the five minutes the hosted database lets a transaction sit idle.
-const ANSWER_WAIT = Duration.minutes(4)
+// How long a question waits for its answer. Nothing travels on the call's
+// connection while it waits, and the proxy in front of the server (Cloudflare)
+// drops a connection that has carried nothing for 125 seconds, taking the call
+// and its answer with it — so the wait ends well before.
+const ANSWER_WAIT = Duration.seconds(90)
 
 /**
  * Put a yes/no question to whoever is on the other end, before doing something
@@ -59,15 +60,33 @@ export const requireApproval = (
 > =>
 	Effect.gen(function* () {
 		if (!(yield* canElicit)) return 'unaskable' as const
-		const reply = yield* McpServer.elicit({
+		const answer = yield* McpServer.elicit({
 			message,
-			schema: Schema.Struct({ confirm: Schema.Literals(['yes', 'no']) }),
+			// A true/false answer, not a "yes"/"no" choice: the 2025-06-18 revision
+			// drops a choice list on the way out, so the client shows a free-text
+			// box and an answer typed as "Yes" fails the call.
+			schema: Schema.Struct({ confirm: Schema.Boolean }),
 		}).pipe(
-			Effect.catchTag('ElicitationDeclined', () =>
-				Effect.succeed({ confirm: 'no' as const }),
+			Effect.map(
+				({ confirm }): ApprovalAnswer => (confirm ? 'confirmed' : 'declined'),
+			),
+			// A refusal carrying a cause is the client failing to put the question
+			// (it answered with an error, or the question cannot be shown on this
+			// revision) — nobody's no.
+			Effect.catchTag('ElicitationDeclined', error =>
+				Effect.succeed<ApprovalAnswer>(
+					error.cause === undefined ? 'declined' : 'unaskable',
+				),
+			),
+			// Closing the question without choosing comes back as an interruption.
+			// It is a person turning the question down, so it reads as a no rather
+			// than as a fault of the server's.
+			Effect.catchCause(cause =>
+				Cause.hasInterruptsOnly(cause)
+					? Effect.succeed<ApprovalAnswer>('declined')
+					: Effect.failCause(cause),
 			),
 			Effect.timeoutOption(ANSWER_WAIT),
 		)
-		if (Option.isNone(reply)) return 'unanswered' as const
-		return reply.value.confirm === 'yes' ? 'confirmed' : 'declined'
+		return Option.getOrElse(answer, (): ApprovalAnswer => 'unanswered')
 	})

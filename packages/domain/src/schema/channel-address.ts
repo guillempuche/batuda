@@ -40,14 +40,14 @@ export const CHANNEL_KINDS = [
 
 export type ChannelKind = (typeof CHANNEL_KINDS)[number]
 
-export const EMAIL_ADDRESS_PATTERN = /^[^@\s]+@[^@\s]+\.[^@\s]+$/
-export const PHONE_ADDRESS_PATTERN = /^\+?[0-9][0-9 ().-]{5,19}$/
+export const EMAIL_ADDRESS_PATTERN = /^[^@\s]+@[^@\s]+\.[^@\s]+$/u
+export const PHONE_ADDRESS_PATTERN = /^\+?[0-9][0-9 ().-]{5,19}$/u
 // A bare host ("acme.com") counts as well as a full address, because that is how
 // a website is most often written down.
 export const WEBSITE_ADDRESS_PATTERN =
 	/^(https?:\/\/)?[a-z0-9-]+(\.[a-z0-9-]+)+([/?#].*)?$/i
 export const INSTAGRAM_ADDRESS_PATTERN =
-	/^(@?[A-Za-z0-9._]{1,30}|https?:\/\/(www\.)?instagram\.com\/.+)$/
+	/^(@?[A-Za-z0-9._]{1,30}|https?:\/\/(www\.)?instagram\.com\/.+)$/u
 export const LINKEDIN_ADDRESS_PATTERN =
 	/^(https?:\/\/)?([a-z]{2,3}\.)?linkedin\.com\/.+$/i
 // Something has to follow the host, so the platform's own home page is not an

@@ -4,6 +4,7 @@ import { SqlClient } from 'effect/sql'
 
 import { companyVisible } from '../../services/company-liveness'
 import { inMcpOrgScope } from '../org-scope'
+import { noSuggestions } from '../prompts/_completions'
 
 const companyIdParam = McpSchema.param('companyId', Schema.String)
 
@@ -14,6 +15,7 @@ export const TimelineResource =
 			'Chronological activity for a company: emails, calls, meetings, documents, proposals, research runs. Latest 100 events.',
 		mimeType: 'application/json',
 		audience: ['assistant'],
+		completion: { companyId: noSuggestions },
 		content: Effect.fn(function* (_uri, companyId) {
 			const sql = yield* SqlClient.SqlClient
 			const rows = yield* sql`

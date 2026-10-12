@@ -32,7 +32,7 @@ export type AcceptedCountry = Schema.Schema.Type<typeof AcceptedCountry>
 // `isRegistryCountry` and the stored country are both capitals, so a code left
 // as written matches nothing.
 export const AcceptedCountryParam = Schema.String.pipe(
-	Schema.check(Schema.isPattern(/^[A-Za-z]{2}$/)),
+	Schema.check(Schema.isPattern(/^[A-Za-z]{2}$/u)),
 )
 
 // Turn a model-supplied place hint into a two-letter country code (upper-case),

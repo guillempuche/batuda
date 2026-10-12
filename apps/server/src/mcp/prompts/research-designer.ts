@@ -3,6 +3,7 @@ import { McpServer } from 'effect/ai'
 
 import { schemaRegistry } from '@batuda/research'
 
+import { completeLang, noSuggestions } from './_completions'
 import { LangParam, langDirective } from './_lang'
 
 export const ResearchDesignerPrompt = McpServer.prompt({
@@ -13,6 +14,7 @@ export const ResearchDesignerPrompt = McpServer.prompt({
 		topic: Schema.String,
 		lang: LangParam,
 	},
+	completion: { topic: noSuggestions, lang: completeLang },
 	content: ({ topic, lang }) =>
 		Effect.gen(function* () {
 			const schemaNames = Object.keys(schemaRegistry)
