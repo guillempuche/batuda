@@ -6,7 +6,11 @@ import {
 	rejectedToolCallCorrection,
 	unknownToolCorrection,
 } from './tool-call-correction'
-import { researchToolkit, toolParametersWireFormat } from './tools'
+import {
+	researchToolkit,
+	toolParametersWireFormat,
+	toolsOffered,
+} from './tools'
 
 // ── Test helpers ──
 
@@ -145,6 +149,9 @@ describe('rejectedToolCallCorrection', () => {
 })
 
 describe('correctionForFailedRound', () => {
+	// What an ordinary research pass offers: every tool in the toolkit.
+	const EVERY_TOOL = toolsOffered('company_enrichment_v1')
+
 	// What reaches the run fiber when a model wrote a call no vendor would take:
 	// every retry on every slot already spent on the same bad call.
 	const rejected = (toolName: string) =>
@@ -161,7 +168,12 @@ describe('correctionForFailedRound', () => {
 		it('should offer a correction naming the tool and the vendor that refused it', () => {
 			// GIVEN a refused web_search call and corrections still to spend
 			// WHEN the run fiber asks whether there is anything to say
-			const correction = correctionForFailedRound(rejected('web_search'), 0, 2)
+			const correction = correctionForFailedRound(
+				rejected('web_search'),
+				0,
+				2,
+				EVERY_TOOL,
+			)
 
 			// THEN it gets the words to append and the two facts the log line needs
 			expect(correction?.toolName).toBe('web_search')
@@ -178,7 +190,7 @@ describe('correctionForFailedRound', () => {
 			// right in two goes will not on a third, and each go has already cost a
 			// full round of retries on every vendor slot
 			expect(
-				correctionForFailedRound(rejected('web_search'), 2, 2),
+				correctionForFailedRound(rejected('web_search'), 2, 2, EVERY_TOOL),
 			).toBeUndefined()
 		})
 	})
@@ -196,7 +208,7 @@ describe('correctionForFailedRound', () => {
 			// THEN nothing — telling a model about its arguments would not fix a
 			// vendor being down, and swallowing the failure would ship a transcript
 			// built from rounds that never ran
-			expect(correctionForFailedRound(outage, 0, 2)).toBeUndefined()
+			expect(correctionForFailedRound(outage, 0, 2, EVERY_TOOL)).toBeUndefined()
 		})
 	})
 
@@ -207,8 +219,29 @@ describe('correctionForFailedRound', () => {
 			// WHEN the run fiber asks
 			// THEN nothing truthful can be said, so the failure stands
 			expect(
-				correctionForFailedRound(rejected('unknown'), 0, 2),
+				correctionForFailedRound(rejected('unknown'), 0, 2, EVERY_TOOL),
 			).toBeUndefined()
+		})
+	})
+
+	describe('when a vendor refused a tool the model invented, in its own words', () => {
+		it('should name the tools this pass offers', () => {
+			// GIVEN a vendor that refused the call at its own API, naming the
+			//       invented tool but not the tools there are
+			const invented = rejected('open_file')
+
+			// WHEN the run fiber asks whether there is anything to say
+			const correction = correctionForFailedRound(
+				invented,
+				0,
+				2,
+				toolsOffered('prospect_scan_v1'),
+			)
+
+			// THEN the model is told the tool does not exist and given the pass's
+			// own tools, rather than the round failing with nothing said
+			expect(correction?.text).toContain('There is no open_file tool')
+			expect(correction?.text).toContain('web_search, scrape_page')
 		})
 	})
 
@@ -224,7 +257,7 @@ describe('correctionForFailedRound', () => {
 			)
 
 			// WHEN the run fiber asks whether there is anything to say
-			const correction = correctionForFailedRound(notOffered, 0, 2)
+			const correction = correctionForFailedRound(notOffered, 0, 2, EVERY_TOOL)
 
 			// THEN the correction names the pass's own tools, which is the one
 			// thing that changes the call the model writes next

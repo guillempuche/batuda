@@ -283,6 +283,7 @@ const qualityFlag = Flag.Boolean('quality').pipe(
 	Flag.withDescription(
 		'Switch the company registers and the enrich, map and verify vendors off for this pass (they are set to none). A register answers with directors and a paid vendor with contact details, so leaving them on feeds the numbers from a source the change under test has nothing to do with — and they do not answer every time, which makes two passes differ for a reason that is not the change',
 	),
+	Flag.withDefault(false),
 )
 
 // The same idea, minus the enrichment tier: that tier is what this command
@@ -291,12 +292,14 @@ const contactsQualityFlag = Flag.Boolean('quality').pipe(
 	Flag.withDescription(
 		'Switch the company registers off for this pass (they are set to none). A register answers with directors, so leaving it on feeds the contact numbers from a source the change under test has nothing to do with — and it does not answer every time, which makes two passes differ for a reason that is not the change. The enrich, map and verify vendors are left as configured: the enrichment tier is what this command measures',
 	),
+	Flag.withDefault(false),
 )
 
 const databaseFromEnvFlag = Flag.Boolean('database-from-env').pipe(
 	Flag.withDescription(
 		"Measure against the DATABASE_URL the environment exported, even when this checkout's .env names another database. Off by default: an environment that ships a connection string of its own otherwise sends the whole pass into somebody else's database, where its runs mix with theirs and the pages it reads back are not its own",
 	),
+	Flag.withDefault(false),
 )
 
 export class InvalidLocale extends Data.TaggedError('InvalidLocale')<{
@@ -1132,11 +1135,13 @@ const researchEvalCommand = Command.make(
 			Flag.withDescription(
 				'Also print the metrics broken out by size/reach bucket and by country, so a regression in one segment is not averaged away',
 			),
+			Flag.withDefault(false),
 		),
 		dryRun: Flag.Boolean('dry-run').pipe(
 			Flag.withDescription(
 				'Check everything a pass needs and spend nothing: that the database is local, that no part of the pipeline would answer with canned data, that every golden row parses, and that this machine can reach each vendor a pass would go to. The reachability check sends no key, so it costs nothing and a vendor that turns it away still counts as reached. Prints how many runs would execute',
 			),
+			Flag.withDefault(false),
 		),
 		priceFrom: Flag.String('price-from').pipe(
 			Flag.withDescription(
@@ -1149,6 +1154,7 @@ const researchEvalCommand = Command.make(
 			Flag.withDescription(
 				'Also file a copy of the report under eval/reports/<golden-stem>/<date>-<commit>.json and print the path, so a later pass can be read against this one and a dry run priced from it. The filed copy carries the rates, the breakdowns and the counts and cost of each run — never anything a run read off the pages of a company',
 			),
+			Flag.withDefault(false),
 		),
 		databaseFromEnv: databaseFromEnvFlag,
 	},

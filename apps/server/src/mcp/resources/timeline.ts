@@ -2,6 +2,8 @@ import { Effect, Schema } from 'effect'
 import { McpSchema, McpServer } from 'effect/ai'
 import { SqlClient } from 'effect/sql'
 
+import { isUuidRef } from '@batuda/instructions'
+
 import { companyVisible } from '../../services/company-liveness'
 import { inMcpOrgScope } from '../org-scope'
 import { noSuggestions } from '../prompts/_completions'
@@ -17,6 +19,9 @@ export const TimelineResource =
 		audience: ['assistant'],
 		completion: { companyId: noSuggestions },
 		content: Effect.fn(function* (_uri, companyId) {
+			// Something that is not an id names no company, so there is nothing to
+			// list — and the database would refuse it outright.
+			if (!isUuidRef(companyId)) return '[]'
 			const sql = yield* SqlClient.SqlClient
 			const rows = yield* sql`
 				SELECT * FROM timeline_activity

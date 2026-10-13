@@ -224,6 +224,12 @@ const COMPANY_LIST_FIELD_SHAPES: ReadonlyArray<{
 	},
 ]
 
+// The company columns that hold a list rather than a single value.
+const COMPANY_LIST_COLUMNS: ReadonlySet<string> = new Set([
+	'tags',
+	'productsFit',
+])
+
 const COMPANY_FIELD_VOCABULARIES: ReadonlyArray<FieldVocabulary> = [
 	{ field: 'status', allowed: COMPANY_STATUSES },
 	{ field: 'priority', allowed: COMPANY_PRIORITIES },
@@ -286,6 +292,24 @@ export const checkFieldValues = (
 			if (bad !== undefined)
 				return `every ${field} entry must be ${wanted} — got ${JSON.stringify(bad)}`
 		}
+	// Every column a proposal can write holds a word, a number, or — for the two
+	// list columns — a list of words. A model that writes anything else (a
+	// location as { city, country }, a list holding a year) would reach the
+	// database as a value no column takes and come back as a failed request.
+	const lists = table === 'companies' ? COMPANY_LIST_COLUMNS : new Set<string>()
+	for (const [field, raw] of Object.entries(fields)) {
+		if (raw === null || raw === undefined) continue
+		if (lists.has(field) && !Array.isArray(raw))
+			return `${field} must be a list of words — got ${JSON.stringify(raw)}`
+		if (typeof raw !== 'object') continue
+		if (
+			Array.isArray(raw) &&
+			lists.has(field) &&
+			raw.every(entry => typeof entry === 'string')
+		)
+			continue
+		return `${field} must be ${lists.has(field) ? 'a list of words' : 'a single value'} — got ${JSON.stringify(raw)}`
+	}
 	return null
 }
 

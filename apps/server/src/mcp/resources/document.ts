@@ -2,6 +2,8 @@ import { Effect, Schema } from 'effect'
 import { McpSchema, McpServer } from 'effect/ai'
 import { SqlClient } from 'effect/sql'
 
+import { isUuidRef } from '@batuda/instructions'
+
 import { inMcpOrgScope } from '../org-scope'
 import { noSuggestions } from '../prompts/_completions'
 
@@ -16,6 +18,9 @@ export const DocumentResource =
 		audience: ['assistant'],
 		completion: { id: noSuggestions },
 		content: Effect.fn(function* (_uri, id) {
+			// Something that is not an id names no document, and the database
+			// would refuse it outright rather than find nothing.
+			if (!isUuidRef(id)) return yield* Effect.die(`Document ${id} not found`)
 			const sql = yield* SqlClient.SqlClient
 			const rows = yield* sql`SELECT * FROM documents WHERE id = ${id} LIMIT 1`
 			const doc = rows[0]

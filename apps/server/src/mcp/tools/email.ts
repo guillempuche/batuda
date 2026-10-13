@@ -166,7 +166,7 @@ const refusalMessage = (reason: 'no_subject' | 'forged_reply'): string =>
 
 const SendEmail = Tool.make('send_email', {
 	description:
-		'Send a new email, starting a new conversation. To answer or follow up on a conversation that already exists use reply_email instead, or a draft carrying thread_link_id — this tool sets no threading headers, so a "Re: " subject here would reach the recipient as a forged reply and is refused. The body is a structured block tree (paragraph / heading / list / quote / divider / image) — not raw html/text. Omit inbox_id to use the mailbox the calling member sends from in the active org — their own default, or the mailbox the team shares when they have set none. Attachments reference staging_ids returned by stage_email_attachment; set inline=true for cid-referenced inline images. Before composing, read the member’s standing email instructions (writing style, sign-off, do/don’t rules) from the batuda://instructions/email resource and write the body to follow them. Returns {_tag:"sent"} on success; {_tag:"suppressed"} if a recipient once hard-bounced or reported spam, which is a hard block on every path; or {_tag:"cancelled"} if an address being written to carries a deliverability verdict of "undeliverable" or "risky" and nobody confirmed it — the answer was no, nobody answered in time, or this client cannot put a question to anybody, and the reason says which. Verdicts of "catch_all" and "unknown", and addresses nobody has checked, are not gated. Read `verification` on a contact\'s channels (list_contacts) before composing to see this coming; when a send is stopped, the reason names the exact call that lifts it. Set skip_footer=true to omit the inbox default footer.',
+		'Send a new email, starting a new conversation. To answer or follow up on a conversation that already exists use reply_email instead, or a draft carrying thread_link_id — this tool sets no threading headers, so a "Re: " subject here would reach the recipient as a forged reply and is refused. The body is a structured block tree (paragraph / heading / list / quote / divider / image) — not raw html/text. Omit inbox_id to use the mailbox the calling member sends from in the active org — their own default, or the mailbox the team shares when they have set none. Attachments reference staging_ids returned by stage_email_attachment; set inline=true for cid-referenced inline images. Before composing, read the member’s standing email instructions (writing style, sign-off, do/don’t rules) from the batuda://instructions/email resource and write the body to follow them. Returns {_tag:"sent"} on success; {_tag:"suppressed"} if a recipient once hard-bounced or reported spam, which is a hard block on every path; or {_tag:"cancelled"} if an address being written to carries a deliverability verdict of "undeliverable" or "risky" and nobody confirmed it — the answer was no, nobody answered in time, another question was still waiting, or this client cannot put a question to anybody, and the reason says which. Verdicts of "catch_all" and "unknown", and addresses nobody has checked, are not gated. Read `verification` on a contact\'s channels (list_contacts) before composing to see this coming; when a send is stopped, the reason names the exact call that lifts it. Set skip_footer=true to omit the inbox default footer.',
 	parameters: Schema.Struct({
 		inbox_id: Schema.optionalKey(Schema.String).annotate({
 			description:
@@ -959,7 +959,9 @@ export const EmailHandlersLive = EmailTools.toLayer(
 				? `this client cannot ask anyone to confirm, and ${reasons}`
 				: answer === 'unanswered'
 					? `nobody answered the question in time, and ${reasons}`
-					: reasons
+					: answer === 'busy'
+						? `another question is still waiting for an answer — ask again once it has been answered — and ${reasons}`
+						: reasons
 
 		return {
 			send_email: params =>
