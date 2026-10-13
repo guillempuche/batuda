@@ -260,14 +260,16 @@ const waitFor = (userId: string, orgId?: string) =>
 
 describe('requireApproval with questions already waiting', () => {
 	it('should not put a second question to a caller who has one waiting', async () => {
-		// GIVEN a caller whose earlier question is still waiting
+		// GIVEN a caller whose earlier question, asked in one organization, is
+		// still waiting
 		const answer = await Effect.runPromise(
 			Effect.gen(function* () {
-				const first = yield* Effect.forkChild(waitFor('ada'))
+				const first = yield* Effect.forkChild(waitFor('ada', 'acme'))
 				yield* Effect.yieldNow
 
-				// WHEN the same caller asks again
-				const second = yield* waitFor('ada')
+				// WHEN the same caller asks again from another organization they
+				// belong to, where no question is waiting
+				const second = yield* waitFor('ada', 'globex')
 				yield* Fiber.interrupt(first)
 				return second
 			}),
@@ -300,31 +302,29 @@ describe('requireApproval with questions already waiting', () => {
 		expect(answer).toBe('busy')
 	})
 
-	it('should keep a seat for other organizations when one has two waiting', async () => {
-		// GIVEN two people of one organization each with a question waiting
+	it('should keep the other seats for other organizations when one has a question waiting', async () => {
+		// GIVEN a person of one organization with a question waiting
 		const answers = await Effect.runPromise(
 			Effect.gen(function* () {
-				const waiting = yield* Effect.forEach(['ada', 'bo'], user =>
-					Effect.forkChild(waitFor(user, 'acme')),
-				)
+				const waiting = yield* Effect.forkChild(waitFor('ada', 'acme'))
 				yield* Effect.yieldNow
 
-				// WHEN a third person of that organization asks, and then somebody
+				// WHEN a second person of that organization asks, and then somebody
 				// from another organization
-				const sameOrg = yield* waitFor('cy', 'acme')
-				const otherOrg = yield* Effect.forkChild(waitFor('di', 'globex'))
+				const sameOrg = yield* waitFor('bo', 'acme')
+				const otherOrg = yield* Effect.forkChild(waitFor('cy', 'globex'))
 				yield* Effect.yieldNow
 				// Still running means it was put and is waiting for its answer; a
 				// question turned away would already have finished with 'busy'.
 				const otherWasAsked = otherOrg.pollUnsafe() === undefined
-				yield* Effect.forEach([...waiting, otherOrg], Fiber.interrupt)
+				yield* Effect.forEach([waiting, otherOrg], Fiber.interrupt)
 				return { sameOrg, otherWasAsked }
 			}),
 		)
 
-		// THEN the third person of the busy organization waits their turn, and
-		// the other organization's question is put — one organization cannot
-		// keep everyone else's questions from being asked
+		// THEN the second person of the busy organization waits their turn, and
+		// the other organization's question is put — one organization never
+		// holds more than one of the three seats
 		expect(answers.sameOrg).toBe('busy')
 		expect(answers.otherWasAsked).toBe(true)
 	})

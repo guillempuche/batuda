@@ -116,6 +116,21 @@ describe('httpPathPattern', () => {
 		})
 	})
 
+	describe('when a reset-password link is spelled oddly but still names the route', () => {
+		it('should collapse the token all the same', () => {
+			// GIVEN a doubled slash, a percent-encoded letter and a backslash — each
+			// a spelling a server may still route to the reset page
+			// WHEN normalised
+			// THEN none of them carries the token into the log line
+			for (const url of [
+				'/auth//reset-password/secret-1',
+				'/auth/%72eset-password/secret-2',
+				'/auth\\reset-password/secret-3',
+			])
+				expect(httpPathPattern(url)).toBe('/auth/reset-password/:token')
+		})
+	})
+
 	describe('when the url is a magic-link verify (token in the query)', () => {
 		it('should drop the token along with the query', () => {
 			// GIVEN a magic-link verify URL with the token in the query

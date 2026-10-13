@@ -1,6 +1,6 @@
 import { Context, DateTime, Effect, Layer, Schema } from 'effect'
 import type { Statement } from 'effect/sql'
-import { SqlClient, type SqlError } from 'effect/sql'
+import { SqlClient } from 'effect/sql'
 
 import { CurrentOrg, NotFound, PageSummary } from '@batuda/controllers'
 import { Page } from '@batuda/domain'
@@ -96,10 +96,8 @@ export class PageService extends Context.Service<PageService>()('PageService', {
 						currentOrg.id,
 					).pipe(
 						inOwnSavepoint(sql),
-						Effect.catch((err: SqlError.SqlError) =>
-							err.reason._tag === 'UniqueViolation' && attempt < maxAttempts
-								? Effect.succeed(null)
-								: Effect.fail(err),
+						Effect.catchReason('SqlError', 'UniqueViolation', (_, err) =>
+							attempt < maxAttempts ? Effect.succeed(null) : Effect.fail(err),
 						),
 					)
 					if (result !== null) return yield* decodePages(result)

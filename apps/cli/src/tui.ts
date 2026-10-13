@@ -175,8 +175,5 @@ const isMain =
 	process.argv[1] === fileURLToPath(import.meta.url)
 
 if (isMain) {
-	NodeRuntime.runMain(
-		program as unknown as Effect.Effect<void, unknown, never>,
-		{ disableErrorReporting: true },
-	)
+	NodeRuntime.runMain(program, { disableErrorReporting: true })
 }

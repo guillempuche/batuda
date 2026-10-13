@@ -153,10 +153,11 @@ const rejectedToolCall = (
 }
 
 // Read the true shape of a failure before it collapses into a ProviderError
-// (only provider + message + recoverable). `Effect.timeout` raises a bare
-// TimeoutError with no message, and a provider blip can arrive as an AiError
-// whose message we couldn't extract — both used to surface as the contentless
-// "<provider> request failed", hiding whether it was a timeout, a 429, or a 500.
+// (only provider + message + recoverable). `Effect.timeout`'s TimeoutError names
+// neither the provider nor what was waited for, and a provider blip can arrive
+// as an AiError with no message to pull out — left alone, both would surface as
+// the contentless "<provider> request failed", hiding whether it was a timeout,
+// a 429, or a 500.
 const describeFailure = (
 	provider: string,
 	err: unknown,
@@ -258,13 +259,6 @@ const isRetryableFailure = (err: unknown): boolean =>
 	!isCutOffReply(err) &&
 	err.reason._tag !== 'ToolNotFoundError'
 
-const rateLimitRetryAfter = (err: unknown): Duration.Duration | undefined => {
-	if (!(err instanceof AiError.AiError)) return undefined
-	const reason = err.reason
-	if (reason._tag !== 'RateLimitError') return undefined
-	return reason.retryAfter
-}
-
 /**
  * Base schedule: jittered exponential backoff, capped at
  * `DEFAULT_MAX_ATTEMPTS - 1` retries (one initial attempt + (N-1) retries).
@@ -282,7 +276,8 @@ const makeRetrySchedule = (provider: string, tier: string | undefined) =>
 		// vendor asking for longer than the limit would be recorded as a call that
 		// hung rather than one that was turned away.
 		Schedule.modifyDelay(({ input, duration }) => {
-			const askedFor = rateLimitRetryAfter(input)
+			const askedFor =
+				input instanceof AiError.AiError ? input.retryAfter : undefined
 			return Effect.succeed(
 				Duration.min(
 					askedFor === undefined ? duration : Duration.max(duration, askedFor),

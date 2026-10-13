@@ -16,6 +16,7 @@ import {
 import { OrgMiddleware } from '../middleware/org'
 import { SessionMiddleware } from '../middleware/session'
 import { PaginatedList, pageQuery } from '../pagination'
+import { FiniteFromQuery } from '../query-number'
 import {
 	BulkResolveResult,
 	CancelResult,
@@ -279,7 +280,7 @@ export const ResearchGroup = HttpApiGroup.make('research')
 			query: {
 				subject_table: Schema.optional(Schema.String),
 				status: Schema.optional(Schema.String),
-				min_confidence: Schema.optional(Schema.NumberFromString),
+				min_confidence: Schema.optional(FiniteFromQuery),
 				machine_checkable: Schema.optional(Schema.String),
 				...pageQuery,
 			},

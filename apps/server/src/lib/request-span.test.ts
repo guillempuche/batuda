@@ -10,25 +10,14 @@
 import { createServer } from 'node:http'
 
 import { NodeHttpServer } from '@effect/platform-node'
-import { Effect, Layer, ManagedRuntime, Tracer } from 'effect'
+import { Effect, Layer, ManagedRuntime } from 'effect'
 import { HttpRouter, HttpServer, HttpServerResponse } from 'effect/http'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
+import { serverSpanRecorder } from './server-span-recorder'
+
 // Names of the spans opened for an incoming request, in the order they opened.
-// A module-level array because the tracer is built once, with the server.
-const serverSpans: Array<string> = []
-
-const countingTracer = (inner: Tracer.Tracer): Tracer.Tracer => ({
-	...inner,
-	span(options) {
-		if (options.kind === 'server') serverSpans.push(options.name)
-		return inner.span(options)
-	},
-})
-
-const CountingTracerLive = Layer.effect(Tracer.Tracer)(
-	Effect.map(Effect.service(Tracer.Tracer), countingTracer),
-)
+const { names: serverSpans, layer: CountingTracerLive } = serverSpanRecorder()
 
 const RoutesLive = Layer.mergeAll(
 	HttpRouter.add('GET', '/ok', HttpServerResponse.text('ok')),

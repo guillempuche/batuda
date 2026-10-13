@@ -103,12 +103,12 @@ export const NextSteps = Schema.Struct({
 export const STALE_DAYS_BOUNDS = { minimum: 1, maximum: 3650 } as const
 
 /**
- * How far down the priority scale the high-priority list reaches, read as
- * importance rather than as the stored number — 1 is the hottest, so `2` takes
- * priorities 1 and 2. The ceiling follows the scale the domain defines, so
- * widening that scale does not quietly leave this behind.
+ * The ends of the priority scale a query may name: the high-priority list's
+ * reach (read as importance — 1 is the hottest, so `2` takes priorities 1 and
+ * 2) and the company list's exact priority. They follow the scale the domain
+ * defines, so widening that scale does not quietly leave this behind.
  */
-export const PRIORITY_AT_LEAST_BOUNDS = {
+export const PRIORITY_BOUNDS = {
 	minimum: Math.min(...COMPANY_PRIORITIES),
 	maximum: Math.max(...COMPANY_PRIORITIES),
 } as const
@@ -121,8 +121,10 @@ export const StaleDays = Schema.FiniteFromString.pipe(
 	Schema.check(Schema.isInt(), Schema.isBetween(STALE_DAYS_BOUNDS)),
 )
 
-const PriorityAtLeast = Schema.FiniteFromString.pipe(
-	Schema.check(Schema.isInt(), Schema.isBetween(PRIORITY_AT_LEAST_BOUNDS)),
+// A priority as a query string carries it: a whole number on the domain's
+// scale. Shared with the company list's exact-priority filter.
+export const PriorityFromString = Schema.FiniteFromString.pipe(
+	Schema.check(Schema.isInt(), Schema.isBetween(PRIORITY_BOUNDS)),
 )
 
 export const PipelineGroup = HttpApiGroup.make('pipeline')
@@ -136,7 +138,7 @@ export const PipelineGroup = HttpApiGroup.make('pipeline')
 			query: {
 				limit: pageQuery.limit,
 				staleDays: Schema.optional(StaleDays),
-				priorityAtLeast: Schema.optional(PriorityAtLeast),
+				priorityAtLeast: Schema.optional(PriorityFromString),
 			},
 			success: NextSteps,
 		}),

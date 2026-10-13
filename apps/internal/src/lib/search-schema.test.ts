@@ -1,12 +1,14 @@
 import { Schema } from 'effect'
 import { describe, expect, it } from 'vitest'
 
+import { PriorityFromString } from '@batuda/controllers'
+
 import { validateSearchWith } from './search-schema'
 
 const decode = validateSearchWith({
 	query: Schema.NonEmptyString,
 	attributeValue: Schema.NonEmptyString,
-	priority: Schema.Union([Schema.Number, Schema.NumberFromString]),
+	priority: PriorityFromString,
 	deleted: Schema.Literals(['only']),
 })
 
@@ -95,6 +97,21 @@ describe('validateSearchWith [search-schema.ts]', () => {
 			// THEN both are the same number
 			expect(decode({ priority: 3 }).priority).toBe(3)
 			expect(decode({ priority: '3' }).priority).toBe(3)
+		})
+	})
+
+	describe('when a number field gets something the server would refuse', () => {
+		it('should cover it rather than send it', () => {
+			// GIVEN a hand-typed `?priority=abc`, `?priority=` and `?priority=9` —
+			// read as plain numbers these become NaN, 0 and 9, which the server
+			// refuses, so the list would fail instead of ignoring the param
+			for (const priority of ['abc', '', 9]) {
+				// WHEN validated
+				const out = decode({ priority })
+				// THEN the key holds nothing, so no filter reaches the list
+				expect('priority' in out).toBe(true)
+				expect(out.priority).toBeUndefined()
+			}
 		})
 	})
 

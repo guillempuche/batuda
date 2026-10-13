@@ -66,8 +66,10 @@ export {
 	NextSteps,
 	PipelineGroup,
 	PipelineSnapshot,
-	PRIORITY_AT_LEAST_BOUNDS,
+	PRIORITY_BOUNDS,
+	PriorityFromString,
 	STALE_DAYS_BOUNDS,
+	StaleDays,
 } from './routes/pipeline'
 export { ProductsGroup } from './routes/products'
 export { ProposalsGroup } from './routes/proposals'

@@ -4,7 +4,7 @@ import { Tool, Toolkit } from 'effect/ai'
 import {
 	NextSteps,
 	PipelineSnapshot,
-	PRIORITY_AT_LEAST_BOUNDS,
+	PRIORITY_BOUNDS,
 	STALE_DAYS_BOUNDS,
 } from '@batuda/controllers'
 
@@ -37,10 +37,7 @@ const GetNextSteps = Tool.make('get_next_steps', {
 		),
 		priorityAtLeast: Schema.optionalKey(
 			Schema.Number.pipe(
-				Schema.check(
-					Schema.isInt(),
-					Schema.isBetween(PRIORITY_AT_LEAST_BOUNDS),
-				),
+				Schema.check(Schema.isInt(), Schema.isBetween(PRIORITY_BOUNDS)),
 			),
 		),
 	}),

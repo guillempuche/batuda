@@ -1,4 +1,4 @@
-import { Cause, Duration, Effect, Option, Schema } from 'effect'
+import { Cause, Duration, Effect, Schema } from 'effect'
 import type { McpSchema } from 'effect/ai'
 import { McpServer } from 'effect/ai'
 
@@ -45,15 +45,16 @@ export type ApprovalAnswer =
 // and its answer with it — so the wait ends well before.
 const ANSWER_WAIT = Duration.seconds(90)
 
-// How many questions may wait for their answer at once: one per person, two per
+// How many questions may wait for their answer at once: one per person, one per
 // organization, three across the server. A call keeps its database connection
 // while it waits, the pool holds ten, and the answer's own request needs one to
 // sign in — so ten waiting questions would stall every request on the server.
-// Two per organization always leaves a seat for the others, so one
-// organization's questions cannot keep everyone else's from being put. A
-// question past a limit is not put, and can be asked again once one is answered.
+// One per organization means no organization holds more than one of the three
+// seats, so its questions cannot keep everyone else's from being put. A question
+// past a limit is not put, and can be asked again once the waiting one is
+// answered.
 const MOST_WAITING = 3
-const MOST_WAITING_PER_ORG = 2
+const MOST_WAITING_PER_ORG = 1
 let waiting = 0
 const waitingPeople = new Set<string>()
 const waitingByOrg = new Map<string, number>()
@@ -127,13 +128,13 @@ const ask = (message: string) =>
 		// Closing the question without choosing comes back as an interruption.
 		// It is a person turning the question down, so it reads as a no rather
 		// than as a fault of the server's.
-		Effect.catchCause(cause =>
-			Cause.hasInterruptsOnly(cause)
-				? Effect.succeed<ApprovalAnswer>('declined')
-				: Effect.failCause(cause),
+		Effect.catchCauseIf(Cause.hasInterruptsOnly, () =>
+			Effect.succeed<ApprovalAnswer>('declined'),
 		),
-		Effect.timeoutOption(ANSWER_WAIT),
-		Effect.map(Option.getOrElse((): ApprovalAnswer => 'unanswered')),
+		Effect.timeoutOrElse({
+			duration: ANSWER_WAIT,
+			orElse: () => Effect.succeed<ApprovalAnswer>('unanswered'),
+		}),
 	)
 
 /**
