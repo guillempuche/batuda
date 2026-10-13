@@ -2,12 +2,7 @@ import { createServer } from 'node:http'
 
 import { NodeHttpServer, NodeRuntime } from '@effect/platform-node'
 import { Config, Effect, Layer } from 'effect'
-import {
-	FetchHttpClient,
-	HttpMiddleware,
-	HttpRouter,
-	HttpServerResponse,
-} from 'effect/http'
+import { FetchHttpClient, HttpRouter, HttpServerResponse } from 'effect/http'
 import { HttpApiBuilder, HttpApiScalar, OpenApi } from 'effect/http-api'
 
 import { BookingProviderLive, IcsParserLive } from '@batuda/calendar'
@@ -54,6 +49,7 @@ import { withGlobalMiddlewareOrder } from './lib/global-middleware-order'
 import { LoggerLive } from './lib/logger'
 import { OtlpObservability } from './lib/observability'
 import { ResearchDefaults } from './lib/research-defaults'
+import { withTracerExemptions } from './lib/tracer-exemptions'
 import { WellKnownLive } from './lib/well-known'
 import { McpHttpLive } from './mcp/http'
 import { OrgMiddlewareLive } from './middleware/org'
@@ -198,23 +194,6 @@ const OpenApiJsonLive = HttpRouter.add(
 	HttpServerResponse.json(OpenApi.fromApi(BatudaApi)),
 )
 
-// Routes where tracing is suppressed. The tracer records `url.full`/`url.query`
-// UNREDACTED, so any route whose URL itself carries a secret must be exempt or
-// the token lands in Honeycomb: magic-link verify (token in query) and
-// reset-password (token in path). `/health` is exempt too — the uptime checker
-// polls it constantly and would otherwise drown the real traces. Matched on the
-// path alone so a query string (e.g. `/health?x=1`) doesn't slip through.
-const TracerDisabledLive = Layer.succeed(HttpMiddleware.TracerDisabledWhen)(
-	request => {
-		const path = request.url.split('?')[0] ?? request.url
-		return (
-			path === '/health' ||
-			path.startsWith('/auth/magic-link/verify') ||
-			path.startsWith('/auth/reset-password')
-		)
-	},
-)
-
 // Observability and CORS are NOT in this list on purpose: a merge decides no
 // order between router-wide middleware, and observability has to run outside
 // CORS. `withGlobalMiddlewareOrder` explains why and is where that order is
@@ -223,7 +202,6 @@ const AppLive = withGlobalMiddlewareOrder(
 	Layer.mergeAll(
 		ApiLive,
 		McpHttpLive,
-		TracerDisabledLive,
 		DocsLive,
 		OpenApiJsonLive,
 		WellKnownLive,
@@ -258,15 +236,17 @@ const AppLive = withGlobalMiddlewareOrder(
 // annotations (request id, org id, tool name) attach to. Passing one as well
 // wraps every request twice and leaves a bare duplicate span beside each real
 // one — two rows per request, so every count reads double. The routes exempt
-// from tracing are the ones `TracerDisabledLive` names above; the platform's own
+// from tracing are the ones `withTracerExemptions` names; the platform's own
 // wrapping reads that same list.
-const program = HttpRouter.serve(AppLive, {
-	// Disable Effect's built-in request logger: it strips the query string but
-	// keeps the raw path, so a reset token carried in the path would export
-	// verbatim to OTLP. ObservabilityLive emits a sanitized completion log
-	// (path_pattern, query stripped) in its place.
-	disableLogger: true,
-}).pipe(
+const program = withTracerExemptions(
+	HttpRouter.serve(AppLive, {
+		// Disable Effect's built-in request logger: it strips the query string but
+		// keeps the raw path, so a reset token carried in the path would export
+		// verbatim to OTLP. ObservabilityLive emits a sanitized completion log
+		// (path_pattern, query stripped) in its place.
+		disableLogger: true,
+	}),
+).pipe(
 	Layer.provide(ServicesLive),
 	Layer.provide(BookingProviderLive),
 	Layer.provide(IcsParserLive),

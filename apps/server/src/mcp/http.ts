@@ -1,7 +1,7 @@
 import { NodeHttpServerRequest } from '@effect/platform-node'
 import { fromNodeHeaders } from 'better-auth/node'
 import { verifyAccessToken } from 'better-auth/oauth2'
-import { Effect, Layer } from 'effect'
+import { Effect, Layer, Result } from 'effect'
 import { McpServer } from 'effect/ai'
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/http'
 import { SqlClient } from 'effect/sql'
@@ -430,13 +430,8 @@ const McpAuthMiddleware = HttpRouter.middleware(
 								algorithms: ['EdDSA'],
 							},
 						}),
-					).pipe(
-						Effect.match({
-							onFailure: () => ({ ok: false as const, payload: undefined }),
-							onSuccess: payload => ({ ok: true as const, payload }),
-						}),
-					)
-					if (!outcome.ok) {
+					).pipe(Effect.result)
+					if (Result.isFailure(outcome)) {
 						return yield* rejectAuth(
 							'invalid_or_expired_token',
 							bearerChallenge(
@@ -446,7 +441,7 @@ const McpAuthMiddleware = HttpRouter.middleware(
 							),
 						)
 					}
-					const payload = outcome.payload
+					const payload = outcome.success
 					if (payload) {
 						const userId = typeof payload.sub === 'string' ? payload.sub : ''
 						const clientId =

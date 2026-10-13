@@ -30,7 +30,8 @@ import { OrgMiddleware } from '../middleware/org'
 import { SessionMiddleware } from '../middleware/session'
 import { PaginatedList, pageQuery } from '../pagination'
 import { CommaList } from '../query-list'
-import { StaleDays } from './pipeline'
+import { FiniteFromQuery } from '../query-number'
+import { PriorityFromString, StaleDays } from './pipeline'
 
 // One research run whose findings were applied to a company, with the pages its
 // citations point at — so a reader can trace a fact on the row back to the run
@@ -218,7 +219,7 @@ const companyFilterQuery = {
 	status: Schema.optional(CommaList),
 	country: Schema.optional(CommaList),
 	industry: Schema.optional(Schema.String),
-	priority: Schema.optional(Schema.NumberFromString),
+	priority: Schema.optional(PriorityFromString),
 	// A user id, or the word `none` for the companies nobody has taken. Both at
 	// once is a real question — what I am working plus what is going spare.
 	owner: Schema.optional(CommaList),
@@ -254,10 +255,11 @@ const companyFilterQuery = {
 	// how somebody finds a deleted company again in order to restore it,
 	// and without it a deletion cannot be undone from outside the code.
 	deleted: Schema.optional(Schema.Literals(['only', 'include'])),
-	minLat: Schema.optional(Schema.NumberFromString),
-	maxLat: Schema.optional(Schema.NumberFromString),
-	minLng: Schema.optional(Schema.NumberFromString),
-	maxLng: Schema.optional(Schema.NumberFromString),
+	// The map's visible box.
+	minLat: Schema.optional(FiniteFromQuery),
+	maxLat: Schema.optional(FiniteFromQuery),
+	minLng: Schema.optional(FiniteFromQuery),
+	maxLng: Schema.optional(FiniteFromQuery),
 }
 
 /**

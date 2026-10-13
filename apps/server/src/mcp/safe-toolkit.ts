@@ -1,13 +1,4 @@
-import {
-	Cause,
-	Context,
-	Effect,
-	Layer,
-	Option,
-	Schema,
-	Sink,
-	Stream,
-} from 'effect'
+import { Cause, Context, Effect, Layer, Option, Schema, Stream } from 'effect'
 import { AiError, McpSchema, McpServer, Tool, type Toolkit } from 'effect/ai'
 
 import { recordFacts } from '@batuda/observability'
@@ -139,7 +130,7 @@ const registerToolkitSafe = <Tools extends Record<string, Tool.Any>>(
 						)
 						.pipe(
 							Stream.unwrap,
-							Stream.run(Sink.last()),
+							Stream.runLast,
 							Effect.flatMap(Effect.fromOption),
 							Effect.provide(services as Context.Context<never>),
 							// Its own org transaction, open for exactly as long as the call:
@@ -198,25 +189,25 @@ const registerToolkitSafe = <Tools extends Record<string, Tool.Any>>(
 							// every dropped connection in the channel reserved for what
 							// nobody intended. The request record next door skips them
 							// for the same reason.
-							Effect.tapCause(cause =>
-								Cause.hasInterruptsOnly(cause)
-									? Effect.void
-									: Effect.andThen(
-											recordFacts({
-												'mcp.tool': tool.name,
-												// A refusal is the tool answering; a fault is nobody's
-												// intention. Telling them apart on the record is what
-												// makes "which tools are turning callers away" a
-												// question anybody can ask.
-												'mcp.tool.outcome': isExpectedFailure(cause)
-													? 'refused'
-													: 'failed',
-											}),
-											(isExpectedFailure(cause)
-												? Effect.logDebug(cause)
-												: Effect.logError(cause)
-											).pipe(Effect.annotateLogs({ 'mcp.tool': tool.name })),
-										),
+							Effect.tapCauseIf(
+								cause => !Cause.hasInterruptsOnly(cause),
+								cause =>
+									Effect.andThen(
+										recordFacts({
+											'mcp.tool': tool.name,
+											// A refusal is the tool answering; a fault is nobody's
+											// intention. Telling them apart on the record is what
+											// makes "which tools are turning callers away" a
+											// question anybody can ask.
+											'mcp.tool.outcome': isExpectedFailure(cause)
+												? 'refused'
+												: 'failed',
+										}),
+										(isExpectedFailure(cause)
+											? Effect.logDebug(cause)
+											: Effect.logError(cause)
+										).pipe(Effect.annotateLogs({ 'mcp.tool': tool.name })),
+									),
 							),
 							Effect.catch(error =>
 								Effect.succeed(

@@ -1,5 +1,6 @@
 import { PgClient } from '@effect/sql-pg'
-import { Config } from 'effect'
+import { Config, Context, Effect, Layer } from 'effect'
+import { SqlClient } from 'effect/sql'
 
 // Mirrors apps/server/src/db/client.ts so column names come back camelCased
 // and parameter objects can be written camelCase too, while the contents of a
@@ -19,4 +20,17 @@ export const PgLive = PgClient.layerConfig({
 	// Named statements cache a query plan, and a migration that adds a column
 	// while the old code still serves makes every `SELECT *` plan fail.
 	prepare: Config.succeed(false),
-})
+}).pipe(
+	// The driver connects on first use. One query while starting turns a database
+	// it cannot reach into a failed boot, rather than a process that answers its
+	// health check and fails every request — which a deploy would put in place
+	// of a release that works.
+	Layer.tap(context =>
+		Context.get(context, SqlClient.SqlClient)`SELECT 1`.pipe(
+			// Above the driver's own five-second limit for connecting, so a slow
+			// first connection is left to that limit rather than cut short here.
+			Effect.timeout('10 seconds'),
+			Effect.orDie,
+		),
+	),
+)

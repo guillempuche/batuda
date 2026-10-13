@@ -8,6 +8,8 @@ import {
 
 import { boundedCause, makeWorkRecord, WorkRecord } from '@batuda/observability'
 
+import { loosePath } from './tracer-exemptions'
+
 // Collapse record-identifying URL segments so errors group by route, not by
 // individual record. UUIDs → :id; the query string and fragment are dropped so
 // a token in `?code=…`/`?token=…` never lands in a span attribute or log line.
@@ -55,8 +57,9 @@ const isMissingRoute = (cause: Cause.Cause<unknown>): boolean => {
 export const httpPathPattern = (url: string): string => {
 	const path = url.split('?')[0]?.split('#')[0] ?? url
 	// The reset-password token rides in the path itself (not a UUID), so collapse
-	// that whole segment — otherwise it would leak into the log line.
-	if (path.startsWith('/auth/reset-password/'))
+	// that whole segment — otherwise it would leak into the log line. Matched
+	// loosely, as tracing is, so `/auth//reset-password/<token>` collapses too.
+	if (loosePath(path).includes('/reset-password/'))
 		return '/auth/reset-password/:token'
 	return path.replace(UUID, ':id')
 }

@@ -285,7 +285,7 @@ This is a CRM holding other people's customer data, so what never gets written d
 
 ### Three rules that are easy to get wrong
 
-**Raw URLs never get recorded.** A URL can carry a single-use secret — a magic-link token in the query, a reset-password token in the path. Records carry a sanitized route with ids collapsed instead. Routes whose URL is itself a credential are exempt from tracing altogether, because the tracer records the full URL unredacted (headers like `authorization` and `cookie` are redacted by default; the URL is not).
+**Raw URLs never get recorded.** A URL can carry a single-use secret — a magic-link token in the query, a reset-password token in the path. Records carry a sanitized route with ids collapsed instead. Routes whose URL is itself a credential are exempt from tracing altogether, because the tracer records the full URL unredacted (it records no headers at all unless told to; the URL it always records).
 
 **Whole argument bags are scrubbed, not the fields that look sensitive.** Tool-call arguments are recorded verbatim by the AI toolkit and include mailbox passwords and whole attached files. Any list of sensitive-looking field names holds only until someone adds a field nobody thought to name — and that field would be secret exactly when it mattered. So the whole value goes, and anything worth tracing gets its own deliberate attribute.
 

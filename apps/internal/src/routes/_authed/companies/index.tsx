@@ -8,6 +8,7 @@ import { LayoutGroup, motion } from 'motion/react'
 import { styled } from 'next-yak'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
+import { PriorityFromString, StaleDays } from '@batuda/controllers'
 import {
 	ATTENTION_FILTERS,
 	ATTRIBUTE_OPS,
@@ -102,15 +103,16 @@ const ValueList = valueListOf(Schema.NonEmptyString)
  * one it cannot read is covered instead — the key stays, holding nothing — and
  * every reader here skips a param holding nothing.
  *
- * `priority` accepts either a parsed number (client navigations where
- * TanStack already decoded the param) or a numeric string (raw URL on
- * first hit). Both decode to `number`.
+ * `priority` and `staleDays` are held to what the server accepts, so a
+ * hand-typed `?priority=abc` or `?priority=9` is dropped here rather than sent
+ * and refused. A number the router already decoded is offered again as its
+ * text, so the raw text and the decoded number both end up a `number`.
  */
 const decodeSearch = validateSearchWith({
 	status: ValueList,
 	country: ValueList,
 	industry: Schema.NonEmptyString,
-	priority: Schema.Union([Schema.Number, Schema.NumberFromString]),
+	priority: PriorityFromString,
 	owner: ValueList,
 	// What a research run concluded. Not a closed set: nothing stops a run
 	// writing a word nobody listed, and a company carrying one still has to be
@@ -122,7 +124,7 @@ const decodeSearch = validateSearchWith({
 	// Set when arriving from a dashboard heading, so the list opens on exactly
 	// what that heading was counting rather than on everything.
 	attention: AttentionFilterSchema,
-	staleDays: Schema.Union([Schema.Number, Schema.NumberFromString]),
+	staleDays: StaleDays,
 	// Shows the ones taken out of view, so somebody can put one back. Absent
 	// means the companies in use, which is the page's ordinary job. A URL
 	// carrying anything else is dropped rather than passed on as a filter the

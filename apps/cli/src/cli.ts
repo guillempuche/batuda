@@ -1,10 +1,11 @@
 import { fileURLToPath } from 'node:url'
 
 import { NodeRuntime, NodeServices } from '@effect/platform-node'
-import { Console, Data, Effect, Option, Redacted } from 'effect'
+import { Console, Data, Effect, Option, Redacted, Runtime } from 'effect'
 import { Argument, Command, Flag, Prompt } from 'effect/cli'
 
 import { isLangCode, LANG_CODES, type LangCode } from '@batuda/domain'
+import { readableError } from '@batuda/observability'
 
 import { authCreateKey } from './commands/auth'
 import { authBootstrap } from './commands/auth-bootstrap'
@@ -1477,6 +1478,16 @@ const isMain =
 // (`message`) land as non-enumerable own properties — `Object.entries` drops
 // them. `core.Error#toJSON` exposes the original construction args through a
 // `plainArgs` symbol, so we prefer that when available.
+// An error inside a field (a wrapper's `cause`) serializes to `{}`, so it is
+// shown by its message — made readable, as a failed schema check hides its
+// details one level down.
+const formatField = (v: unknown): string =>
+	typeof v === 'string'
+		? v
+		: v instanceof Error
+			? readableError(v).message
+			: JSON.stringify(v)
+
 const formatError = (e: unknown): string => {
 	if (e && typeof e === 'object' && '_tag' in e) {
 		const tag = String((e as { _tag: unknown })._tag)
@@ -1487,11 +1498,11 @@ const formatError = (e: unknown): string => {
 				: (e as Record<string, unknown>)
 		const fields = Object.entries(raw)
 			.filter(([k]) => k !== '_tag' && !k.startsWith('_'))
-			.map(([k, v]) => `${k}=${typeof v === 'string' ? v : JSON.stringify(v)}`)
+			.map(([k, v]) => `${k}=${formatField(v)}`)
 			.join(', ')
 		return fields ? `${tag}(${fields})` : tag
 	}
-	if (e instanceof Error) return e.message
+	if (e instanceof Error) return readableError(e).message
 	return String(e)
 }
 
@@ -1499,6 +1510,9 @@ const formatError = (e: unknown): string => {
 // unhandled exceptions). Without the latter, a `disableErrorReporting`
 // runtime swallows defects entirely and the user sees an empty exit 1.
 const reportError = (e: unknown) => {
+	// The CLI module has already printed this one — the help with its parse
+	// errors, or a user error — and marked it so.
+	if (!Runtime.getErrorReported(e)) return Effect.void
 	const hint = recoveryHint(e)
 	if (hint) {
 		const tag =
@@ -1523,8 +1537,5 @@ if (isMain) {
 		Effect.tapError(reportError),
 		Effect.tapDefect(reportError),
 	)
-	NodeRuntime.runMain(
-		program as unknown as Effect.Effect<void, unknown, never>,
-		{ disableErrorReporting: true },
-	)
+	NodeRuntime.runMain(program, { disableErrorReporting: true })
 }

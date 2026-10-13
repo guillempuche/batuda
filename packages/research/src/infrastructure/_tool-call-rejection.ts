@@ -21,6 +21,8 @@
  * its message, so a genuinely malformed request still fails fast.
  */
 
+// Adds its typed `openai` entry to the library's error metadata, read below.
+import type {} from '@effect/ai-openai-compat'
 import { Effect } from 'effect'
 import { AiError } from 'effect/ai'
 
@@ -40,18 +42,10 @@ const REJECTED_TOOL_CALL_CODES: ReadonlySet<string> = new Set([
 
 // Every vendor is reached through the OpenAI-compatible client, so whichever one
 // answered, its error code is filed under that client's own key.
-const providerErrorCode = (metadata: unknown): string | undefined => {
-	if (typeof metadata !== 'object' || metadata === null) return undefined
-	const openai = (metadata as { openai?: unknown }).openai
-	if (typeof openai !== 'object' || openai === null) return undefined
-	const code = (openai as { errorCode?: unknown }).errorCode
-	return typeof code === 'string' ? code : undefined
-}
-
 const isRejectedToolCall = (err: unknown): err is AiError.AiError =>
 	err instanceof AiError.AiError &&
 	err.reason._tag === 'InvalidRequestError' &&
-	REJECTED_TOOL_CALL_CODES.has(providerErrorCode(err.reason.metadata) ?? '')
+	REJECTED_TOOL_CALL_CODES.has(err.reason.metadata.openai?.errorCode ?? '')
 
 // The provider names the tool in its message, bare or quoted ("attempted to
 // call tool 'open_file' which was not in request.tools"). The name labels the

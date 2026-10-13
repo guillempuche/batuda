@@ -3,6 +3,7 @@ import { ClientOnly, createFileRoute } from '@tanstack/react-router'
 import { Schema } from 'effect'
 import { styled } from 'next-yak'
 
+import { PriorityFromString, StaleDays } from '@batuda/controllers'
 import {
 	ATTRIBUTE_OPS,
 	AttentionFilter as AttentionFilterSchema,
@@ -28,14 +29,14 @@ const ValueList = valueListOf(Schema.NonEmptyString)
 const decodeSearch = validateSearchWith({
 	country: ValueList,
 	industry: Schema.NonEmptyString,
-	priority: Schema.Union([Schema.Number, Schema.NumberFromString]),
+	priority: PriorityFromString,
 	owner: ValueList,
 	fitVerdict: ValueList,
 	tags: ValueList,
 	sort: CompanySortSchema,
 	query: Schema.NonEmptyString,
 	attention: AttentionFilterSchema,
-	staleDays: Schema.Union([Schema.Number, Schema.NumberFromString]),
+	staleDays: StaleDays,
 	// Carried like the rest: the list hands over whatever it holds, and a filter
 	// this route does not name is not merely unshown, it is dropped — so going
 	// from the bin to the board would quietly show the live pipeline instead.

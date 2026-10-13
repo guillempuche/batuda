@@ -6,6 +6,7 @@ import { SqlClient } from 'effect/sql'
 
 import { BadRequest, CurrentOrg } from '@batuda/controllers'
 
+import { inOwnSavepoint } from '../lib/savepoint.js'
 import {
 	compressEmailImage,
 	isCompressibleImage,
@@ -159,6 +160,10 @@ export class EmailAttachmentStaging extends Context.Service<EmailAttachmentStagi
 							${DateTime.toDate(expiresAt)}
 						)
 					`.pipe(
+						// The upload endpoint answers this refusal itself rather than
+						// failing, so the request's transaction goes on to commit — which
+						// a refused statement would otherwise have already broken.
+						inOwnSavepoint(sql),
 						Effect.mapError(
 							() =>
 								new BadRequest({ message: 'Failed to persist staging row' }),
@@ -287,6 +292,12 @@ export class EmailAttachmentStaging extends Context.Service<EmailAttachmentStagi
 				})
 
 			// ── sweepForDraft ── draft deleted → remove associated stagings.
+			// This and `markSentAndCleanup` run inside the caller's transaction, and
+			// the caller carries on whatever happens in them — after a send, the mail
+			// has already gone. So each runs in a savepoint of its own and reports a
+			// failure rather than swallowing it: a statement the database refused
+			// would otherwise fail the commit afterwards, and a send answered with an
+			// error is one a client sends again.
 			const sweepForDraft = (
 				draftId: string,
 			): Effect.Effect<void, BadRequest> =>
@@ -311,8 +322,20 @@ export class EmailAttachmentStaging extends Context.Service<EmailAttachmentStagi
 					yield* sql`
 						DELETE FROM email_attachment_staging
 						WHERE staging_id IN ${sql.in(rows.map(r => r.stagingId))}
-					`.pipe(Effect.ignore)
-				})
+					`.pipe(
+						Effect.mapError(
+							() =>
+								new BadRequest({ message: 'Failed to purge draft stagings' }),
+						),
+					)
+				}).pipe(
+					inOwnSavepoint(sql),
+					Effect.catchTag('SqlError', () =>
+						Effect.fail(
+							new BadRequest({ message: 'Failed to clean up stagings' }),
+						),
+					),
+				)
 
 			// ── markSentAndCleanup ── provider acked the send; purge.
 			const markSentAndCleanup = (
@@ -334,8 +357,20 @@ export class EmailAttachmentStaging extends Context.Service<EmailAttachmentStagi
 					yield* sql`
 						DELETE FROM email_attachment_staging
 						WHERE staging_id IN ${sql.in([...stagingIds])}
-					`.pipe(Effect.ignore)
-				})
+					`.pipe(
+						Effect.mapError(
+							() =>
+								new BadRequest({ message: 'Failed to purge sent stagings' }),
+						),
+					)
+				}).pipe(
+					inOwnSavepoint(sql),
+					Effect.catchTag('SqlError', () =>
+						Effect.fail(
+							new BadRequest({ message: 'Failed to clean up stagings' }),
+						),
+					),
+				)
 
 			// ── attachToDraft ── wire a staging to a draft so sweep tracks it.
 			const attachToDraft = (

@@ -8,7 +8,6 @@ import {
 	type VerificationVerdict,
 } from '@batuda/domain'
 
-import { pgErrorCode } from '../lib/pg-error'
 import { jsonColumn, textArray } from '../lib/pg-params'
 
 // The shape a bulk channel write takes. `kind` and `value` are the names the
@@ -533,16 +532,12 @@ export const patchChannel = (
 				`,
 			)
 			.pipe(
-				Effect.catchTag(
-					'SqlError',
-					(error): Effect.Effect<never, BadRequest | SqlError.SqlError> =>
-						pgErrorCode(error) === '23505'
-							? Effect.fail(
-									new BadRequest({
-										message: `"${patch.value ?? stored.address}" is already on file as a ${nextKind ?? stored.channel}. Remove the one you meant to replace rather than renaming onto it.`,
-									}),
-								)
-							: Effect.fail(error),
+				Effect.catchReason('SqlError', 'UniqueViolation', () =>
+					Effect.fail(
+						new BadRequest({
+							message: `"${patch.value ?? stored.address}" is already on file as a ${nextKind ?? stored.channel}. Remove the one you meant to replace rather than renaming onto it.`,
+						}),
+					),
 				),
 			)
 
