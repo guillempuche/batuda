@@ -633,7 +633,7 @@ publish_page: ({ id }) => Effect.gen(function* () {
 }).pipe(Effect.orDie),
 ```
 
-The tool must list `McpSchema.McpServerClient` and `McpSchema.McpRequestContext` in its `dependencies`, act only on `'confirmed'` (`requireApproval` also answers `'unanswered'` when nobody replies within 90 seconds, well inside the 125 seconds Cloudflare lets a silent connection live, and `'unaskable'` when the client fails to show the question; a person closing it counts as `'declined'`), and its `success` schema must be able to carry the refusal — a closed `Schema.Struct` cannot, and the refusal then fails to encode.
+The tool must list `McpSchema.McpServerClient` and `McpSchema.McpRequestContext` in its `dependencies`, act only on `'confirmed'` (`requireApproval` also answers `'unanswered'` when nobody replies within 90 seconds, well inside the 125 seconds Cloudflare lets a silent connection live, `'unaskable'` when the client fails to show the question or answers it with something unreadable, and `'busy'` when three questions are already waiting across the server, two from the same organization, or one from the same person — a waiting call keeps its database connection, and the pool holds ten; a person closing the question counts as `'declined'`), and its `success` schema must be able to carry the refusal — a closed `Schema.Struct` cannot, and the refusal then fails to encode.
 
 Two things not to do. Do not call `McpServer.elicit()` without asking `canElicit` first: a client that cannot show a question answers the request with a refusal, and reading that as "the person said no" reports a decision nobody made. Neither Claude.ai nor ChatGPT can show one today, so on those clients every such question used to answer itself. And do not use `Tool.make`'s `needsApproval` field — Effect reads it only in its AI client loop, never in the MCP server, so a tool declaring it runs anyway while its description promises otherwise. A test in `_annotations.test.ts` fails if one reappears.
 
@@ -1123,11 +1123,11 @@ Research capability providers implement one of the 8 ports in `packages/research
 
 1. Create `packages/research/src/infrastructure/{vendor}/{capability}.ts`
 2. Use `Layer.effect(PortTag, Effect.gen(function* () { ... }))` pattern
-3. `yield*` any services you need (`HttpClient.HttpClient`, `Config.redacted(...)`)
+3. `yield*` any services you need (`HttpClient.HttpClient`, `Config.Redacted(...)`)
 4. Return `PortTag.of({ methodName: (input) => Effect.gen(...) })`
 5. Map all errors to `new ProviderError({ provider: 'name', message, recoverable: bool })`
 6. Import in `providers-live.ts`, add the vendor literal to the capability's `*_VENDORS` tuple, and add a branch in the matching `*Instance(vendor, slot)` factory
-7. If the vendor needs an API key, read it inside the factory with `Config.redacted(keyForSlot('RESEARCH_API_KEY_<CAP>', slot))`
+7. If the vendor needs an API key, read it inside the factory with `Config.Redacted(keyForSlot('RESEARCH_API_KEY_<CAP>', slot))`
 
 The R type flows automatically — stubs have `R = never`, real providers declare `R = HttpClient` (or whatever they need), and the composition root in `main.ts` satisfies all requirements.
 

@@ -16,7 +16,7 @@
  * call wrong needs.
  */
 
-import { isRejectedToolCall } from '../domain/errors'
+import { isRejectedToolCall, UNREADABLE_TOOL_NAME } from '../domain/errors'
 import { toolParametersWireFormat } from './tools'
 
 interface ParameterSchema {
@@ -139,6 +139,10 @@ export interface ToolCallCorrection {
  * tool whose arguments were refused cannot be looked up — which is what a
  * provider whose wording could not be read leaves behind.
  *
+ * A call to a tool the pass does not offer is answered with the ones it does.
+ * Our own client says which those are; a vendor that refuses the name at its
+ * API does not, so the pass's own list (`offeredTools`) stands in.
+ *
  * Only decides. Appending to the prompt and counting what has been spent are
  * left to the caller, which is what makes the decision testable on its own.
  */
@@ -146,12 +150,19 @@ export const correctionForFailedRound = (
 	error: unknown,
 	correctionsMade: number,
 	limit: number,
+	offeredTools: ReadonlyArray<string>,
 ): ToolCallCorrection | undefined => {
 	if (!isRejectedToolCall(error) || correctionsMade >= limit) return undefined
-	const text =
-		error.availableTools !== undefined
-			? unknownToolCorrection(error.toolName, error.availableTools)
-			: rejectedToolCallCorrection(error.toolName, error.mistake)
+	const notOffered =
+		error.availableTools !== undefined ||
+		(error.toolName !== UNREADABLE_TOOL_NAME &&
+			!offeredTools.includes(error.toolName))
+	const text = notOffered
+		? unknownToolCorrection(
+				error.toolName,
+				error.availableTools ?? offeredTools,
+			)
+		: rejectedToolCallCorrection(error.toolName, error.mistake)
 	if (text === undefined) return undefined
 	return { toolName: error.toolName, provider: error.provider, text }
 }

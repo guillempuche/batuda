@@ -246,6 +246,33 @@ describe('hardenLanguageModel', () => {
 		expect(Ref.getUnsafe(attemptsRef)).toBe(3)
 	})
 
+	it('should not ask again after the model called a tool it was not given', async () => {
+		// GIVEN a stub LM whose model names a tool that does not exist, which the
+		// library marks retryable
+		const attemptsRef = Ref.makeUnsafe(0)
+		const stub = makeStubLm(attemptsRef, () =>
+			Effect.fail(
+				new AiError.AiError({
+					module: 'test',
+					method: 'generateText',
+					reason: new AiError.ToolNotFoundError({
+						toolName: 'open_file',
+						availableTools: ['web_search', 'scrape_page'],
+					}),
+				}),
+			),
+		)
+		const hardened = hardenLanguageModel(stub, 'together')
+
+		// WHEN generateText is invoked
+		const exit = await runWithVirtualClock(() => invokeGenerateText(hardened))
+
+		// THEN one attempt is made: the same request brings back the same invented
+		// name, and the correction after the round is the better second try
+		expect(Exit.isFailure(exit)).toBe(true)
+		expect(Ref.getUnsafe(attemptsRef)).toBe(1)
+	})
+
 	it('should stop retrying once a non-recoverable error is observed', async () => {
 		// GIVEN a stub LM that fails with an authentication error (non-retryable)
 		const attemptsRef = Ref.makeUnsafe(0)

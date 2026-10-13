@@ -249,8 +249,14 @@ const reportFailure = (
 	)
 }
 
+// A call to a tool the model was not given is not asked again: the same request
+// tends to bring back the same invented name, and the correction after the round,
+// which names the tools there are, is the better second try.
 const isRetryableFailure = (err: unknown): boolean =>
-	err instanceof AiError.AiError && err.isRetryable && !isCutOffReply(err)
+	err instanceof AiError.AiError &&
+	err.isRetryable &&
+	!isCutOffReply(err) &&
+	err.reason._tag !== 'ToolNotFoundError'
 
 const rateLimitRetryAfter = (err: unknown): Duration.Duration | undefined => {
 	if (!(err instanceof AiError.AiError)) return undefined

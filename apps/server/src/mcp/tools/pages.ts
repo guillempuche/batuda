@@ -171,7 +171,9 @@ export const PageHandlersLive = PageTools.toLayer(
 							reason:
 								answer === 'declined'
 									? 'the page was not published because the answer was no'
-									: 'the page was not published because nobody answered in time',
+									: answer === 'busy'
+										? 'the page was not published because another question is still waiting for an answer; ask again once it has been answered'
+										: 'the page was not published because nobody answered in time',
 						}
 					const rows = yield* service.publish(id)
 					const published = rows[0]

@@ -190,6 +190,14 @@ const SCAN_TOOLS: ReadonlyArray<ResearchToolName> = [
 	'scrape_page',
 ]
 
+/** The tools a pass of this kind offers the model, by name. */
+export const toolsOffered = (
+	schemaName: string,
+): ReadonlyArray<ResearchToolName> =>
+	isDiscoveryScan(schemaName)
+		? SCAN_TOOLS
+		: Object.values(researchToolkit.tools).map(tool => tool.name)
+
 /**
  * Which tools this round may call, and whether it must call one.
  *

@@ -270,6 +270,7 @@ import {
 	isUnsupportedScrapeUrl,
 	researchToolkit,
 	researchToolkitLayer,
+	toolsOffered,
 } from './tools'
 import { clearFieldOnlyDoubt } from './unconfirmed-mark-guard'
 import { makeUsageMeter, UsageMeter } from './usage-meter'
@@ -6381,6 +6382,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 											error,
 											toolCorrections,
 											MAX_TOOL_CORRECTIONS,
+											toolsOffered(schemaName),
 										)
 										if (correction === undefined) return false
 										toolCorrections++

@@ -24,6 +24,8 @@
 import { Effect } from 'effect'
 import { AiError } from 'effect/ai'
 
+import { UNREADABLE_TOOL_NAME } from '../domain/errors'
+
 /**
  * Provider error codes meaning "the model wrote a tool call we would not accept".
  *
@@ -51,19 +53,25 @@ const isRejectedToolCall = (err: unknown): err is AiError.AiError =>
 	err.reason._tag === 'InvalidRequestError' &&
 	REJECTED_TOOL_CALL_CODES.has(providerErrorCode(err.reason.metadata) ?? '')
 
-// The provider names the tool in its message, and which tool the models keep
-// fumbling is worth knowing. Read for the label only — nothing branches on it, so
-// a miss costs a vaguer log line. "tool call validation failed" looks the same to
-// a pattern as a tool being named, hence the words skipped below.
-const TOOL_NAME_IN_MESSAGE = /\btool ([A-Za-z_][A-Za-z0-9_]*)/gi
-const WORDING_NOT_A_NAME: ReadonlySet<string> = new Set(['call', 'calls'])
+// The provider names the tool in its message, bare or quoted ("attempted to
+// call tool 'open_file' which was not in request.tools"). The name labels the
+// log line and decides which correction the model gets: a tool the pass does not
+// offer is answered with the ones it does, so a miss leaves the round
+// uncorrected. "tool call validation failed" and "Tool choice is required" look
+// the same to a pattern as a tool being named, hence the words skipped below.
+const TOOL_NAME_IN_MESSAGE = /\btool ['"]?([A-Za-z_][A-Za-z0-9_]*)/gi
+const WORDING_NOT_A_NAME: ReadonlySet<string> = new Set([
+	'call',
+	'calls',
+	'choice',
+])
 const toolNamed = (description: string): string => {
 	for (const match of description.matchAll(TOOL_NAME_IN_MESSAGE)) {
 		const name = match[1]
 		if (name !== undefined && !WORDING_NOT_A_NAME.has(name.toLowerCase()))
 			return name
 	}
-	return 'unknown'
+	return UNREADABLE_TOOL_NAME
 }
 
 // The status the provider answered with, kept for the log because the error this

@@ -537,6 +537,41 @@ describe('checkFieldValues on values a model is likely to send', () => {
 		})
 	})
 
+	describe('when a field is given a value no column can hold', () => {
+		it('should refuse an object written where a single value belongs', () => {
+			// GIVEN a location the model wrote as its parts
+			// WHEN the proposal is checked
+			// THEN it is refused as unusable, rather than reaching the database
+			// and coming back as a failed request
+			expect(
+				checkFieldValues('companies', { location: { city: 'Girona' } }),
+			).toContain('location must be a single value')
+		})
+
+		it('should refuse a list of products holding something other than words', () => {
+			// GIVEN a products list with a year among its entries
+			// THEN it is refused, and a list of words is not
+			expect(
+				checkFieldValues('companies', { productsFit: ['eco', 2026] }),
+			).toContain('productsFit must be a list of words')
+			expect(
+				checkFieldValues('companies', { productsFit: ['eco', 'retail'] }),
+			).toBeNull()
+			// AND a single word where the list belongs is refused too
+			expect(checkFieldValues('companies', { productsFit: 'eco' })).toContain(
+				'productsFit must be a list of words',
+			)
+		})
+
+		it('should refuse a list written where a contact has one job title', () => {
+			// GIVEN two titles where the column holds one
+			// THEN it is refused rather than stored as the text of a list
+			expect(
+				checkFieldValues('contacts', { role: ['CEO', 'Founder'] }),
+			).toContain('role must be a single value')
+		})
+	})
+
 	describe('when a contact proposal carries a company vocabulary field', () => {
 		it('should not judge it by the company rules', () => {
 			// GIVEN status, which is a company column and no part of a contact

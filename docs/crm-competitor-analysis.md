@@ -90,7 +90,7 @@ Migration source of truth: [`0001_initial.ts`](../apps/server/src/db/migrations/
 
 ### 3.3 Services — `apps/server/src/services`
 
-Effect `ServiceMap.Service<T>` layered instantiation with `SqlClient` injected via the DI container. Two pluggable adapter interfaces:
+Effect `Context.Service<T>` layered instantiation with `SqlClient` injected via the DI container. Two pluggable adapter interfaces:
 
 - **Email** — [`mail-transport.ts`](../apps/server/src/services/mail-transport.ts) is the per-inbox IMAP+SMTP port (`imapflow` + `nodemailer` + `mailparser`). Credentials decrypt through [`credential-crypto.ts`](../apps/server/src/services/credential-crypto.ts) (AES-256-GCM, HKDF subkey per inbox). The thick service [`email.ts`](../apps/server/src/services/email.ts) orchestrates inbox CRUD, probe + grant_status updates, footer injection, thread linking, and draft staging. Inbound IDLE + persistence runs in [`apps/mail-worker`](../apps/mail-worker/); the worker writes as `app_service` (BYPASSRLS) and resolves `organization_id` from the inbox row. Attachments staged separately in [`email-attachment-staging.ts`](../apps/server/src/services/email-attachment-staging.ts).
 - **Storage** — [`storage-provider.ts`](../apps/server/src/services/storage-provider.ts) / S3-compatible impl [`s3-storage-provider.ts`](../apps/server/src/services/s3-storage-provider.ts) (MinIO dev, Cloudflare R2 prod, path-style).

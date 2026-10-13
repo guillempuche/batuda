@@ -70,6 +70,10 @@ export class CutOffReply extends ProviderError {
  */
 export const REJECTED_TOOL_CALL = 'ToolParameterValidationError'
 
+// What a refused call's tool is recorded as when the vendor's wording does not
+// name it.
+export const UNREADABLE_TOOL_NAME = 'unknown'
+
 /**
  * A tool call the model wrote wrongly: the tool it named, and the objection in
  * the words of whoever raised it.

@@ -137,6 +137,43 @@ describe('reclassifyRejectedToolCall', () => {
 		).toBe('scrape_page')
 	})
 
+	it('should read a tool name the provider quotes', async () => {
+		// GIVEN a provider refusing a tool the model invented, naming it in quotes
+		// WHEN the failure passes through the combinator
+		const surfaced = await reclassified(
+			refusedToolCall(
+				"attempted to call tool 'open_file' which was not in request.tools",
+			),
+		)
+
+		// THEN the quoted name is the one carried, so the correction can tell the
+		// model that tool does not exist
+		const reason = reasonOf(surfaced)
+		expect(
+			reason?._tag === 'ToolParameterValidationError'
+				? reason.toolName
+				: undefined,
+		).toBe('open_file')
+	})
+
+	it('should not read "Tool choice is required" as a tool named choice', async () => {
+		// GIVEN a provider refusing a forced round in which the model called no
+		// tool at all
+		// WHEN the failure passes through the combinator
+		const surfaced = await reclassified(
+			refusedToolCall('Tool choice is required, but model did not call a tool'),
+		)
+
+		// THEN no tool is named, so nobody tells the model a "choice" tool does
+		// not exist
+		const reason = reasonOf(surfaced)
+		expect(
+			reason?._tag === 'ToolParameterValidationError'
+				? reason.toolName
+				: undefined,
+		).toBe('unknown')
+	})
+
 	it('should leave an invalid request carrying a different provider code alone', async () => {
 		// GIVEN a 400 that really is a bad request — too long a prompt
 		const error = invalidRequest('Please reduce the length of the messages', {
