@@ -119,7 +119,10 @@ function ApiKeysPage() {
 		// Inputs stay DOM-owned and are read via FormData on submit: a
 		// controlled value+onChange pair drops programmatic fill() updates,
 		// so the field would submit empty under automation.
-		const form = new FormData(event.currentTarget)
+		// React clears `currentTarget` once the handler yields, so hold the form
+		// itself for the reset after the request.
+		const formElement = event.currentTarget
+		const form = new FormData(formElement)
 		const name = String(form.get('name') ?? '').trim()
 		const expiresRaw = String(form.get('expiresInDays') ?? '').trim()
 		if (name.length === 0) {
@@ -148,7 +151,7 @@ function ApiKeysPage() {
 			if (minted) {
 				setCopied(false)
 				setCreated(minted)
-				event.currentTarget.reset()
+				formElement.reset()
 				return
 			}
 		}

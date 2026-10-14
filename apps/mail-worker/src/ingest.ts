@@ -61,6 +61,33 @@ export const ingestRawMessage = (args: {
 			.putRaw(key, args.raw)
 			.pipe(Effect.mapError(err => new Error(String(err))))
 
+		// A message is known by its Message-ID everywhere below: threads are
+		// pivoted on it, bounces are matched on it, and one is allowed per
+		// organization. A message that arrives without one would take the empty
+		// string, so the first such message claims it and every later one is
+		// turned away.
+		const parsed = fromParsedMail(mail)
+		const withMessageId =
+			parsed.messageId === ''
+				? { ...parsed, messageId: syntheticMessageId(args.raw) }
+				: parsed
+
+		// A message we sent comes back out of the sent folder with its files
+		// already stored and listed by the server when it sent them; storing
+		// them again here would only leave copies nothing points at.
+		const alreadyListed =
+			args.direction === 'outbound'
+				? yield* sql<{ one: number }>`
+						SELECT 1 AS one FROM email_messages
+						WHERE organization_id = ${args.organizationId}
+						  AND inbox_id = ${args.inboxId}
+						  AND message_id = ${withMessageId.messageId}
+						  AND direction = 'outbound'
+						  AND attachments <> '[]'::jsonb
+						LIMIT 1
+					`.pipe(Effect.map(rows => rows.length > 0))
+				: false
+
 		// Upload each parsed attachment as its own object before the SQL
 		// INSERT. If a put fails the gen short-circuits, the message is
 		// not inserted, and the next worker tick re-runs the same UID
@@ -68,8 +95,9 @@ export const ingestRawMessage = (args: {
 		// dedupe index). Result: never persist a row whose attachments
 		// JSONB references missing bytes.
 		const attachmentsMeta: AttachmentMetadata[] = []
-		for (let i = 0; i < mail.attachments.length; i++) {
-			const a = mail.attachments[i]!
+		const toStore = alreadyListed ? [] : mail.attachments
+		for (let i = 0; i < toStore.length; i++) {
+			const a = toStore[i]!
 			const aKey = attachmentKey({
 				organizationId: args.organizationId,
 				inboxId: args.inboxId,
@@ -91,17 +119,6 @@ export const ingestRawMessage = (args: {
 				storageKey: aKey,
 			})
 		}
-
-		// A message is known by its Message-ID everywhere below: threads are
-		// pivoted on it, bounces are matched on it, and one is allowed per
-		// organization. A message that arrives without one would take the empty
-		// string, so the first such message claims it and every later one is
-		// turned away.
-		const parsed = fromParsedMail(mail)
-		const withMessageId =
-			parsed.messageId === ''
-				? { ...parsed, messageId: syntheticMessageId(args.raw) }
-				: parsed
 
 		yield* sql.withTransaction(
 			Effect.gen(function* () {

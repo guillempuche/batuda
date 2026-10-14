@@ -4,11 +4,16 @@ import {
 } from '@batuda/email/sanitize'
 import type { EmailBlock, EmailBlocks } from '@batuda/email/schema'
 
-// Caller supplies the translated attribution templates so Lingui stays
-// at the component boundary. {date} and {who} are literal placeholders.
+// Caller supplies the translated attribution lines so Lingui stays at the
+// component boundary. They are functions rather than strings with `{date}`
+// in them: Lingui reads braces in a message as its own placeholders and fills
+// them with nothing before any later substitution could see them.
 export interface AttributionTemplates {
-	readonly withDate: string
-	readonly withoutDate: string
+	readonly withDate: (parts: {
+		readonly date: string
+		readonly who: string
+	}) => string
+	readonly withoutDate: (parts: { readonly who: string }) => string
 	readonly fallbackSender: string
 }
 
@@ -45,10 +50,9 @@ const buildAttribution = (input: ParentToQuoteInput): EmailBlock => {
 	const datePart = input.receivedAt
 		? formatDate(input.receivedAt, input.locale)
 		: null
-	const template = datePart
-		? input.attribution.withDate
-		: input.attribution.withoutDate
-	const text = fillTemplate(template, { who, date: datePart ?? '' })
+	const text = datePart
+		? input.attribution.withDate({ date: datePart, who })
+		: input.attribution.withoutDate({ who })
 	return {
 		type: 'paragraph',
 		spans: [{ kind: 'text', value: text, italic: true }],
@@ -79,9 +83,3 @@ const formatDate = (d: Date, locale: string | undefined): string => {
 		return d.toISOString()
 	}
 }
-
-const fillTemplate = (
-	template: string,
-	vars: Readonly<Record<string, string>>,
-): string =>
-	template.replace(/\{(\w+)\}/g, (_m, key: string) => vars[key] ?? '')

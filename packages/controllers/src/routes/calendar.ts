@@ -12,6 +12,7 @@ import { BadRequest, Conflict, Forbidden, NotFound } from '../errors'
 import { OrgMiddleware } from '../middleware/org'
 import { SessionMiddleware } from '../middleware/session'
 import { PaginatedList, pageQuery } from '../pagination'
+import { UuidParam } from '../uuid-param'
 
 // A free slot returned by the availability lookup. The provider hands back
 // Date objects; on the wire they encode to ISO strings.
@@ -85,7 +86,7 @@ export const CalendarGroup = HttpApiGroup.make('calendar')
 	)
 	.add(
 		HttpApiEndpoint.get('getEvent', '/calendar/events/:id', {
-			params: { id: Schema.String },
+			params: { id: UuidParam },
 			success: CalendarEventWithAttendees,
 			error: NotFound.pipe(HttpApiSchema.status(404)),
 		}),
@@ -99,7 +100,7 @@ export const CalendarGroup = HttpApiGroup.make('calendar')
 	)
 	.add(
 		HttpApiEndpoint.post('rsvpEvent', '/calendar/events/:id/rsvp', {
-			params: { id: Schema.String },
+			params: { id: UuidParam },
 			payload: RsvpEventInput,
 			success: Schema.Unknown,
 			error: [

@@ -2,7 +2,7 @@ import { DateTime, Effect, Schema } from 'effect'
 import { HttpApiBuilder } from 'effect/http-api'
 import { SqlClient } from 'effect/sql'
 
-import { BatudaApi, CurrentOrg } from '@batuda/controllers'
+import { BatudaApi, CurrentOrg, NotFound } from '@batuda/controllers'
 import { Product } from '@batuda/domain'
 
 import { withJsonColumns } from '../lib/pg-params'
@@ -50,15 +50,23 @@ export const ProductsLive = HttpApiBuilder.group(
 							})}
 							WHERE id = ${_.params.id} RETURNING *
 						`
+						// Row-level security hides another organisation's product, so the
+						// write touches nothing; say so rather than answer 200 with null.
+						const row = rows[0]
+						if (row === undefined)
+							return yield* new NotFound({ entity: 'product', id: _.params.id })
 						yield* Effect.logInfo('Product updated').pipe(
 							Effect.annotateLogs({
 								event: 'product.updated',
 								productId: _.params.id,
 							}),
 						)
-						const row = rows[0]
-						return row === undefined ? null : yield* decodeProduct(row)
-					}).pipe(Effect.orDie),
+						return yield* decodeProduct(row)
+					}).pipe(
+						Effect.catch(e =>
+							e._tag === 'NotFound' ? Effect.fail(e) : Effect.die(e),
+						),
+					),
 				)
 		}),
 )

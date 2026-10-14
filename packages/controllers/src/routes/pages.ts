@@ -8,6 +8,7 @@ import { NotFound } from '../errors'
 import { OrgMiddleware } from '../middleware/org'
 import { SessionMiddleware } from '../middleware/session'
 import { PaginatedList, pageQuery } from '../pagination'
+import { UuidParam } from '../uuid-param'
 
 // Listing projection: page metadata without the Tiptap `content`/`meta` blobs,
 // so a company's page index stays light.
@@ -57,7 +58,7 @@ export const PagesGroup = HttpApiGroup.make('pages')
 	)
 	.add(
 		HttpApiEndpoint.get('get', '/v1/pages/:id', {
-			params: { id: Schema.String },
+			params: { id: UuidParam },
 			success: Page.json,
 			error: NotFound.pipe(HttpApiSchema.status(404)),
 		}),
@@ -70,15 +71,17 @@ export const PagesGroup = HttpApiGroup.make('pages')
 	)
 	.add(
 		HttpApiEndpoint.patch('update', '/v1/pages/:id', {
-			params: { id: Schema.String },
+			params: { id: UuidParam },
 			payload: UpdatePageInput,
-			success: Schema.NullOr(Page.json),
+			success: Page.json,
+			error: NotFound.pipe(HttpApiSchema.status(404)),
 		}),
 	)
 	.add(
 		HttpApiEndpoint.patch('publish', '/v1/pages/:id/publish', {
-			params: { id: Schema.String },
-			success: Schema.NullOr(Page.json),
+			params: { id: UuidParam },
+			success: Page.json,
+			error: NotFound.pipe(HttpApiSchema.status(404)),
 		}),
 	)
 	.middleware(SessionMiddleware)

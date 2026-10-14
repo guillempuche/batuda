@@ -449,9 +449,9 @@ export const CalendarHandlersLive = CalendarTools.toLayer(
 			manage_event_types: params =>
 				Effect.gen(function* () {
 					if (params.action === 'sync') return yield* svc.syncEventTypes()
-					const conditions: Array<Statement.Fragment> = [
-						companyVisible(sql, sql`company_id`),
-					]
+					// Event types belong to the organisation, not to a company, so there is
+					// no company whose deletion should hide them.
+					const conditions: Array<Statement.Fragment> = []
 					if (params.active === true) conditions.push(sql`active = true`)
 					if (params.active === false) conditions.push(sql`active = false`)
 					const rows = yield* sql`

@@ -19,6 +19,7 @@ import {
 	rulerUnderRule,
 	stenciledTitle,
 } from '#/lib/workshop-mixins'
+import { newestFirstUndatedLast } from './conversation-order'
 
 /**
  * The meetings feeding this tab. The tab body and the tab's badge both ask for
@@ -85,7 +86,12 @@ type UnifiedRow =
 			readonly date: string
 			readonly row: CalendarRow
 	  }
-	| { readonly kind: 'task'; readonly date: string; readonly row: TaskRow }
+	| {
+			readonly kind: 'task'
+			// Null on an open task with no due date: it has nothing to be placed by.
+			readonly date: string | null
+			readonly row: TaskRow
+	  }
 
 const ALL_KINDS: ReadonlyArray<ConvKind> = [
 	'interaction',
@@ -174,10 +180,9 @@ export function ConversationsTab({
 			out.push({ kind: 'calendar', date: row.startAt, row })
 		}
 		for (const row of tasks) {
-			const date = row.completedAt ?? row.dueAt ?? new Date(0).toISOString()
-			out.push({ kind: 'task', date, row })
+			out.push({ kind: 'task', date: row.completedAt ?? row.dueAt, row })
 		}
-		return out.sort((a, b) => Date.parse(b.date) - Date.parse(a.date))
+		return newestFirstUndatedLast(out)
 	}, [interactions, threads, calendar, tasks])
 
 	const visible = useMemo(
@@ -317,9 +322,11 @@ export function ConversationsTab({
 									<RowTitle>{titleFor(item)}</RowTitle>
 									{subtitle ? <RowSubtitle>{subtitle}</RowSubtitle> : null}
 								</RowMain>
-								<RowMeta>
-									<RelativeDate value={item.date} fallback={FALLBACK_DATE} />
-								</RowMeta>
+								{item.date === null ? null : (
+									<RowMeta>
+										<RelativeDate value={item.date} fallback={FALLBACK_DATE} />
+									</RowMeta>
+								)}
 							</>
 						)
 						const key = `${item.kind}-${item.row.id}`

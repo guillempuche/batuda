@@ -3,7 +3,7 @@ import { HttpApiBuilder } from 'effect/http-api'
 import type { Statement } from 'effect/sql'
 import { SqlClient } from 'effect/sql'
 
-import { BatudaApi } from '@batuda/controllers'
+import { BatudaApi, CurrentOrg, NotFound } from '@batuda/controllers'
 import { Interaction } from '@batuda/domain'
 import { InteractionLogged, TimelineActivityService } from '@batuda/timeline'
 
@@ -14,7 +14,10 @@ import {
 	takePage,
 	totalColumn,
 } from '../lib/sql-pagination'
-import { companyVisible } from '../services/company-liveness'
+import {
+	companyVisible,
+	requireLiveCompany,
+} from '../services/company-liveness'
 
 const decodeInteraction = Schema.decodeUnknownEffect(Interaction)
 const decodeInteractions = Schema.decodeUnknownEffect(Schema.Array(Interaction))
@@ -39,7 +42,7 @@ export const InteractionsLive = HttpApiBuilder.group(
 						const probed = yield* sql<{ readonly total?: string | number }>`
 							SELECT *${totalColumn(sql, page.count)} FROM interactions
 							WHERE ${sql.and(conditions)}
-							ORDER BY date DESC
+							ORDER BY date DESC, id
 							LIMIT ${probeLimit(page.limit)} OFFSET ${page.offset}
 						`
 						const { rows, hasMore } = takePage(probed, page.limit)
@@ -63,20 +66,25 @@ export const InteractionsLive = HttpApiBuilder.group(
 				)
 				.handle('create', _ =>
 					Effect.gen(function* () {
-						const payload = _.payload as {
-							companyId: string
-							contactId?: string
-							date?: DateTime.Utc
-							durationMin?: number
-							channel: string
-							direction: string
-							type: string
-							subject?: string
-							summary?: string
-							outcome?: string
-							nextAction?: string
-							nextActionAt?: string
-							metadata?: unknown
+						const payload = _.payload
+						const currentOrg = yield* CurrentOrg
+
+						// Checked before writing: a missing company or contact would
+						// otherwise be refused by the database mid-transaction and
+						// answered as a breakage, not as the caller's mistake.
+						yield* requireLiveCompany(sql, currentOrg.id, payload.companyId)
+						if (payload.contactId !== undefined) {
+							const contacts = yield* sql`
+								SELECT 1 FROM contacts
+								WHERE id = ${payload.contactId}
+									AND deleted_at IS NULL
+								LIMIT 1
+							`.pipe(Effect.orDie)
+							if (contacts.length === 0)
+								return yield* new NotFound({
+									entity: 'contact',
+									id: payload.contactId,
+								})
 						}
 
 						const occurredAt = payload.date
@@ -91,7 +99,7 @@ export const InteractionsLive = HttpApiBuilder.group(
 								companyId: payload.companyId,
 								contactId: payload.contactId ?? null,
 								channel: payload.channel,
-								direction: payload.direction as 'inbound' | 'outbound',
+								direction: payload.direction,
 								type: payload.type,
 								subject: payload.subject ?? null,
 								summary: payload.summary ?? null,
@@ -137,7 +145,11 @@ export const InteractionsLive = HttpApiBuilder.group(
 						)
 
 						return yield* decodeInteraction(rows[0])
-					}).pipe(Effect.orDie),
+					}).pipe(
+						Effect.catch(e =>
+							e._tag === 'NotFound' ? Effect.fail(e) : Effect.die(e),
+						),
+					),
 				)
 		}),
 )

@@ -121,7 +121,7 @@ export const DocumentsLive = HttpApiBuilder.group(
 								${totalColumn(sql, page.count)}
 							FROM documents d
 							${whereClause}
-							ORDER BY d.updated_at DESC
+							ORDER BY d.updated_at DESC, d.id
 							LIMIT ${probeLimit(page.limit)} OFFSET ${page.offset}
 						`
 						const { rows, hasMore } = takePage(probed, page.limit)
@@ -316,15 +316,26 @@ export const DocumentsLive = HttpApiBuilder.group(
 							UPDATE documents SET ${sql.update({ ...fields, updatedAt: DateTime.toDateUtc(DateTime.nowUnsafe()) })}
 							WHERE id = ${_.params.id} RETURNING *
 						`
+						// Row-level security hides another organisation's document, so the
+						// write touches nothing; say so rather than answer 200 with null.
+						const row = rows[0]
+						if (row === undefined)
+							return yield* new NotFound({
+								entity: 'document',
+								id: _.params.id,
+							})
 						yield* Effect.logInfo('Document updated').pipe(
 							Effect.annotateLogs({
 								event: 'document.updated',
 								documentId: _.params.id,
 							}),
 						)
-						const row = rows[0]
-						return row === undefined ? null : yield* detailFor(row, _.params.id)
-					}).pipe(Effect.orDie),
+						return yield* detailFor(row, _.params.id)
+					}).pipe(
+						Effect.catch(e =>
+							e._tag === 'NotFound' ? Effect.fail(e) : Effect.die(e),
+						),
+					),
 				)
 				.handle('remove', _ =>
 					Effect.gen(function* () {

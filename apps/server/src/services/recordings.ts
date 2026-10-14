@@ -294,7 +294,7 @@ export class RecordingService extends Context.Service<RecordingService>()(
 						INNER JOIN interactions i ON i.id = cr.interaction_id
 						WHERE i.company_id = ${companyId}
 						  AND cr.deleted_at IS NULL
-						ORDER BY i.date DESC
+						ORDER BY i.date DESC, cr.id
 						LIMIT ${probeLimit(page.limit)}
 						OFFSET ${page.offset}
 					`

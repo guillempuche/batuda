@@ -3,7 +3,7 @@ import { createHmac } from 'node:crypto'
 import { Cause, Context, DateTime, Effect, Layer } from 'effect'
 import { SqlClient } from 'effect/sql'
 
-import { CurrentOrg } from '@batuda/controllers'
+import { CurrentOrg, NotFound } from '@batuda/controllers'
 
 import { textArray } from '../lib/pg-params'
 
@@ -41,6 +41,68 @@ export class WebhookService extends Context.Service<WebhookService>()(
 		make: Effect.gen(function* () {
 			const sql = yield* SqlClient.SqlClient
 
+			// Send the webhooks in the background, but only after the caller has
+			// looked the endpoints up. The lookup has to run as part of the original
+			// request so it reads from the right place; sending it to the background
+			// too could make it run too late and read the wrong data.
+			const deliver = (
+				endpoints: ReadonlyArray<WebhookEndpoint>,
+				event: string,
+				payload: unknown,
+			) =>
+				Effect.forEach(
+					endpoints,
+					endpoint =>
+						Effect.tryPromise({
+							try: () =>
+								fetch(endpoint.url, {
+									method: 'POST',
+									headers: {
+										'Content-Type': 'application/json',
+										'X-Batuda-Event': event,
+										'X-Batuda-Signature': hmacSign(endpoint.secret, payload),
+									},
+									body: JSON.stringify({
+										event,
+										payload,
+										timestamp: DateTime.formatIso(DateTime.nowUnsafe()),
+									}),
+								}),
+							catch: e =>
+								new Error(`Webhook delivery failed: ${endpoint.url}: ${e}`),
+						}).pipe(
+							Effect.catch((error: Error) =>
+								Effect.logError('Webhook delivery failed').pipe(
+									Effect.annotateLogs({
+										event: 'webhook.failed',
+										endpointUrl: endpoint.url,
+										webhookEvent: event,
+										error: error.message,
+									}),
+								),
+							),
+						),
+					{ concurrency: 'unbounded' },
+				).pipe(
+					// The per-endpoint catch above handles delivery failures, but a
+					// DEFECT inside this detached fiber (a bug, not a fetch
+					// rejection) would otherwise vanish with no trace. Catch the
+					// whole cause so it's logged; let a genuine interrupt
+					// (shutdown/cancel) propagate. Mirrors the research event sink.
+					Effect.catchCause(cause =>
+						Cause.hasInterruptsOnly(cause)
+							? Effect.interrupt
+							: Effect.logError('Webhook fan-out failed').pipe(
+									Effect.annotateLogs({
+										event: 'webhook.fanout.failed',
+										webhookEvent: event,
+										cause: Cause.pretty(cause),
+									}),
+								),
+					),
+					Effect.forkDetach,
+				)
+
 			return {
 				// `fire` is called from services that already have CurrentOrg
 				// in scope, so we resolve it inside the effect and only fan
@@ -64,65 +126,22 @@ export class WebhookService extends Context.Service<WebhookService>()(
 							}),
 						)
 
-						// Send the webhooks in the background, but only after the lookup
-						// above has finished. The lookup has to run as part of the original
-						// request so it reads from the right place; sending it to the
-						// background too could make it run too late and read the wrong data.
-						yield* Effect.forEach(
-							matching,
-							endpoint =>
-								Effect.tryPromise({
-									try: () =>
-										fetch(endpoint.url, {
-											method: 'POST',
-											headers: {
-												'Content-Type': 'application/json',
-												'X-Batuda-Event': event,
-												'X-Batuda-Signature': hmacSign(
-													endpoint.secret,
-													payload,
-												),
-											},
-											body: JSON.stringify({
-												event,
-												payload,
-												timestamp: DateTime.formatIso(DateTime.nowUnsafe()),
-											}),
-										}),
-									catch: e =>
-										new Error(`Webhook delivery failed: ${endpoint.url}: ${e}`),
-								}).pipe(
-									Effect.catch((error: Error) =>
-										Effect.logError('Webhook delivery failed').pipe(
-											Effect.annotateLogs({
-												event: 'webhook.failed',
-												endpointUrl: endpoint.url,
-												webhookEvent: event,
-												error: error.message,
-											}),
-										),
-									),
-								),
-							{ concurrency: 'unbounded' },
-						).pipe(
-							// The per-endpoint catch above handles delivery failures, but a
-							// DEFECT inside this detached fiber (a bug, not a fetch
-							// rejection) would otherwise vanish with no trace. Catch the
-							// whole cause so it's logged; let a genuine interrupt
-							// (shutdown/cancel) propagate. Mirrors the research event sink.
-							Effect.catchCause(cause =>
-								Cause.hasInterruptsOnly(cause)
-									? Effect.interrupt
-									: Effect.logError('Webhook fan-out failed').pipe(
-											Effect.annotateLogs({
-												event: 'webhook.fanout.failed',
-												webhookEvent: event,
-												cause: Cause.pretty(cause),
-											}),
-										),
-							),
-							Effect.forkDetach,
-						)
+						yield* deliver(matching, event, payload)
+					}),
+
+				// Send a test event to one endpoint, whatever it listens for, so
+				// the person setting it up can see it arrive.
+				test: (id: string) =>
+					Effect.gen(function* () {
+						const currentOrg = yield* CurrentOrg
+						const rows = yield* sql<WebhookEndpoint>`
+							SELECT * FROM webhook_endpoints
+							WHERE id = ${id} AND organization_id = ${currentOrg.id}
+						`
+						const endpoint = rows[0]
+						if (endpoint === undefined)
+							return yield* new NotFound({ entity: 'webhook', id })
+						yield* deliver([endpoint], 'test', { webhookId: id })
 					}),
 
 				list: () =>

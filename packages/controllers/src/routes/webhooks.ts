@@ -1,10 +1,12 @@
 import { Schema } from 'effect'
-import { HttpApiEndpoint, HttpApiGroup } from 'effect/http-api'
+import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from 'effect/http-api'
 
 import { WebhookEndpoint } from '@batuda/domain'
 
+import { NotFound } from '../errors'
 import { OrgMiddleware } from '../middleware/org'
 import { SessionMiddleware } from '../middleware/session'
+import { UuidParam } from '../uuid-param'
 
 const CreateWebhookInput = Schema.Struct({
 	name: Schema.String.pipe(Schema.check(Schema.isMinLength(1))),
@@ -35,21 +37,23 @@ export const WebhooksGroup = HttpApiGroup.make('webhooks')
 	)
 	.add(
 		HttpApiEndpoint.patch('update', '/webhooks/:id', {
-			params: { id: Schema.String },
+			params: { id: UuidParam },
 			payload: UpdateWebhookInput,
-			success: Schema.NullOr(WebhookEndpoint.json),
+			success: WebhookEndpoint.json,
+			error: NotFound.pipe(HttpApiSchema.status(404)),
 		}),
 	)
 	.add(
 		HttpApiEndpoint.delete('remove', '/webhooks/:id', {
-			params: { id: Schema.String },
+			params: { id: UuidParam },
 			success: Schema.Void,
 		}),
 	)
 	.add(
 		HttpApiEndpoint.post('test', '/webhooks/:id/test', {
-			params: { id: Schema.String },
+			params: { id: UuidParam },
 			success: Schema.Void,
+			error: NotFound.pipe(HttpApiSchema.status(404)),
 		}),
 	)
 	.middleware(SessionMiddleware)

@@ -15,7 +15,7 @@ import { styled } from 'next-yak'
 import { useState } from 'react'
 
 import { isLangCode, type LangCode } from '@batuda/domain'
-import { PriButton, PriInput, PriSelect } from '@batuda/ui/pri'
+import { PriButton, PriField, PriInput, PriSelect } from '@batuda/ui/pri'
 
 import { langSelectItems } from '#/i18n/lang-labels'
 import { useLang } from '#/i18n/lang-provider'
@@ -25,6 +25,7 @@ import {
 	useHydratedActiveMember,
 	useHydratedActiveOrganization,
 } from '#/lib/auth-client'
+import { isLikelyEmail, normalizeEmail } from '#/lib/forms'
 import { isOrgAdmin } from '#/lib/identity'
 import {
 	brushedMetalPlate,
@@ -83,6 +84,8 @@ function MembersPage() {
 	const [newMemberLocale, setNewMemberLocale] = useState<LangCode>(activeLang)
 	const [adding, setAdding] = useState(false)
 	const [addError, setAddError] = useState<string | null>(null)
+	// What is wrong with the typed address, shown under the field itself.
+	const [emailError, setEmailError] = useState<string | null>(null)
 	const [addedEmail, setAddedEmail] = useState<string | null>(null)
 
 	const members = (active.data?.members ?? []) as ReadonlyArray<OrgMember>
@@ -124,9 +127,13 @@ function MembersPage() {
 
 	const handleAdd = async (event: React.FormEvent<HTMLFormElement>) => {
 		event.preventDefault()
-		const trimmed = newMemberEmail.trim().toLowerCase()
+		const trimmed = normalizeEmail(newMemberEmail)
 		if (!trimmed) {
-			setAddError(t`Enter an email address.`)
+			setEmailError(t`Enter an email address.`)
+			return
+		}
+		if (!isLikelyEmail(trimmed)) {
+			setEmailError(t`Enter a full email address, like name@company.com.`)
 			return
 		}
 		setAdding(true)
@@ -211,6 +218,7 @@ function MembersPage() {
 							// reopening it shows an error about the last address above
 							// an empty form.
 							setAddError(null)
+							setEmailError(null)
 							setShowAddPanel(open => !open)
 						}}
 					>
@@ -323,6 +331,7 @@ function MembersPage() {
 									aria-label={t`Close`}
 									onClick={() => {
 										setAddError(null)
+										setEmailError(null)
 										setShowAddPanel(false)
 									}}
 								>
@@ -343,8 +352,14 @@ function MembersPage() {
 								</ErrorBanner>
 							) : null}
 
-							<Form onSubmit={handleAdd} data-testid='add-member-form'>
-								<Field>
+							{/* The browser's own bubble speaks the browser's language, not
+							    the app's, so the address is checked in handleAdd instead. */}
+							<Form
+								onSubmit={handleAdd}
+								noValidate
+								data-testid='add-member-form'
+							>
+								<PriField.Root invalid={emailError !== null}>
 									<Label htmlFor='add-member-email'>
 										<Trans>Email</Trans>
 									</Label>
@@ -358,10 +373,19 @@ function MembersPage() {
 										value={newMemberEmail}
 										onChange={e => {
 											setNewMemberEmail(e.currentTarget.value)
+											setEmailError(null)
 										}}
 										data-testid='add-member-email'
 									/>
-								</Field>
+									{emailError ? (
+										<PriField.Error
+											match={true}
+											data-testid='add-member-email-error'
+										>
+											{emailError}
+										</PriField.Error>
+									) : null}
+								</PriField.Root>
 
 								<Field>
 									<Label htmlFor='add-member-role'>

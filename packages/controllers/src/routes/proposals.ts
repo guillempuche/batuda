@@ -7,6 +7,7 @@ import { NotFound } from '../errors'
 import { OrgMiddleware } from '../middleware/org'
 import { SessionMiddleware } from '../middleware/session'
 import { PaginatedList, pageQuery } from '../pagination'
+import { UuidParam } from '../uuid-param'
 
 const CreateProposalInput = Schema.Struct({
 	companyId: Schema.String,
@@ -41,7 +42,7 @@ export const ProposalsGroup = HttpApiGroup.make('proposals')
 	)
 	.add(
 		HttpApiEndpoint.get('get', '/proposals/:id', {
-			params: { id: Schema.String },
+			params: { id: UuidParam },
 			success: Proposal.json,
 			error: NotFound.pipe(HttpApiSchema.status(404)),
 		}),
@@ -54,9 +55,10 @@ export const ProposalsGroup = HttpApiGroup.make('proposals')
 	)
 	.add(
 		HttpApiEndpoint.patch('update', '/proposals/:id', {
-			params: { id: Schema.String },
+			params: { id: UuidParam },
 			payload: UpdateProposalInput,
-			success: Schema.NullOr(Proposal.json),
+			success: Proposal.json,
+			error: NotFound.pipe(HttpApiSchema.status(404)),
 		}),
 	)
 	.middleware(SessionMiddleware)

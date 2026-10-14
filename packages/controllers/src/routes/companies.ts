@@ -31,6 +31,7 @@ import { SessionMiddleware } from '../middleware/session'
 import { PaginatedList, pageQuery } from '../pagination'
 import { CommaList } from '../query-list'
 import { FiniteFromQuery } from '../query-number'
+import { UuidParam } from '../uuid-param'
 import { PriorityFromString, StaleDays } from './pipeline'
 
 // One research run whose findings were applied to a company, with the pages its
@@ -343,16 +344,18 @@ export const CompaniesGroup = HttpApiGroup.make('companies')
 	)
 	.add(
 		HttpApiEndpoint.patch('update', '/companies/:id', {
-			params: { id: Schema.String },
+			params: { id: UuidParam },
 			payload: UpdateCompanyInput,
-			// null when the id doesn't exist.
-			success: Schema.NullOr(Company.json),
-			error: AttributeRejected.pipe(HttpApiSchema.status(400)),
+			success: Company.json,
+			error: [
+				AttributeRejected.pipe(HttpApiSchema.status(400)),
+				NotFound.pipe(HttpApiSchema.status(404)),
+			],
 		}),
 	)
 	.add(
 		HttpApiEndpoint.post('geocode', '/companies/:id/geocode', {
-			params: { id: Schema.String },
+			params: { id: UuidParam },
 			success: Company.json,
 			error: NotFound.pipe(HttpApiSchema.status(404)),
 		}),
@@ -361,7 +364,7 @@ export const CompaniesGroup = HttpApiGroup.make('companies')
 		// Mark a company as a verified lead (or clear it). `verified: true` stamps
 		// who verified it and when; `false` clears both.
 		HttpApiEndpoint.post('verify', '/companies/:id/verify', {
-			params: { id: Schema.String },
+			params: { id: UuidParam },
 			payload: Schema.Struct({ verified: Schema.Boolean }),
 			success: Company.json,
 			error: NotFound.pipe(HttpApiSchema.status(404)),
@@ -371,7 +374,7 @@ export const CompaniesGroup = HttpApiGroup.make('companies')
 		// Take a company out of view. Its people go with it, and its name is
 		// released so the same firm can be added again later.
 		HttpApiEndpoint.delete('delete', '/companies/:id', {
-			params: { id: Schema.String },
+			params: { id: UuidParam },
 			success: DeleteCompanyResult,
 			error: NotFound.pipe(HttpApiSchema.status(404)),
 		}),
@@ -385,7 +388,7 @@ export const CompaniesGroup = HttpApiGroup.make('companies')
 			'clearSuppression',
 			'/companies/:id/email-suppression/clear',
 			{
-				params: { id: Schema.String },
+				params: { id: UuidParam },
 				success: CompanySuppressionCleared,
 			},
 		),
@@ -395,7 +398,7 @@ export const CompaniesGroup = HttpApiGroup.make('companies')
 		// name has since been taken by another company, because the caller has to
 		// rename that one first.
 		HttpApiEndpoint.post('restore', '/companies/:id/restore', {
-			params: { id: Schema.String },
+			params: { id: UuidParam },
 			success: DeleteCompanyResult,
 			error: [
 				BadRequest.pipe(HttpApiSchema.status(400)),

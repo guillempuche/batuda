@@ -4,6 +4,7 @@ import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from 'effect/http-api'
 import { Conflict, NotFound } from '../errors'
 import { OrgMiddleware } from '../middleware/org'
 import { SessionMiddleware } from '../middleware/session'
+import { UuidParam } from '../uuid-param'
 
 // One trade in an organisation's own list.
 //
@@ -49,7 +50,7 @@ export const CompanyIndustriesGroup = HttpApiGroup.make('companyIndustries')
 	.add(
 		// Renaming also accepts the name: choosing the wording is the review.
 		HttpApiEndpoint.patch('rename', '/company-industries/:id', {
-			params: { id: Schema.String },
+			params: { id: UuidParam },
 			payload: RenameCompanyIndustryInput,
 			success: Schema.Void,
 			error: Schema.Union([
@@ -60,14 +61,14 @@ export const CompanyIndustriesGroup = HttpApiGroup.make('companyIndustries')
 	)
 	.add(
 		HttpApiEndpoint.post('review', '/company-industries/:id/review', {
-			params: { id: Schema.String },
+			params: { id: UuidParam },
 			success: Schema.Void,
 			error: NotFound.pipe(HttpApiSchema.status(404)),
 		}),
 	)
 	.add(
 		HttpApiEndpoint.post('merge', '/company-industries/:id/merge', {
-			params: { id: Schema.String },
+			params: { id: UuidParam },
 			payload: MergeCompanyIndustryInput,
 			success: MergedCompanyIndustryView,
 			error: Schema.Union([
@@ -78,7 +79,7 @@ export const CompanyIndustriesGroup = HttpApiGroup.make('companyIndustries')
 	)
 	.add(
 		HttpApiEndpoint.delete('delete', '/company-industries/:id', {
-			params: { id: Schema.String },
+			params: { id: UuidParam },
 			success: Schema.Void,
 			error: Schema.Union([
 				NotFound.pipe(HttpApiSchema.status(404)),

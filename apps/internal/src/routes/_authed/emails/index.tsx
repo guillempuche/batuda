@@ -140,6 +140,9 @@ type InboxOption = {
 	readonly description: string | null
 }
 
+const inboxLabel = (inbox: InboxOption): string =>
+	inbox.displayName ? `${inbox.displayName} <${inbox.email}>` : inbox.email
+
 type CompanyLookup = {
 	readonly slug: string
 	readonly name: string
@@ -297,6 +300,17 @@ function EmailsIndexPage() {
 				? narrowInboxes(inboxesResult.value)
 				: [],
 		[inboxesResult],
+	)
+
+	const inboxItems = useMemo(
+		() => [
+			{ value: ALL, label: t`All inboxes` },
+			...inboxOptions.map(inbox => ({
+				value: inbox.id,
+				label: inboxLabel(inbox),
+			})),
+		],
+		[inboxOptions, t],
 	)
 
 	// No inbox connected yet → first-run onboarding instead of an empty list.
@@ -782,6 +796,9 @@ function EmailsIndexPage() {
 								// each option by the address on it, which a generic control
 								// has nowhere to put.
 								<PriSelect.Root
+									// The trigger reads its label from here; without it, it
+									// prints the raw value it holds.
+									items={inboxItems}
 									value={search.inboxId ?? ALL}
 									onValueChange={value =>
 										handleInboxFilter(value === ALL ? undefined : String(value))
@@ -791,7 +808,7 @@ function EmailsIndexPage() {
 										data-testid='inbox-filter-trigger'
 										aria-label={t`Filter by inbox`}
 									>
-										<PriSelect.Value placeholder={t`All inboxes`} />
+										<PriSelect.Value />
 										<PriSelect.Icon>
 											<ChevronsUpDown size={14} aria-hidden />
 										</PriSelect.Icon>
@@ -820,9 +837,7 @@ function EmailsIndexPage() {
 															<Check size={12} aria-hidden />
 														</PriSelect.ItemIndicator>
 														<PriSelect.ItemText>
-															{inbox.displayName
-																? `${inbox.displayName} <${inbox.email}>`
-																: inbox.email}
+															{inboxLabel(inbox)}
 														</PriSelect.ItemText>
 													</PriSelect.Item>
 												))}
