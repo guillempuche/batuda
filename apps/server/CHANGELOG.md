@@ -3,6 +3,23 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-10-14 (server-v2026.10.14)
+
+### Bug Fixes
+
+* cap waiting approvals and correct invented tool names ([f4b7e62](https://github.com/guillempuche/batuda/commit/f4b7e626cb89f706a81c3602e97b62ce71363a90))
+* keep token addresses out of traces and stop on a dead database ([51640eb](https://github.com/guillempuche/batuda/commit/51640ebecc97c8b24dc7202ded314d9fd204d18d))
+* settle older bugs found by a UI test campaign ([9a5257e](https://github.com/guillempuche/batuda/commit/9a5257eeb259c5ac8dbd267ffd2f65f2c881e4a7))
+* settle the MCP regressions Effect 4.0.3 brought in ([c470c56](https://github.com/guillempuche/batuda/commit/c470c569becc00ef7a51e220eb3ec33868acea81))
+
+### Refactoring
+
+* **research:** read the run row once and share the copied helpers ([d275633](https://github.com/guillempuche/batuda/commit/d275633765240d3f68d63859153cd6a58e27ad9a))
+
+### Chores
+
+* upgrade Effect to 4.0.3 and hold every /mcp spelling to sign-in ([78b33fe](https://github.com/guillempuche/batuda/commit/78b33fe8c886857c5d7de35251b38d8aaeb3e302))
+
 ## 2026-10-11 (server-v2026.10.11)
 
 ### Bug Fixes
