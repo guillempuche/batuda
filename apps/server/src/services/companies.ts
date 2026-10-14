@@ -388,13 +388,13 @@ export class CompanyService extends Context.Service<CompanyService>()(
 						const orderBy = ((): Statement.Fragment => {
 							switch (filters.sort) {
 								case 'name':
-									return sql`name ASC`
+									return sql`name ASC, id`
 								case 'recent_contact':
-									return sql`last_contacted_at DESC NULLS LAST`
+									return sql`last_contacted_at DESC NULLS LAST, id`
 								case 'recent_update':
-									return sql`updated_at DESC`
+									return sql`updated_at DESC, id`
 								default:
-									return sql`priority, updated_at DESC`
+									return sql`priority, updated_at DESC, id`
 							}
 						})()
 

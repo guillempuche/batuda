@@ -7,6 +7,7 @@ import { BadRequest, Conflict, NotFound } from '../errors'
 import { OrgMiddleware } from '../middleware/org'
 import { SessionMiddleware } from '../middleware/session'
 import { PaginatedList, pageQuery } from '../pagination'
+import { UuidParam } from '../uuid-param'
 
 // List projection: recording metadata joined with its interaction's date,
 // contact, and summary. Dates encode to ISO strings on the wire.
@@ -65,14 +66,14 @@ export const RecordingsGroup = HttpApiGroup.make('recordings')
 	)
 	.add(
 		HttpApiEndpoint.get('get', '/recordings/:id', {
-			params: { id: Schema.String },
+			params: { id: UuidParam },
 			success: RecordingDetail,
 			error: NotFound.pipe(HttpApiSchema.status(404)),
 		}),
 	)
 	.add(
 		HttpApiEndpoint.get('playback', '/recordings/:id/playback', {
-			params: { id: Schema.String },
+			params: { id: UuidParam },
 			success: Schema.Struct({
 				url: Schema.String,
 				expiresAt: Schema.String,
@@ -82,7 +83,7 @@ export const RecordingsGroup = HttpApiGroup.make('recordings')
 	)
 	.add(
 		HttpApiEndpoint.delete('delete', '/recordings/:id', {
-			params: { id: Schema.String },
+			params: { id: UuidParam },
 			success: Schema.Struct({ ok: Schema.Boolean }),
 			error: NotFound.pipe(HttpApiSchema.status(404)),
 		}),

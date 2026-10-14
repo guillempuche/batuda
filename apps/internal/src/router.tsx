@@ -1,10 +1,7 @@
 import { createRouter, stringifySearchWith } from '@tanstack/react-router'
 
+import { NotFound } from '#/components/shared/not-found'
 import { routeTree } from './routeTree.gen'
-
-function NotFound() {
-	return <p>Pàgina no trobada</p>
-}
 
 /**
  * A filter holding several values is written into the address as one

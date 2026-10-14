@@ -11,6 +11,7 @@ import { BadRequest, NotFound } from '../errors'
 import { OrgMiddleware } from '../middleware/org'
 import { SessionMiddleware } from '../middleware/session'
 import { PaginatedList, pageQuery } from '../pagination'
+import { UuidParam } from '../uuid-param'
 
 // A reachable channel supplied in bulk (agent/import path). `kind` is open
 // (email, phone, linkedin, x, website, bluesky, …); only the email channel
@@ -129,20 +130,20 @@ export const ContactsGroup = HttpApiGroup.make('contacts')
 	)
 	.add(
 		HttpApiEndpoint.patch('update', '/contacts/:id', {
-			params: { id: Schema.String },
+			params: { id: UuidParam },
 			payload: UpdateContactInput,
 			success: ContactWithChannels,
 		}),
 	)
 	.add(
 		HttpApiEndpoint.delete('remove', '/contacts/:id', {
-			params: { id: Schema.String },
+			params: { id: UuidParam },
 			success: Schema.Void,
 		}),
 	)
 	.add(
 		HttpApiEndpoint.post('addChannel', '/contacts/:id/channels', {
-			params: { id: Schema.String },
+			params: { id: UuidParam },
 			payload: AddChannelInput,
 			success: ContactChannel.json,
 			// An address that could never be one of its kind — a phone number in the
@@ -155,7 +156,7 @@ export const ContactsGroup = HttpApiGroup.make('contacts')
 			'updateChannel',
 			'/contacts/:id/channels/:channelId',
 			{
-				params: { id: Schema.String, channelId: Schema.String },
+				params: { id: UuidParam, channelId: UuidParam },
 				payload: PatchChannelInput,
 				success: ContactChannel.json,
 				// Every channel of every company, branch and person lives in one
@@ -173,7 +174,7 @@ export const ContactsGroup = HttpApiGroup.make('contacts')
 			'deleteChannel',
 			'/contacts/:id/channels/:channelId',
 			{
-				params: { id: Schema.String, channelId: Schema.String },
+				params: { id: UuidParam, channelId: UuidParam },
 				success: Schema.Void,
 				error: NotFound.pipe(HttpApiSchema.status(404)),
 			},
@@ -187,7 +188,7 @@ export const ContactsGroup = HttpApiGroup.make('contacts')
 			'clearSuppression',
 			'/contacts/:id/email-suppression/clear',
 			{
-				params: { id: Schema.String },
+				params: { id: UuidParam },
 				success: SuppressionCleared,
 			},
 		),

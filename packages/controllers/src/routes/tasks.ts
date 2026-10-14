@@ -13,6 +13,7 @@ import { BadRequest, Conflict, NotFound } from '../errors'
 import { OrgMiddleware } from '../middleware/org'
 import { SessionMiddleware } from '../middleware/session'
 import { PaginatedList, pageQuery } from '../pagination'
+import { UuidParam } from '../uuid-param'
 
 // bulkComplete reports how many of the requested ids it actually closed.
 export const BulkCompleteResult = Schema.Struct({
@@ -159,7 +160,7 @@ export const TasksGroup = HttpApiGroup.make('tasks')
 	)
 	.add(
 		HttpApiEndpoint.get('get', '/tasks/:id', {
-			params: { id: Schema.String },
+			params: { id: UuidParam },
 			success: Task.json,
 			error: NotFound.pipe(HttpApiSchema.status(404)),
 		}),
@@ -173,7 +174,7 @@ export const TasksGroup = HttpApiGroup.make('tasks')
 	)
 	.add(
 		HttpApiEndpoint.patch('update', '/tasks/:id', {
-			params: { id: Schema.String },
+			params: { id: UuidParam },
 			payload: UpdateTaskInput,
 			headers: IfMatchHeader,
 			success: Task.json,
@@ -188,21 +189,21 @@ export const TasksGroup = HttpApiGroup.make('tasks')
 	)
 	.add(
 		HttpApiEndpoint.post('complete', '/tasks/:id/complete', {
-			params: { id: Schema.String },
+			params: { id: UuidParam },
 			success: Task.json,
 			error: NotFound.pipe(HttpApiSchema.status(404)),
 		}),
 	)
 	.add(
 		HttpApiEndpoint.post('reopen', '/tasks/:id/reopen', {
-			params: { id: Schema.String },
+			params: { id: UuidParam },
 			success: Task.json,
 			error: NotFound.pipe(HttpApiSchema.status(404)),
 		}),
 	)
 	.add(
 		HttpApiEndpoint.post('cancel', '/tasks/:id/cancel', {
-			params: { id: Schema.String },
+			params: { id: UuidParam },
 			success: Task.json,
 			error: [
 				NotFound.pipe(HttpApiSchema.status(404)),
@@ -212,7 +213,7 @@ export const TasksGroup = HttpApiGroup.make('tasks')
 	)
 	.add(
 		HttpApiEndpoint.post('snooze', '/tasks/:id/snooze', {
-			params: { id: Schema.String },
+			params: { id: UuidParam },
 			payload: SnoozeInput,
 			success: Task.json,
 			error: [
@@ -223,7 +224,7 @@ export const TasksGroup = HttpApiGroup.make('tasks')
 	)
 	.add(
 		HttpApiEndpoint.post('reschedule', '/tasks/:id/reschedule', {
-			params: { id: Schema.String },
+			params: { id: UuidParam },
 			payload: RescheduleInput,
 			success: Task.json,
 			error: NotFound.pipe(HttpApiSchema.status(404)),
@@ -237,7 +238,7 @@ export const TasksGroup = HttpApiGroup.make('tasks')
 	)
 	.add(
 		HttpApiEndpoint.get('events', '/tasks/:id/events', {
-			params: { id: Schema.String },
+			params: { id: UuidParam },
 			query: { ...pageQuery },
 			success: PaginatedList(TaskEvent.json),
 			error: NotFound.pipe(HttpApiSchema.status(404)),

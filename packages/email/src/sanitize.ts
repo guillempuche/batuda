@@ -223,15 +223,45 @@ const DROPPED_TAGS = new Set([
 	'w:wordart',
 ])
 
-// Unsupported block tags that leave a placeholder paragraph behind.
-const PLACEHOLDER_TAGS: Record<string, string> = {
-	table: '[table]',
-	thead: '',
-	tbody: '',
-	tr: '',
-	td: '',
-	th: '',
-}
+// Table structure has no block of its own, so a table is read for its text:
+// each cell becomes its own paragraph, in reading order. Most HTML mail is laid
+// out in tables (every message this app sends is), so dropping them would
+// leave nothing of the body to quote.
+const TABLE_WRAPPER_TAGS = new Set([
+	'table',
+	'thead',
+	'tbody',
+	'tfoot',
+	'tr',
+	'caption',
+])
+
+// Elements that write blocks of their own rather than spans of a line.
+const STARTS_BLOCK_TAGS = new Set([
+	...TABLE_WRAPPER_TAGS,
+	'p',
+	'td',
+	'th',
+	'div',
+	'section',
+	'article',
+	'main',
+	'header',
+	'footer',
+	'aside',
+	'h1',
+	'h2',
+	'h3',
+	'h4',
+	'h5',
+	'h6',
+	'ul',
+	'ol',
+	'blockquote',
+	'hr',
+	'pre',
+	'img',
+])
 
 const walkChildren = (node: DomNode, out: EmailBlock[], ctx: WalkCtx): void => {
 	if (node.kind !== 'element') return
@@ -249,19 +279,21 @@ const visit = (node: DomNode, out: EmailBlock[], ctx: WalkCtx): void => {
 	const tag = node.tag
 	if (DROPPED_TAGS.has(tag)) return
 
-	if (tag in PLACEHOLDER_TAGS) {
-		const label = PLACEHOLDER_TAGS[tag]
-		if (label) {
-			out.push({
-				type: 'paragraph',
-				spans: [{ kind: 'text', value: label, italic: true }],
-			})
+	if (TABLE_WRAPPER_TAGS.has(tag)) {
+		// A table is a block, so whatever was being gathered into a line
+		// around it does not carry on into its cells.
+		for (const c of node.children) {
+			// The line breaks between rows and cells are layout, not text.
+			if (c.kind === 'text' && c.value.trim() === '') continue
+			visit(c, out, { marks: ctx.marks })
 		}
 		return
 	}
 
 	switch (tag) {
 		case 'p':
+		case 'td':
+		case 'th':
 		case 'div':
 		case 'section':
 		case 'article':
@@ -269,14 +301,26 @@ const visit = (node: DomNode, out: EmailBlock[], ctx: WalkCtx): void => {
 		case 'header':
 		case 'footer':
 		case 'aside': {
+			// Text before a nested block (a table in a cell, a list in a div) is
+			// written out before that block, so the reading order holds.
 			const spans: Span[] = []
-			for (const c of node.children)
-				visit(c, out, { ...ctx, spanBuffer: spans })
-			if (spans.length > 0) {
-				out.push({ type: 'paragraph', spans: collapseSpans(spans) })
-			} else if (tag === 'p') {
-				out.push({ type: 'paragraph', spans: [] })
+			const blocksBefore = out.length
+			const flush = () => {
+				if (hasVisibleSpan(spans))
+					out.push({ type: 'paragraph', spans: collapseSpans(spans) })
+				spans.length = 0
 			}
+			for (const c of node.children) {
+				if (c.kind === 'element' && STARTS_BLOCK_TAGS.has(c.tag)) {
+					flush()
+					visit(c, out, { marks: ctx.marks })
+				} else {
+					visit(c, out, { ...ctx, spanBuffer: spans })
+				}
+			}
+			flush()
+			if (tag === 'p' && out.length === blocksBefore)
+				out.push({ type: 'paragraph', spans: [] })
 			return
 		}
 		case 'h1':
@@ -427,6 +471,11 @@ const pushSpan = (out: EmailBlock[], ctx: WalkCtx, span: Span): void => {
 	}
 	out.push({ type: 'paragraph', spans: [span] })
 }
+
+// Indentation between nested blocks reaches a container as text of its own;
+// a container holding only that has nothing to say.
+const hasVisibleSpan = (spans: ReadonlyArray<Span>): boolean =>
+	spans.some(s => s.kind !== 'text' || s.value.trim().length > 0)
 
 // Merge adjacent text spans that share the same mark flags. Keeps the
 // tree compact and deterministic across equivalent HTML shapes.

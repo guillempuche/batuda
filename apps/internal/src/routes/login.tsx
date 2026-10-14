@@ -14,7 +14,7 @@ import { PriButton, PriInput } from '@batuda/ui/pri'
 
 import { PriPasswordInput } from '#/components/primitives/pri-password-input'
 import { apiBaseUrl } from '#/lib/api-base'
-import { normalizeEmail } from '#/lib/forms'
+import { isLikelyEmail, normalizeEmail } from '#/lib/forms'
 import { validateSearchWith } from '#/lib/search-schema'
 import { rulerUnderRule, stenciledTitle } from '#/lib/workshop-mixins'
 
@@ -128,9 +128,11 @@ export const Route = createFileRoute('/login')({
 
 interface FormState {
 	readonly error: string | null
+	// React empties the form after the action, so the address comes back to refill it.
+	readonly email: string
 }
 
-const INITIAL_STATE: FormState = { error: null }
+const INITIAL_STATE: FormState = { error: null, email: '' }
 
 // Module-scope MessageDescriptors so `lingui extract` finds them
 // statically; `t(descriptor)` from `useLingui()` resolves them at render.
@@ -195,7 +197,7 @@ function LoginPage() {
 					// The credentials were fine; the connection request itself
 					// lapsed. Send them back to the assistant, not to "wrong password".
 					if (oauthQuery && isOAuthQueryError(body)) {
-						return { error: t(MESSAGES.oauthRestart) }
+						return { error: t(MESSAGES.oauthRestart), email }
 					}
 					const key = passwordErrorKey(body, response.status)
 					// Known codes have curated copy; unknowns defer to Better-Auth's
@@ -204,7 +206,7 @@ function LoginPage() {
 						key === 'fallback'
 							? (body?.message ?? t(MESSAGES.passwordFallback))
 							: t(MESSAGES[key])
-					return { error }
+					return { error, email }
 				}
 				// The server replies with where to send the browser next — the
 				// consent screen, or back to the assistant. Go there, not into
@@ -215,7 +217,7 @@ function LoginPage() {
 					} | null
 					if (body?.url) {
 						window.location.assign(body.url)
-						return { error: null }
+						return { error: null, email }
 					}
 					// No next URL came back — they're signed in, so just enter the app.
 				}
@@ -223,10 +225,10 @@ function LoginPage() {
 				// originally requested URL (or `/`); the root's beforeLoad
 				// re-checks the session and lets us through.
 				await navigate({ href: safeReturnTo(search.returnTo) })
-				return { error: null }
+				return { error: null, email }
 			} catch (cause) {
 				console.error('[Login] sign-in failed:', cause)
-				return { error: t(MESSAGES.network) }
+				return { error: t(MESSAGES.network), email }
 			}
 		},
 		INITIAL_STATE,
@@ -378,6 +380,10 @@ function LoginPage() {
 							type='email'
 							autoComplete='email'
 							required
+							// A new key mounts the field afresh with the returned
+							// address, since the input only reads its default once.
+							key={state.email}
+							defaultValue={state.email}
 							ref={emailFieldRef}
 							disabled={isPending || magicLinkStatus.kind === 'sending'}
 							data-testid='login-email'
@@ -597,9 +603,6 @@ const magicLinkVerifyErrorKey = (
 			return 'verifyUnknown'
 	}
 }
-
-const isLikelyEmail = (value: string): boolean =>
-	value.length > 3 && value.includes('@') && !value.includes(' ')
 
 const absoluteUrl = (path: string, query?: Record<string, string>): string => {
 	const origin =

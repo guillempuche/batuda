@@ -378,6 +378,38 @@ const toOutboundAttachments = (
 export const sentRawKey = (organizationId: string, inboxId: string): string =>
 	`messages/${organizationId}/${inboxId}/sent/${randomUUID()}.eml`
 
+// Where one file sent with a message is kept: beside that message's wire bytes,
+// the way the mail worker stores the files of a message that arrived.
+export const sentAttachmentKey = (rawRef: string, index: number): string =>
+	`${rawRef.replace(/\.eml$/, '')}/attachment-${index}.bin`
+
+// One entry of `email_messages.attachments`, in the shape the mail worker
+// writes for arriving mail, so the thread view, the download route and the
+// "has attachments" filter read sent and received files alike.
+export interface StoredAttachment {
+	readonly index: number
+	readonly filename: string
+	readonly contentType: string
+	readonly sizeBytes: number
+	readonly cid: string | null
+	readonly isInline: boolean
+	readonly storageKey: string
+}
+
+export const storedAttachmentFor = (
+	attachment: OutboundAttachment,
+	index: number,
+	storageKey: string,
+): StoredAttachment => ({
+	index,
+	filename: attachment.filename,
+	contentType: attachment.contentType,
+	sizeBytes: Buffer.from(attachment.contentBase64, 'base64').byteLength,
+	cid: attachment.contentId ?? null,
+	isInline: attachment.disposition === 'inline',
+	storageKey,
+})
+
 const toRecipientArray = (
 	value: string | readonly string[] | undefined,
 ): readonly string[] | undefined => {
@@ -1103,7 +1135,11 @@ export class EmailService extends Context.Service<EmailService>()(
 				inbox: InboxRow,
 				message: OutboundMessage,
 			): Effect.Effect<
-				{ messageId: string; rawRef: string },
+				{
+					messageId: string
+					rawRef: string
+					attachments: ReadonlyArray<StoredAttachment>
+				},
 				SmtpSendFailed | EmailNotSendable,
 				never
 			> =>
@@ -1178,7 +1214,58 @@ export class EmailService extends Context.Service<EmailService>()(
 							),
 						),
 					)
-					return { messageId, rawRef: key }
+					const attachments = yield* keepSentAttachments(
+						inbox.id,
+						key,
+						message.attachments ?? [],
+					)
+					return { messageId, rawRef: key, attachments }
+				})
+
+			// Keep a copy of each file that went out, so the message lists them
+			// straight away. The Sent folder would supply them too, but only once
+			// the worker reads it, and only from a mailbox that files what it sends.
+			// Like the wire copy, a file that cannot be kept is left off the list
+			// rather than failing a message that has already gone.
+			const keepSentAttachments = (
+				inboxId: string,
+				rawRef: string,
+				attachments: ReadonlyArray<OutboundAttachment>,
+			) =>
+				Effect.gen(function* () {
+					const kept: StoredAttachment[] = []
+					for (const [position, attachment] of attachments.entries()) {
+						const storageKey = sentAttachmentKey(rawRef, position)
+						const stored = yield* storage
+							.put({
+								key: storageKey,
+								body: Buffer.from(attachment.contentBase64, 'base64'),
+								contentType: attachment.contentType,
+							})
+							.pipe(
+								Effect.as(true),
+								Effect.catchCause(cause =>
+									Effect.logWarning(
+										'Keeping a copy of a sent attachment failed',
+									).pipe(
+										Effect.andThen(Effect.logError(boundedCause(cause))),
+										Effect.annotateLogs({
+											event: 'email.sent_attachment_copy_failed',
+											inboxId,
+										}),
+										Effect.as(false),
+									),
+								),
+							)
+						// The download route finds a file by its place in this list,
+						// so the index counts only the files actually kept.
+						if (stored) {
+							kept.push(
+								storedAttachmentFor(attachment, kept.length, storageKey),
+							)
+						}
+					}
+					return kept
 				})
 
 			// `result.threadId` is the RFC 5322 Message-ID of the thread root.
@@ -1207,6 +1294,8 @@ export class EmailService extends Context.Service<EmailService>()(
 					| { inReplyTo: string; references: readonly string[] }
 					| undefined
 				rawRfc822Ref: string
+				// The files that went with it, kept by `dispatchOutbound`.
+				attachments: ReadonlyArray<StoredAttachment>
 				// What the recipient was sent. Kept on the row because the only
 				// other copies are the wire bytes in object storage and whatever
 				// sits in their mailbox.
@@ -1271,6 +1360,7 @@ export class EmailService extends Context.Service<EmailService>()(
 									imapUid: null,
 									imapUidvalidity: null,
 									rawRfc822Ref: args.rawRfc822Ref,
+									attachments: JSON.stringify(args.attachments),
 									subject: args.subject,
 									receivedAt: sentAt,
 									// Same 200-character cut arriving mail uses, so a message
@@ -1474,6 +1564,7 @@ export class EmailService extends Context.Service<EmailService>()(
 							bcc,
 							existingThreadLink: null,
 							rawRfc822Ref: dispatched.rawRef,
+							attachments: dispatched.attachments,
 							textBody: rendered.text,
 							htmlBody: rendered.html,
 							actor: extras.actor,
@@ -1735,6 +1826,7 @@ export class EmailService extends Context.Service<EmailService>()(
 								references: outbound.references ?? [],
 							},
 							rawRfc822Ref: dispatched.rawRef,
+							attachments: dispatched.attachments,
 							textBody: rendered.text,
 							htmlBody: rendered.html,
 							actor: extras.actor,
@@ -2302,7 +2394,7 @@ export class EmailService extends Context.Service<EmailService>()(
 						const probed = yield* sql<{ readonly total?: string | number }>`
 							SELECT ${sql.unsafe(MESSAGE_RECORD_COLUMNS)}${totalColumn(sql, page.count)} FROM email_messages
 							WHERE ${sql.and(conditions)}
-							ORDER BY status_updated_at DESC
+							ORDER BY status_updated_at DESC, id
 							LIMIT ${probeLimit(page.limit)}
 							OFFSET ${page.offset}
 						`
@@ -3535,6 +3627,7 @@ export class EmailService extends Context.Service<EmailService>()(
 								},
 							}),
 							rawRfc822Ref: dispatched.rawRef,
+							attachments: dispatched.attachments,
 							textBody: rendered.text,
 							htmlBody: rendered.html,
 							actor,

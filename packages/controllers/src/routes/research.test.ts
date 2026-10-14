@@ -3,7 +3,11 @@ import { describe, expect, it } from 'vitest'
 
 import { schemaNames } from '@batuda/research/application/schemas'
 
-import { ContextInput, CreateResearchInput } from './research'
+import {
+	ContextInput,
+	CreateResearchInput,
+	UpdatePolicyInput,
+} from './research'
 
 // Decode through the canonical JSON codec so the check mirrors what the MCP tool
 // and HTTP route actually run on a caller's payload.
@@ -231,6 +235,84 @@ describe('CreateResearchInput', () => {
 			).toBe('Success')
 			expect(
 				decodeExit(CreateResearchInput, { query: 'q'.repeat(8001) })._tag,
+			).toBe('Failure')
+		})
+	})
+})
+
+describe('UpdatePolicyInput', () => {
+	describe('when the limits are in range', () => {
+		it('should accept zero, ordinary amounts and both ends of the score', () => {
+			// GIVEN a policy turned all the way down, and one with ordinary limits
+			// WHEN each is decoded
+			// THEN both go through unchanged, and null still turns auto-apply off
+			expect(
+				decode(UpdatePolicyInput, {
+					budget_cents: 0,
+					paid_budget_cents: 0,
+					auto_approve_paid_cents: 0,
+					paid_monthly_cap_cents: 0,
+					auto_apply_min_confidence: 0,
+				}).budget_cents,
+			).toBe(0)
+			expect(
+				decode(UpdatePolicyInput, {
+					budget_cents: 725,
+					auto_apply_min_confidence: 100,
+				}).auto_apply_min_confidence,
+			).toBe(100)
+			expect(
+				decode(UpdatePolicyInput, { auto_apply_min_confidence: null })
+					.auto_apply_min_confidence,
+			).toBeNull()
+		})
+	})
+
+	describe('when a limit is below zero', () => {
+		it('should refuse every money field', () => {
+			// GIVEN each money limit set to a negative amount
+			const fields = [
+				'budget_cents',
+				'paid_budget_cents',
+				'auto_approve_paid_cents',
+				'paid_monthly_cap_cents',
+			]
+
+			// WHEN each is decoded on its own
+			// THEN each is refused, rather than saved as a ceiling every spend
+			// check would then compare against
+			for (const field of fields)
+				expect(decodeExit(UpdatePolicyInput, { [field]: -5 })._tag, field).toBe(
+					'Failure',
+				)
+		})
+	})
+
+	describe('when the confidence threshold is outside 0–100', () => {
+		it('should refuse it', () => {
+			// GIVEN a threshold above the top of the score, and one below it
+			// WHEN each is decoded
+			// THEN both are refused — 150 would switch auto-apply off without
+			// saying so, since no finding can ever reach it
+			expect(
+				decodeExit(UpdatePolicyInput, { auto_apply_min_confidence: 150 })._tag,
+			).toBe('Failure')
+			expect(
+				decodeExit(UpdatePolicyInput, { auto_apply_min_confidence: -1 })._tag,
+			).toBe('Failure')
+		})
+	})
+})
+
+describe('CreateResearchInput budgets', () => {
+	describe('when a run asks for a negative budget', () => {
+		it('should refuse it', () => {
+			// GIVEN a run request with a budget below zero
+			// WHEN it is decoded
+			// THEN it is refused before any run is written
+			expect(
+				decodeExit(CreateResearchInput, { query: 'Acme', budget_cents: -1 })
+					._tag,
 			).toBe('Failure')
 		})
 	})

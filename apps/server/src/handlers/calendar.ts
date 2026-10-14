@@ -84,9 +84,9 @@ export const CalendarLive = HttpApiBuilder.group(
 			return handlers
 				.handle('listEventTypes', _ =>
 					Effect.gen(function* () {
-						const conditions: Array<Statement.Fragment> = [
-							companyVisible(sql, sql`company_id`),
-						]
+						// Event types belong to the organisation, not to a company, so there is
+						// no company whose deletion should hide them.
+						const conditions: Array<Statement.Fragment> = []
 						if (_.query.active === 'true') conditions.push(sql`active = true`)
 						else if (_.query.active === 'false')
 							conditions.push(sql`active = false`)
@@ -133,7 +133,7 @@ export const CalendarLive = HttpApiBuilder.group(
 						const probed = yield* sql<{ readonly total?: string | number }>`
 							SELECT *${totalColumn(sql, page.count)} FROM calendar_events
 							${whereClause}
-							ORDER BY start_at ASC
+							ORDER BY start_at ASC, id
 							LIMIT ${probeLimit(page.limit)} OFFSET ${page.offset}
 						`
 						const { rows, hasMore } = takePage(probed, page.limit)

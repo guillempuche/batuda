@@ -58,7 +58,7 @@ export const TimelineLive = HttpApiBuilder.group(
 					const probed = yield* sql<{ readonly total?: string | number }>`
 						SELECT *${totalColumn(sql, page.count)} FROM timeline_activity
 						${whereClause}
-						ORDER BY occurred_at DESC
+						ORDER BY occurred_at DESC, id
 						LIMIT ${probeLimit(page.limit)} OFFSET ${page.offset}
 					`
 					const { rows, hasMore } = takePage(probed, page.limit)

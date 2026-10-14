@@ -6,7 +6,10 @@ import DOMPurify from 'isomorphic-dompurify'
  * `javascript:` URIs, etc.) and forces every surviving <a> to open
  * in a new tab with `rel="noopener noreferrer"`.
  *
- * Isomorphic: works in the browser directly and under SSR via jsdom.
+ * Browser only. The app server-renders on Cloudflare Workers, where there is
+ * no DOM and DOMPurify comes back without its methods; there this returns an
+ * empty string rather than anything unsanitized, and the caller falls back to
+ * the plain-text body.
  */
 
 let hooksRegistered = false
@@ -75,6 +78,7 @@ const ALLOWED_ATTR = [
 ]
 
 export function sanitizeEmailHtml(dirty: string): string {
+	if (!DOMPurify.isSupported) return ''
 	registerHooks()
 	return DOMPurify.sanitize(dirty, {
 		ALLOWED_TAGS,

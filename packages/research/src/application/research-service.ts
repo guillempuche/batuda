@@ -1184,7 +1184,7 @@ export const queryPendingProposals = (
 		>`
 			SELECT sub.*${count === 'exact' ? sql`, COUNT(*) OVER () AS total` : sql``}
 			FROM (${matching}) sub
-			ORDER BY sub.run_created_at DESC
+			ORDER BY sub.run_created_at DESC, sub.research_id, sub.proposed_update_id
 			LIMIT ${probeLimit(limit)}
 			OFFSET ${offset}
 		`
@@ -1312,7 +1312,7 @@ export const queryPendingPaidActions = (
 		>`
 			SELECT sub.*${count === 'exact' ? sql`, COUNT(*) OVER () AS total` : sql``}
 			FROM (${matching}) sub
-			ORDER BY sub.run_created_at DESC
+			ORDER BY sub.run_created_at DESC, sub.research_id, sub.action_id
 			LIMIT ${probeLimit(limit)}
 			OFFSET ${offset}
 		`
@@ -8993,7 +8993,7 @@ export class ResearchService extends Context.Service<ResearchService>()(
 								${count === 'exact' ? sql`, COUNT(*) OVER () AS total` : sql``}
 							FROM research_runs r
 							WHERE ${sql.and(conditions)}
-							ORDER BY r.created_at DESC
+							ORDER BY r.created_at DESC, r.id
 							LIMIT ${probeLimit(limit)}
 							OFFSET ${offset}
 						`

@@ -71,7 +71,7 @@ export const ContactsLive = HttpApiBuilder.group(
 							${totalColumn(sql, page.count)}
 							FROM contacts c
 							WHERE ${sql.and(conditions)}
-							ORDER BY c.name
+							ORDER BY c.name, c.id
 							LIMIT ${probeLimit(page.limit)} OFFSET ${page.offset}
 						`
 						const { rows, hasMore } = takePage(probed, page.limit)

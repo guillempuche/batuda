@@ -1,6 +1,107 @@
-import { describe, it } from 'vitest'
+import { describe, expect, it } from 'vitest'
+
+import { sanitizeHtmlToBlocks } from './sanitize'
 
 describe('sanitizeHtmlToBlocks', () => {
+	describe('when the HTML is laid out in tables', () => {
+		it('should keep the text of a body wrapped in a layout table', () => {
+			// GIVEN the shape every message this app sends has: the body inside a
+			// presentation table, with blank lines between the table's parts
+			const html = `<html><body><table role="presentation"><tbody>
+				<tr><td style="color:#2D2A24"><p><span>Hello there</span></p>
+				<p>Second line</p></td></tr>
+			</tbody></table></body></html>`
+
+			// WHEN it is quoted
+			const blocks = sanitizeHtmlToBlocks(html, { client: false })
+
+			// THEN the quote holds the message's own paragraphs, not a stand-in
+			expect(blocks).toEqual([
+				{ type: 'paragraph', spans: [{ kind: 'text', value: 'Hello there' }] },
+				{ type: 'paragraph', spans: [{ kind: 'text', value: 'Second line' }] },
+			])
+		})
+
+		it('should give each cell of a data table its own line, in reading order', () => {
+			// GIVEN a table of figures with a header row
+			const html =
+				'<table><tr><th>Item</th><th>Price</th></tr><tr><td>Module</td><td><b>40</b></td></tr></table>'
+
+			// WHEN it is quoted
+			const blocks = sanitizeHtmlToBlocks(html, { client: false })
+
+			// THEN every cell survives as text, formatting inside a cell included
+			expect(blocks).toEqual([
+				{ type: 'paragraph', spans: [{ kind: 'text', value: 'Item' }] },
+				{ type: 'paragraph', spans: [{ kind: 'text', value: 'Price' }] },
+				{ type: 'paragraph', spans: [{ kind: 'text', value: 'Module' }] },
+				{
+					type: 'paragraph',
+					spans: [{ kind: 'text', value: '40', bold: true }],
+				},
+			])
+		})
+
+		it('should leave out empty cells rather than quoting blank lines', () => {
+			// GIVEN a spacer cell beside one with text
+			const html = '<table><tr><td></td><td>Only this</td></tr></table>'
+
+			// WHEN it is quoted
+			const blocks = sanitizeHtmlToBlocks(html, { client: false })
+
+			// THEN only the cell with something in it remains
+			expect(blocks).toEqual([
+				{ type: 'paragraph', spans: [{ kind: 'text', value: 'Only this' }] },
+			])
+		})
+
+		it('should keep the text around a nested table in reading order', () => {
+			// GIVEN a greeting, a signature laid out in its own table, and a closing
+			// line, all inside one cell — the way most mail nests its layout
+			const html =
+				'<table><tr><td>Hi Anna,<table><tr><td>Signature</td></tr></table>Thanks</td></tr></table>'
+
+			// WHEN it is quoted
+			const blocks = sanitizeHtmlToBlocks(html, { client: false })
+
+			// THEN the greeting comes first, then the signature, then the closing
+			expect(blocks).toEqual([
+				{ type: 'paragraph', spans: [{ kind: 'text', value: 'Hi Anna,' }] },
+				{ type: 'paragraph', spans: [{ kind: 'text', value: 'Signature' }] },
+				{ type: 'paragraph', spans: [{ kind: 'text', value: 'Thanks' }] },
+			])
+		})
+
+		it('should keep the text before a list inside a block ahead of the list', () => {
+			// GIVEN a line of text followed by a list, inside one div
+			const html = '<div>Options:<ul><li>One</li></ul></div>'
+
+			// WHEN it is quoted
+			const blocks = sanitizeHtmlToBlocks(html, { client: false })
+
+			// THEN the line comes before the list, not after it
+			expect(blocks.map(b => b.type)).toEqual(['paragraph', 'list'])
+			expect(blocks[0]).toEqual({
+				type: 'paragraph',
+				spans: [{ kind: 'text', value: 'Options:' }],
+			})
+		})
+
+		it('should still drop a script hidden inside a cell', () => {
+			// GIVEN a cell carrying a script next to its text
+			const html =
+				'<table><tr><td>Safe<script>alert(1)</script></td></tr></table>'
+
+			// WHEN it is quoted
+			const blocks = sanitizeHtmlToBlocks(html, { client: false })
+
+			// THEN the text stays and the script does not
+			expect(blocks).toEqual([
+				{ type: 'paragraph', spans: [{ kind: 'text', value: 'Safe' }] },
+			])
+		})
+	})
+
 	describe('allowlist mapping', () => {
 		it.todo(
 			// GIVEN "<p>hi</p>"
@@ -199,13 +300,6 @@ describe('sanitizeHtmlToBlocks', () => {
 			// WHEN sanitized
 			// THEN both are dropped — no external resource loads via quote rendering
 			'should drop resource-loading head elements',
-		)
-
-		it.todo(
-			// GIVEN '<table><tr><td>cell</td></tr></table>'
-			// WHEN sanitized
-			// THEN output contains an italic "[table]" placeholder paragraph, no table semantics
-			'should replace <table> with an italic placeholder span',
 		)
 
 		it.todo(

@@ -3,6 +3,7 @@ import { HttpApiEndpoint, HttpApiGroup } from 'effect/http-api'
 
 import { OrgMiddleware } from '../middleware/org'
 import { SessionMiddleware } from '../middleware/session'
+import { UuidParam } from '../uuid-param'
 
 // ── Inputs ──
 //
@@ -96,20 +97,20 @@ export const InstructionsGroup = HttpApiGroup.make('instructions')
 	)
 	.add(
 		HttpApiEndpoint.get('getTemplate', '/instructions/templates/:id', {
-			params: { id: Schema.String },
+			params: { id: UuidParam },
 			success: Schema.Unknown,
 		}),
 	)
 	.add(
 		HttpApiEndpoint.patch('updateTemplate', '/instructions/templates/:id', {
-			params: { id: Schema.String },
+			params: { id: UuidParam },
 			payload: UpdateTemplateInput,
 			success: Schema.Unknown,
 		}),
 	)
 	.add(
 		HttpApiEndpoint.delete('deleteTemplate', '/instructions/templates/:id', {
-			params: { id: Schema.String },
+			params: { id: UuidParam },
 			success: Schema.Unknown,
 		}),
 	)
@@ -118,7 +119,7 @@ export const InstructionsGroup = HttpApiGroup.make('instructions')
 			'transferTemplate',
 			'/instructions/templates/:id/transfer',
 			{
-				params: { id: Schema.String },
+				params: { id: UuidParam },
 				payload: TransferInput,
 				success: Schema.Unknown,
 			},
@@ -138,26 +139,26 @@ export const InstructionsGroup = HttpApiGroup.make('instructions')
 	)
 	.add(
 		HttpApiEndpoint.get('getStack', '/instructions/stacks/:id', {
-			params: { id: Schema.String },
+			params: { id: UuidParam },
 			success: Schema.Unknown,
 		}),
 	)
 	.add(
 		HttpApiEndpoint.patch('updateStack', '/instructions/stacks/:id', {
-			params: { id: Schema.String },
+			params: { id: UuidParam },
 			payload: UpdateStackInput,
 			success: Schema.Unknown,
 		}),
 	)
 	.add(
 		HttpApiEndpoint.delete('deleteStack', '/instructions/stacks/:id', {
-			params: { id: Schema.String },
+			params: { id: UuidParam },
 			success: Schema.Unknown,
 		}),
 	)
 	.add(
 		HttpApiEndpoint.put('setDefaultStack', '/instructions/stacks/:id/default', {
-			params: { id: Schema.String },
+			params: { id: UuidParam },
 			success: Schema.Unknown,
 		}),
 	)
@@ -196,14 +197,14 @@ export const InstructionsGroup = HttpApiGroup.make('instructions')
 	)
 	.add(
 		HttpApiEndpoint.patch('updateAttribute', '/instructions/attributes/:id', {
-			params: { id: Schema.String },
+			params: { id: UuidParam },
 			payload: UpdateAttributeInput,
 			success: Schema.Unknown,
 		}),
 	)
 	.add(
 		HttpApiEndpoint.delete('deleteAttribute', '/instructions/attributes/:id', {
-			params: { id: Schema.String },
+			params: { id: UuidParam },
 			success: Schema.Unknown,
 		}),
 	)

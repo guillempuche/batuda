@@ -17,6 +17,7 @@ import { OrgMiddleware } from '../middleware/org'
 import { SessionMiddleware } from '../middleware/session'
 import { PaginatedList, pageQuery } from '../pagination'
 import { FiniteFromQuery } from '../query-number'
+import { UuidParam } from '../uuid-param'
 import {
 	BulkResolveResult,
 	CancelResult,
@@ -32,6 +33,15 @@ import {
 } from './research-schemas'
 
 // ── Input schemas ──
+
+// Money limits are whole cents and never negative: a negative ceiling
+// would be saved and then read by every check that compares spend against it.
+const Cents = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))
+
+// The 0–100 score findings carry, which the auto-apply threshold is compared to.
+const ConfidenceScore = Schema.Int.check(
+	Schema.isBetween({ minimum: 0, maximum: 100 }),
+)
 
 const SubjectRef = Schema.Struct({
 	table: ResearchSubjectTable,
@@ -108,9 +118,9 @@ export const CreateResearchInput = Schema.Struct({
 	// would otherwise write a batch row and one run per matched company, every
 	// one of them doomed.
 	schema_name: Schema.optional(SchemaNameSchema),
-	budget_cents: Schema.optional(Schema.Int),
-	paid_budget_cents: Schema.optional(Schema.Int),
-	auto_approve_paid_cents: Schema.optional(Schema.Int),
+	budget_cents: Schema.optional(Cents),
+	paid_budget_cents: Schema.optional(Cents),
+	auto_approve_paid_cents: Schema.optional(Cents),
 	confirm: Schema.optional(Schema.Boolean),
 	// A saved stack (id) and/or ad-hoc extra templates for this run. The UI holds
 	// ids, so only ids are accepted here (the MCP surface resolves names).
@@ -118,13 +128,14 @@ export const CreateResearchInput = Schema.Struct({
 	template_ids: Schema.optional(Schema.Array(Schema.String)),
 })
 
-const UpdatePolicyInput = Schema.Struct({
-	budget_cents: Schema.optional(Schema.Int),
-	paid_budget_cents: Schema.optional(Schema.Int),
-	auto_approve_paid_cents: Schema.optional(Schema.Int),
-	paid_monthly_cap_cents: Schema.optional(Schema.Int),
+// Exported for the test next door, which pins the ranges.
+export const UpdatePolicyInput = Schema.Struct({
+	budget_cents: Schema.optional(Cents),
+	paid_budget_cents: Schema.optional(Cents),
+	auto_approve_paid_cents: Schema.optional(Cents),
+	paid_monthly_cap_cents: Schema.optional(Cents),
 	// Nullable so the client can turn auto-apply off by sending null.
-	auto_apply_min_confidence: Schema.optional(Schema.NullOr(Schema.Int)),
+	auto_apply_min_confidence: Schema.optional(Schema.NullOr(ConfidenceScore)),
 })
 
 const AttachInput = Schema.Struct({
@@ -180,7 +191,7 @@ export const ResearchGroup = HttpApiGroup.make('research')
 	// GET /research/:id — full row with findings + sources
 	.add(
 		HttpApiEndpoint.get('get', '/research/:id', {
-			params: { id: Schema.String },
+			params: { id: UuidParam },
 			success: ResearchRunDetail,
 			error: NotFound.pipe(HttpApiSchema.status(404)),
 		}),
@@ -190,7 +201,7 @@ export const ResearchGroup = HttpApiGroup.make('research')
 	// the page never has to fetch anything alongside it to stay current.
 	.add(
 		HttpApiEndpoint.get('live', '/research/:id/live', {
-			params: { id: Schema.String },
+			params: { id: UuidParam },
 			success: HttpApiSchema.StreamSse({ data: ResearchRunLive }),
 			error: NotFound.pipe(HttpApiSchema.status(404)),
 		}),
@@ -198,7 +209,7 @@ export const ResearchGroup = HttpApiGroup.make('research')
 	// POST /research/:id/cancel
 	.add(
 		HttpApiEndpoint.post('cancel', '/research/:id/cancel', {
-			params: { id: Schema.String },
+			params: { id: UuidParam },
 			success: CancelResult,
 			error: NotFound.pipe(HttpApiSchema.status(404)),
 		}),
@@ -206,7 +217,7 @@ export const ResearchGroup = HttpApiGroup.make('research')
 	// POST /research/:id/attach — post-hoc link
 	.add(
 		HttpApiEndpoint.post('attach', '/research/:id/attach', {
-			params: { id: Schema.String },
+			params: { id: UuidParam },
 			payload: AttachInput,
 			success: Schema.Unknown,
 			error: NotFound.pipe(HttpApiSchema.status(404)),
@@ -215,7 +226,7 @@ export const ResearchGroup = HttpApiGroup.make('research')
 	// POST /research/:id/rerun — target correction: re-run anchored to a domain
 	.add(
 		HttpApiEndpoint.post('rerun', '/research/:id/rerun', {
-			params: { id: Schema.String },
+			params: { id: UuidParam },
 			payload: RerunInput,
 			success: Schema.Unknown,
 			error: NotFound.pipe(HttpApiSchema.status(404)),
@@ -224,7 +235,7 @@ export const ResearchGroup = HttpApiGroup.make('research')
 	// DELETE /research/:id — soft-delete
 	.add(
 		HttpApiEndpoint.delete('delete', '/research/:id', {
-			params: { id: Schema.String },
+			params: { id: UuidParam },
 			success: Schema.Unknown,
 		}),
 	)
@@ -233,7 +244,7 @@ export const ResearchGroup = HttpApiGroup.make('research')
 		HttpApiEndpoint.get('bySubject', '/research/by-subject/:table/:subjectId', {
 			params: {
 				table: Schema.String,
-				subjectId: Schema.String,
+				subjectId: UuidParam,
 			},
 			success: Schema.Array(ResearchRunSummary),
 		}),
@@ -244,7 +255,7 @@ export const ResearchGroup = HttpApiGroup.make('research')
 			'approvePaidAction',
 			'/research/:id/paid-actions/:paId/approve',
 			{
-				params: { id: Schema.String, paId: Schema.String },
+				params: { id: UuidParam, paId: Schema.String },
 				success: PaidActionResult,
 				error: NotFound.pipe(HttpApiSchema.status(404)),
 			},
@@ -255,7 +266,7 @@ export const ResearchGroup = HttpApiGroup.make('research')
 			'skipPaidAction',
 			'/research/:id/paid-actions/:paId/skip',
 			{
-				params: { id: Schema.String, paId: Schema.String },
+				params: { id: UuidParam, paId: Schema.String },
 				success: PaidActionResult,
 				error: NotFound.pipe(HttpApiSchema.status(404)),
 			},
@@ -293,7 +304,7 @@ export const ResearchGroup = HttpApiGroup.make('research')
 			'listProposedUpdates',
 			'/research/:id/proposed-updates',
 			{
-				params: { id: Schema.String },
+				params: { id: UuidParam },
 				query: { ...pageQuery },
 				success: PaginatedList(Schema.Unknown),
 				error: NotFound.pipe(HttpApiSchema.status(404)),
@@ -305,7 +316,7 @@ export const ResearchGroup = HttpApiGroup.make('research')
 			'applyProposedUpdate',
 			'/research/:id/proposed-updates/:puId/apply',
 			{
-				params: { id: Schema.String, puId: Schema.String },
+				params: { id: UuidParam, puId: Schema.String },
 				success: ProposedUpdateResult,
 				error: NotFound.pipe(HttpApiSchema.status(404)),
 			},
@@ -316,7 +327,7 @@ export const ResearchGroup = HttpApiGroup.make('research')
 			'rejectProposedUpdate',
 			'/research/:id/proposed-updates/:puId/reject',
 			{
-				params: { id: Schema.String, puId: Schema.String },
+				params: { id: UuidParam, puId: Schema.String },
 				success: ProposedUpdateResult,
 				error: NotFound.pipe(HttpApiSchema.status(404)),
 			},

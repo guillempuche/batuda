@@ -133,6 +133,13 @@ export const ProposalsLive = HttpApiBuilder.group(
 							WHERE id = ${_.params.id} LIMIT 1
 						`
 						const before = existing[0]
+						// Row-level security hides another organisation's proposal, so
+						// there is nothing to edit; say so rather than answer 200 with null.
+						if (before === undefined)
+							return yield* new NotFound({
+								entity: 'proposal',
+								id: _.params.id,
+							})
 
 						// Stamp the moment the proposal was sent, and the moment the
 						// customer first responded, on the transition into each — so a
@@ -140,13 +147,13 @@ export const ProposalsLive = HttpApiBuilder.group(
 						const now = DateTime.toDateUtc(DateTime.nowUnsafe())
 						const newStatus = payload.status
 						const stamps: Record<string, unknown> = {}
-						if (newStatus === 'sent' && before?.status !== 'sent') {
+						if (newStatus === 'sent' && before.status !== 'sent') {
 							stamps['sentAt'] = now
 						}
 						if (
 							newStatus !== undefined &&
 							RESPONDED_STATUSES.has(newStatus) &&
-							!RESPONDED_STATUSES.has(before?.status ?? '')
+							!RESPONDED_STATUSES.has(before.status)
 						) {
 							stamps['respondedAt'] = now
 						}
@@ -161,7 +168,7 @@ export const ProposalsLive = HttpApiBuilder.group(
 						`
 
 						const eventKind = newStatus ? statusToEventKind(newStatus) : null
-						if (before && eventKind && before.status !== newStatus) {
+						if (eventKind && before.status !== newStatus) {
 							yield* timeline.record(
 								new ProposalEvent({
 									proposalId: _.params.id,
@@ -181,8 +188,17 @@ export const ProposalsLive = HttpApiBuilder.group(
 							}),
 						)
 						const row = rows[0]
-						return row === undefined ? null : yield* decodeProposal(row)
-					}).pipe(Effect.orDie),
+						if (row === undefined)
+							return yield* new NotFound({
+								entity: 'proposal',
+								id: _.params.id,
+							})
+						return yield* decodeProposal(row)
+					}).pipe(
+						Effect.catch(e =>
+							e._tag === 'NotFound' ? Effect.fail(e) : Effect.die(e),
+						),
+					),
 				)
 		}),
 )

@@ -2654,6 +2654,10 @@ msgstr "Enrichment"
 msgid "Enter a day as YYYY-MM-DD."
 msgstr "Enter a day as YYYY-MM-DD."
 
+#: src/routes/_authed/settings/organization/members.tsx
+msgid "Enter a full email address, like name@company.com."
+msgstr "Enter a full email address, like name@company.com."
+
 #: src/routes/login.tsx
 msgid "Enter a valid email above first."
 msgstr "Enter a valid email above first."
@@ -2967,6 +2971,10 @@ msgstr "Go to connections"
 #: src/routes/reset-password.tsx
 msgid "Go to sign in"
 msgstr "Go to sign in"
+
+#: src/components/shared/not-found.tsx
+msgid "Go to the pipeline"
+msgstr "Go to the pipeline"
 
 #: src/routes/_authed/companies/index.tsx
 msgid "Gone quiet"
@@ -4748,6 +4756,10 @@ msgstr "Owner user ID"
 msgid "Page {page} of {totalPages}"
 msgstr "Page {page} of {totalPages}"
 
+#: src/components/shared/not-found.tsx
+msgid "Page not found"
+msgstr "Page not found"
+
 #: src/routes/_authed/pages/$id.tsx
 msgid "Page published"
 msgstr "Page published"
@@ -6349,6 +6361,10 @@ msgstr "The last refresh failed. This is the list as it was loaded before."
 #: src/routes/_authed/tasks/index.tsx
 msgid "The ledger is clean."
 msgstr "The ledger is clean."
+
+#: src/components/shared/not-found.tsx
+msgid "The link may be out of date, or the record was deleted."
+msgstr "The link may be out of date, or the record was deleted."
 
 #: src/routes/_authed/companies/index.tsx
 #: src/routes/_authed/pages/index.tsx

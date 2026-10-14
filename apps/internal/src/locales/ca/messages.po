@@ -2654,6 +2654,10 @@ msgstr "Enriquiment"
 msgid "Enter a day as YYYY-MM-DD."
 msgstr "Escriu un dia com a AAAA-MM-DD."
 
+#: src/routes/_authed/settings/organization/members.tsx
+msgid "Enter a full email address, like name@company.com."
+msgstr "Escriu una adreça electrònica completa, com nom@empresa.com."
+
 #: src/routes/login.tsx
 msgid "Enter a valid email above first."
 msgstr "Primer escriu un correu vàlid a sobre."
@@ -2967,6 +2971,10 @@ msgstr "Ves a connexions"
 #: src/routes/reset-password.tsx
 msgid "Go to sign in"
 msgstr "Ves a iniciar sessió"
+
+#: src/components/shared/not-found.tsx
+msgid "Go to the pipeline"
+msgstr "Ves al pipeline"
 
 #: src/routes/_authed/companies/index.tsx
 msgid "Gone quiet"
@@ -4748,6 +4756,10 @@ msgstr "ID d'usuari propietari"
 msgid "Page {page} of {totalPages}"
 msgstr "Pàgina {page} de {totalPages}"
 
+#: src/components/shared/not-found.tsx
+msgid "Page not found"
+msgstr "Pàgina no trobada"
+
 #: src/routes/_authed/pages/$id.tsx
 msgid "Page published"
 msgstr "Pàgina publicada"
@@ -6349,6 +6361,10 @@ msgstr "L'última actualització ha fallat. Aquesta és la llista tal com es va 
 #: src/routes/_authed/tasks/index.tsx
 msgid "The ledger is clean."
 msgstr "El llibre de comptes està net."
+
+#: src/components/shared/not-found.tsx
+msgid "The link may be out of date, or the record was deleted."
+msgstr "Potser l'enllaç ha caducat o el registre s'ha suprimit."
 
 #: src/routes/_authed/companies/index.tsx
 #: src/routes/_authed/pages/index.tsx

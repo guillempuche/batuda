@@ -73,6 +73,9 @@ export default function ScheduleGrid({ events, onEventClick }: Props) {
 			],
 			defaultView: pickDefaultView(),
 			locale: scheduleXLocale(i18n.locale),
+			// Schedule-X draws in UTC unless told otherwise, while the event
+			// dialog speaks the reader's zone; both have to use the same one.
+			timezone: viewerTimeZone(),
 			events: calendarEvents,
 			calendars: CALENDAR_PALETTE,
 			callbacks: {
@@ -175,38 +178,66 @@ function toScheduleXEvent(event: ScheduleGridEvent): {
 }
 
 /**
+ * The reader's own zone. The grid and the event dialog both read it, so
+ * the hour on the grid matches the hour the dialog spells out.
+ */
+function viewerTimeZone(): string {
+	return typeof Intl !== 'undefined'
+		? Intl.DateTimeFormat().resolvedOptions().timeZone
+		: 'UTC'
+}
+
+/**
  * Schedule-X 4.x requires Temporal.ZonedDateTime for timed events. The
- * server stores timestamptz ISO strings; we build the zoned value using
- * the runtime's IANA timezone so the grid renders in the viewer's
- * local wall-clock without tampering with the stored instant.
+ * server stores timestamptz ISO strings; the zoned value is built in the
+ * same zone the grid is told to draw in.
  */
 function toZonedDateTime(iso: string): Temporal.ZonedDateTime {
-	const tz =
-		typeof Intl !== 'undefined'
-			? Intl.DateTimeFormat().resolvedOptions().timeZone
-			: 'UTC'
-	return Temporal.Instant.from(iso).toZonedDateTimeISO(tz)
+	return Temporal.Instant.from(iso).toZonedDateTimeISO(viewerTimeZone())
 }
 
 const Frame = styled.div`
 	/*
-	 * Schedule-X reads its palette from CSS custom properties prefixed
-	 * with --sx-. Overriding them inside the wrapper keeps the workshop
-	 * look localised to the /calendar route without monkey-patching the
-	 * vendor stylesheet.
+	 * Schedule-X paints from --sx- variables fixed to light colours on :root.
+	 * Pointing each at a theme token makes the header, view menu and date
+	 * picker follow the app's theme; the background is opaque because those
+	 * popups float over the grid with it as their fill.
 	 */
 	--sx-color-primary: var(--color-primary);
 	--sx-color-on-primary: var(--color-on-primary);
-	--sx-color-background: transparent;
+	--sx-color-primary-container: var(--color-primary-container);
+	--sx-color-on-primary-container: var(--color-on-primary-container);
+	--sx-color-background: var(--color-paper-aged);
+	--sx-color-on-background: var(--color-on-surface);
 	--sx-color-surface: var(--color-paper-aged);
+	--sx-color-surface-bright: var(--color-surface-bright);
+	--sx-color-surface-dim: var(--color-surface-container-highest);
+	--sx-color-surface-container: var(--color-surface-container);
+	--sx-color-surface-container-low: var(--color-surface-container-low);
+	--sx-color-surface-container-high: var(--color-surface-container-high);
 	--sx-color-on-surface: var(--color-on-surface);
+	--sx-color-outline: var(--color-outline);
+	--sx-color-outline-variant: var(--color-outline-variant);
+	--sx-color-neutral: var(--color-on-surface-variant);
+	--sx-color-neutral-variant: var(--color-on-surface-variant);
+	--sx-color-surface-tint: var(--color-primary);
+	--sx-internal-color-text: var(--color-on-surface);
+	--sx-internal-color-light-gray: var(--color-surface-container-high);
+	--sx-internal-color-gray-ripple-background: var(--color-surface-container-highest);
 	--sx-color-border: var(--color-ledger-line);
 	--sx-internal-color-border: var(--color-ledger-line);
+	--sx-box-shadow-level3: var(--elevation-3);
 
 	height: 100%;
 	min-height: 28rem;
+	color: var(--color-on-surface);
 
 	.sx-react-calendar-wrapper {
 		height: 100%;
+	}
+
+	/* Form controls do not inherit text colour; the browser's default is black. */
+	.sx__date-input {
+		color: var(--color-on-surface);
 	}
 `

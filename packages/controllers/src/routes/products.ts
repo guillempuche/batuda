@@ -1,10 +1,12 @@
 import { Schema } from 'effect'
-import { HttpApiEndpoint, HttpApiGroup } from 'effect/http-api'
+import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from 'effect/http-api'
 
 import { Product } from '@batuda/domain'
 
+import { NotFound } from '../errors'
 import { OrgMiddleware } from '../middleware/org'
 import { SessionMiddleware } from '../middleware/session'
+import { UuidParam } from '../uuid-param'
 
 const CreateProductInput = Schema.Struct({
 	slug: Schema.String.pipe(Schema.check(Schema.isPattern(/^[a-z0-9-]+$/u))),
@@ -41,9 +43,10 @@ export const ProductsGroup = HttpApiGroup.make('products')
 	)
 	.add(
 		HttpApiEndpoint.patch('update', '/products/:id', {
-			params: { id: Schema.String },
+			params: { id: UuidParam },
 			payload: UpdateProductInput,
-			success: Schema.NullOr(Product.json),
+			success: Product.json,
+			error: NotFound.pipe(HttpApiSchema.status(404)),
 		}),
 	)
 	.middleware(SessionMiddleware)

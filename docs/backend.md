@@ -999,7 +999,7 @@ It stays out of the web API on purpose: an address in a query string ends up in 
 Date ranges and `participant` are likewise not on the screen; the search box already matches addresses loosely.
 
 `has_attachments` counts files somebody attached rather than images inside the message.
-A message this system sent gets its list of attachments only when the mailbox's Sent folder is next read, so a very recent send may not count yet.
+A message this system sent records its files when it goes out, kept in object storage beside its wire copy (`sentAttachmentKey` in `email.ts`), so it counts at once and does not wait for the Sent folder to be read.
 
 ### Env vars
 

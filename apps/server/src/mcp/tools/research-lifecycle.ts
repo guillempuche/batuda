@@ -335,15 +335,18 @@ const ResolveResearchProposedUpdate = Tool.make(
 	.annotate(Tool.Destructive, true)
 	.annotate(Tool.OpenWorld, false)
 
+// A negative limit would be saved and then read by every spend check.
+const Cents = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))
+
 const ResearchPolicy = Tool.make('research_policy', {
 	description:
 		'Get or update research budget limits. action=get returns the active limits: three per-run limits belonging to the calling user (free budget, paid budget, paid-action auto-approve threshold) plus paid_monthly_cap_cents, which is the ORGANIZATION\'s ceiling on paid research spend for the calendar month and applies to everyone in it. action=set upserts the provided fields; unspecified fields keep their current value. Cents-denominated. Raising any limit lets more money be spent without anyone being asked, so the person is asked before a raise takes effect ({status:"cancelled"} if they said no, nobody answered in time, or another question was still waiting — the nextStep says which, {status:"confirmation_required"} if this client has no way to ask them — relay nextStep rather than retrying). Lowering a limit, or leaving it where it is, needs no approval.',
 	parameters: Schema.Struct({
 		action: PolicyAction,
-		budget_cents: Schema.optionalKey(Schema.Int),
-		paid_budget_cents: Schema.optionalKey(Schema.Int),
-		auto_approve_paid_cents: Schema.optionalKey(Schema.Int),
-		paid_monthly_cap_cents: Schema.optionalKey(Schema.Int),
+		budget_cents: Schema.optionalKey(Cents),
+		paid_budget_cents: Schema.optionalKey(Cents),
+		auto_approve_paid_cents: Schema.optionalKey(Cents),
+		paid_monthly_cap_cents: Schema.optionalKey(Cents),
 	}),
 	// get → the policy wrapped in an object (a bare null isn't valid MCP output);
 	// set → the upserted policy directly.

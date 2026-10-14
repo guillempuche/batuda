@@ -1,7 +1,7 @@
 import { Effect, Schema } from 'effect'
 import { HttpApiBuilder } from 'effect/http-api'
 
-import { BatudaApi } from '@batuda/controllers'
+import { BatudaApi, NotFound } from '@batuda/controllers'
 import { WebhookEndpoint } from '@batuda/domain'
 
 import { WebhookService } from '../services/webhooks'
@@ -39,9 +39,17 @@ export const WebhooksLive = HttpApiBuilder.group(
 				.handle('update', _ =>
 					Effect.gen(function* () {
 						const rows = yield* svc.update(_.params.id, _.payload)
+						// Another organisation's endpoint is out of reach, so the write
+						// touches nothing; say so rather than answer 200 with null.
 						const row = rows[0]
-						return row === undefined ? null : yield* decodeWebhook(row)
-					}).pipe(Effect.orDie),
+						if (row === undefined)
+							return yield* new NotFound({ entity: 'webhook', id: _.params.id })
+						return yield* decodeWebhook(row)
+					}).pipe(
+						Effect.catch(e =>
+							e._tag === 'NotFound' ? Effect.fail(e) : Effect.die(e),
+						),
+					),
 				)
 				.handle('remove', _ =>
 					Effect.gen(function* () {
@@ -56,8 +64,12 @@ export const WebhooksLive = HttpApiBuilder.group(
 				)
 				.handle('test', _ =>
 					svc
-						.fire('test', { webhookId: _.params.id })
-						.pipe(Effect.asVoid, Effect.orDie),
+						.test(_.params.id)
+						.pipe(
+							Effect.catch(e =>
+								e._tag === 'NotFound' ? Effect.fail(e) : Effect.die(e),
+							),
+						),
 				)
 		}),
 )

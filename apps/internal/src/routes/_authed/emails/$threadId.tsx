@@ -41,6 +41,7 @@ import { dehydrateAtom, handOverFromServer } from '#/lib/atom-hydration'
 import type { BatudaApiServerClient } from '#/lib/batuda-api-server'
 import { downloadUrlFor } from '#/lib/email-attachments'
 import { sanitizeEmailHtml } from '#/lib/sanitize-email'
+import { useHydrated } from '#/lib/use-hydrated'
 import {
 	agedPaperSurface,
 	brushedMetalBezel,
@@ -237,8 +238,9 @@ function ThreadDetailPage() {
 			const subject = prefixSubject(detail.subject ?? '')
 			const quoteSeed = seed
 			const attribution = {
-				withDate: t`On {date}, {who} wrote:`,
-				withoutDate: t`{who} wrote:`,
+				withDate: ({ date, who }: { date: string; who: string }) =>
+					t`On ${date}, ${who} wrote:`,
+				withoutDate: ({ who }: { who: string }) => t`${who} wrote:`,
 				fallbackSender: t`someone`,
 			}
 			const bodyJson = quoteSeed
@@ -523,7 +525,11 @@ function MessageItem({ msg }: { readonly msg: ThreadMessage }) {
 		msg.inboundClassification === 'spam' ||
 		msg.inboundClassification === 'blocked'
 
-	const body = pickBody(msg)
+	// The sanitizer needs a real DOM, which the server does not have. The server
+	// and the first browser render show the plain text; the rich body replaces
+	// it once the page is live, so both renders agree.
+	const hydrated = useHydrated()
+	const body = pickBody(msg, hydrated)
 
 	return (
 		<MessageCard
@@ -828,10 +834,11 @@ type RenderableBody =
  * Prefer HTML when the provider gives us rich content — it survives
  * headings, lists, blockquotes, links, and inline formatting. Fall
  * back to plain text (or the preview line) when HTML is absent or
- * sanitization leaves nothing renderable.
+ * sanitization leaves nothing renderable. HTML is only considered in the
+ * browser, where the sanitizer has a DOM to work with.
  */
-function pickBody(msg: ThreadMessage): RenderableBody {
-	if (msg.html && msg.html.trim() !== '') {
+function pickBody(msg: ThreadMessage, inBrowser: boolean): RenderableBody {
+	if (inBrowser && msg.html && msg.html.trim() !== '') {
 		const clean = sanitizeEmailHtml(msg.html).trim()
 		if (clean !== '') return { kind: 'html', value: clean }
 	}

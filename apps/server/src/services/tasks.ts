@@ -314,8 +314,8 @@ export class TaskService extends Context.Service<TaskService>()('TaskService', {
 					const conditions = conditionsFor(currentOrg.id, filters)
 					const order =
 						page.sort === 'recent'
-							? sql`COALESCE(due_at, created_at) DESC`
-							: sql`due_at ASC NULLS LAST, created_at ASC`
+							? sql`COALESCE(due_at, created_at) DESC, id`
+							: sql`due_at ASC NULLS LAST, created_at ASC, id`
 					// The company rides along rather than being looked up afterwards:
 					// a screen showing a handful of tasks was fetching every company
 					// in the organisation to turn an id into a name.
@@ -377,7 +377,7 @@ export class TaskService extends Context.Service<TaskService>()('TaskService', {
 					const probed = yield* sql<{ readonly total?: string | number }>`
 						SELECT *${totalColumn(sql, page.count)} FROM task_events
 						WHERE task_id = ${taskId}
-						ORDER BY at DESC
+						ORDER BY at DESC, id
 						LIMIT ${probeLimit(page.limit)} OFFSET ${page.offset}
 					`
 					const { rows, hasMore } = takePage(probed, page.limit)
@@ -645,9 +645,10 @@ export class TaskService extends Context.Service<TaskService>()('TaskService', {
 							WHERE id = ${id} AND organization_id = ${currentOrg.id}
 							RETURNING *
 						`.pipe(Effect.orDie)
+					// Gone between the read above and this write.
 					const row = updated[0]
 					if (row === undefined)
-						return yield* Effect.die(new Error('task update returned no row'))
+						return yield* new NotFound({ entity: 'task', id })
 					return yield* decodeTask(row).pipe(Effect.orDie)
 				}),
 

@@ -31,6 +31,28 @@ const keepAttributeRejected = <A, E extends { readonly _tag: string }, R>(
 		),
 	)
 
+// As above, and NotFound is kept too: on an edit, answering 200 with nothing
+// for a company out of view would read as an edit that landed.
+const keepRefusals = <A, E extends { readonly _tag: string }, R>(
+	self: Effect.Effect<A, E, R>,
+): Effect.Effect<
+	A,
+	Extract<E, { readonly _tag: 'AttributeRejected' | 'NotFound' }>,
+	R
+> =>
+	self.pipe(
+		Effect.catch(e =>
+			e._tag === 'AttributeRejected' || e._tag === 'NotFound'
+				? Effect.fail(
+						e as Extract<
+							E,
+							{ readonly _tag: 'AttributeRejected' | 'NotFound' }
+						>,
+					)
+				: Effect.die(e),
+		),
+	)
+
 export const CompaniesLive = HttpApiBuilder.group(
 	BatudaApi,
 	'companies',
@@ -100,13 +122,11 @@ export const CompaniesLive = HttpApiBuilder.group(
 						).pipe(
 							Effect.provideService(CompanyService, svc),
 							Effect.provideService(Geocoder, geocoder),
-							// A company that is gone, or was taken out of view, is not an
-							// edit that failed — it is one there was nothing to make.
-							Effect.catchTag('NotFound', () => Effect.succeed(null)),
 						)
-						// Nothing happened, so nothing is written on the account's history
-						// and nothing is claimed to the caller.
-						if (result === null) return null
+						// Row-level security hides another organisation's company, so the
+						// write touches nothing; say so rather than answer 200 with null.
+						if (result === null)
+							return yield* new NotFound({ entity: 'company', id: _.params.id })
 						yield* Effect.logInfo('Company updated').pipe(
 							Effect.annotateLogs({
 								event: 'company.updated',
@@ -121,7 +141,7 @@ export const CompaniesLive = HttpApiBuilder.group(
 							actorUserId: session.userId,
 						})
 						return result
-					}).pipe(keepAttributeRejected),
+					}).pipe(keepRefusals),
 				)
 				.handle('geocode', _ =>
 					geocodeCompany(_.params.id).pipe(

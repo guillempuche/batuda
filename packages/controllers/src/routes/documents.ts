@@ -7,6 +7,7 @@ import { NotFound } from '../errors'
 import { OrgMiddleware } from '../middleware/org'
 import { SessionMiddleware } from '../middleware/session'
 import { PaginatedList, pageQuery } from '../pagination'
+import { UuidParam } from '../uuid-param'
 
 // A document plus the records it is filed under. The subjects live in their own
 // table, so they ride alongside the row rather than in it.
@@ -70,7 +71,7 @@ export const DocumentsGroup = HttpApiGroup.make('documents')
 	)
 	.add(
 		HttpApiEndpoint.get('get', '/documents/:id', {
-			params: { id: Schema.String },
+			params: { id: UuidParam },
 			success: DocumentDetail,
 			error: NotFound.pipe(HttpApiSchema.status(404)),
 		}),
@@ -84,7 +85,7 @@ export const DocumentsGroup = HttpApiGroup.make('documents')
 		// because the response is that redirect, not a body — same as the
 		// attachment download.
 		HttpApiEndpoint.get('open', '/documents/:id/open', {
-			params: { id: Schema.String },
+			params: { id: UuidParam },
 			success: Schema.Unknown,
 			error: NotFound.pipe(HttpApiSchema.status(404)),
 		}),
@@ -97,14 +98,15 @@ export const DocumentsGroup = HttpApiGroup.make('documents')
 	)
 	.add(
 		HttpApiEndpoint.patch('update', '/documents/:id', {
-			params: { id: Schema.String },
+			params: { id: UuidParam },
 			payload: UpdateDocumentInput,
-			success: Schema.NullOr(DocumentDetail),
+			success: DocumentDetail,
+			error: NotFound.pipe(HttpApiSchema.status(404)),
 		}),
 	)
 	.add(
 		HttpApiEndpoint.delete('remove', '/documents/:id', {
-			params: { id: Schema.String },
+			params: { id: UuidParam },
 			success: Schema.Void,
 		}),
 	)
@@ -112,7 +114,7 @@ export const DocumentsGroup = HttpApiGroup.make('documents')
 		// File an existing document under one more record. Filing it where it
 		// already sits changes nothing rather than failing.
 		HttpApiEndpoint.post('attach', '/documents/:id/subjects', {
-			params: { id: Schema.String },
+			params: { id: UuidParam },
 			payload: LinkInput,
 			success: Schema.Void,
 			error: NotFound.pipe(HttpApiSchema.status(404)),
@@ -124,9 +126,9 @@ export const DocumentsGroup = HttpApiGroup.make('documents')
 			'/documents/:id/subjects/:subjectTable/:subjectId',
 			{
 				params: {
-					id: Schema.String,
+					id: UuidParam,
 					subjectTable: DocumentSubjectTable,
-					subjectId: Schema.String,
+					subjectId: UuidParam,
 				},
 				success: Schema.Void,
 			},
