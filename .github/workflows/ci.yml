@@ -45,11 +45,21 @@ jobs:
       # the new one boots — so a migration that drops/renames a column the old
       # version still reads breaks it mid-rollout. Fail a PR that adds a
       # non-backward-compatible migration unless it carries an `expand-contract:`
-      # marker (docs/runbooks.md). Runs before install — needs only git + node.
+      # marker (docs/runbooks.md). It also fails an edit to a migration the
+      # newest server release already shipped, so that tag is fetched too.
+      # Runs before install — needs only git + node.
+      - name: Migration check tests
+        run: node --test 'scripts/**/*.test.mjs'
+
       - name: Migration safety (expand-contract)
         run: |
           git fetch --no-tags --depth=1 origin "$GITHUB_BASE_REF"
-          node scripts/check-migration-safety.mjs "origin/$GITHUB_BASE_REF"
+          release=$(git ls-remote --tags --refs origin 'refs/tags/server-v*' \
+            | sed 's#.*refs/tags/##' | sort -V | tail -n 1)
+          if [ -n "$release" ]; then
+            git fetch --no-tags --depth=1 origin "+refs/tags/$release:refs/tags/$release"
+          fi
+          node scripts/check-migration-safety.mjs "origin/$GITHUB_BASE_REF" "$release"
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
